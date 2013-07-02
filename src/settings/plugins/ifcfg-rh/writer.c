@@ -1245,12 +1245,30 @@ write_vlan_setting (NMConnection *connection, shvarFile *ifcfg, gboolean *wired,
 	return TRUE;
 }
 
+static const char *bonding_props[] = {
+	/* NM_SETTING_BOND_OPTION_MODE, */
+	NM_SETTING_BOND_OPTION_MIIMON,
+	NM_SETTING_BOND_OPTION_DOWNDELAY,
+	NM_SETTING_BOND_OPTION_UPDELAY,
+	NM_SETTING_BOND_OPTION_ARP_INTERVAL,
+	NM_SETTING_BOND_OPTION_ARP_IP_TARGET,
+	NM_SETTING_BOND_OPTION_ARP_VALIDATE,
+	NM_SETTING_BOND_OPTION_PRIMARY,
+	NM_SETTING_BOND_OPTION_PRIMARY_RESELECT,
+	NM_SETTING_BOND_OPTION_FAIL_OVER_MAC,
+	NM_SETTING_BOND_OPTION_USE_CARRIER,
+	NM_SETTING_BOND_OPTION_AD_SELECT,
+	NM_SETTING_BOND_OPTION_XMIT_HASH_POLICY,
+	NM_SETTING_BOND_OPTION_RESEND_IGMP,
+	NULL
+};
+
 static gboolean
 write_bonding_setting (NMConnection *connection, shvarFile *ifcfg, GError **error)
 {
 	NMSettingBond *s_bond;
 	const char *iface;
-	guint32 i, num_opts;
+	GString *str;
 
 	s_bond = nm_connection_get_setting_bond (connection);
 	if (!s_bond) {
@@ -1268,27 +1286,43 @@ write_bonding_setting (NMConnection *connection, shvarFile *ifcfg, GError **erro
 	svSetValue (ifcfg, "DEVICE", iface, FALSE);
 	svSetValue (ifcfg, "BONDING_OPTS", NULL, FALSE);
 
-	num_opts = nm_setting_bond_get_num_options (s_bond);
-	if (num_opts > 0) {
-		GString *str = g_string_sized_new (64);
+	str = g_string_sized_new (64);
+	g_string_append_printf (str, "mode=%s", nm_setting_bond_get_mode (s_bond));
 
-		for (i = 0; i < nm_setting_bond_get_num_options (s_bond); i++) {
-			const char *key, *value;
+	for (i = 0; bonding_props[i]; i++) {
+		if (!strcmp (bonding_props[i], NM_SETTING_BOND_OPTION_ARP_IP_TARGET)) {
+			char **arp_ip_target;
+			int j;
 
-			if (!nm_setting_bond_get_option (s_bond, i, &key, &value))
-				continue;
+			arp_ip_target = nm_setting_bond_get_arp_ip_target (s_bond);
+			if (arp_ip_target) {
+				g_string_append (str, " arp_ip_target=");
+				for (j = 0; arp_ip_target[j]; j++) {
+					if (j > 0)
+						g_string_append_c (str, ',');
+					g_string_append (str, arp_ip_target[j]);
+				}
+				g_strfreev (arp_ip_target);
+			}
+		} else if (!strcmp (bonding_props[i], NM_SETTING_BOND_OPTION_USE_CARRIER)) {
+			if (!nm_setting_bond_get_use_carrier (s_bond))
+				g_string_append (str, " use_carrier=0");
+		} else {
+			GValue val = G_VALUE_INIT;
+			const char *strval;
 
-			if (str->len)
-				g_string_append_c (str, ' ');
+			g_value_init (&val, G_TYPE_STRING);
+			g_object_get_property (G_OBJECT (s_bond), bonding_props[i], &val);
+			strval = g_value_get_string (&val);
 
-			g_string_append_printf (str, "%s=%s", key, value);
+			if (strval && *strval && *strval != '0')
+				g_string_append_printf (str, " %s=%s", bonding_props[i], strval);
+			g_value_unset (&val);
 		}
-
-		if (str->len)
-			svSetValue (ifcfg, "BONDING_OPTS", str->str, FALSE);
-
-		g_string_free (str, TRUE);
 	}
+
+	svSetValue (ifcfg, "BONDING_OPTS", str->str, FALSE);
+	g_string_free (str, TRUE);
 
 	svSetValue (ifcfg, "TYPE", TYPE_BOND, FALSE);
 	svSetValue (ifcfg, "BONDING_MASTER", "yes", FALSE);

@@ -4059,29 +4059,87 @@ infiniband_connection_from_ifcfg (const char *file,
 	return connection;
 }
 
-static void
-handle_bond_option (NMSettingBond *s_bond,
-                    const char *key,
-                    const char *value)
-{
-	char *sanitized = NULL, *j;
-	const char *p = value;
+typedef void (*IfcfgRhOptFunc) (NMSetting *setting,
+                                const char *key,
+                                const char *value,
+                                gpointer data);
 
-	/* Remove any quotes or +/- from arp_ip_target */
-	if (!g_strcmp0 (key, NM_SETTING_BOND_OPTION_ARP_IP_TARGET) && value && value[0]) {
-		if (*p == '\'' || *p == '"')
-			p++;
-		j = sanitized = g_malloc0 (strlen (p) + 1);
-		while (*p) {
-			if (*p != '+' && *p != '-' && *p != '\'' && *p != '"')
-				*j++ = *p;
-			p++;
+static void
+handle_ifcfg_rh_opts (NMSetting *setting,
+                      const char *value,
+                      IfcfgRhOptFunc func,
+                      gpointer data)
+{
+	char **items, **iter;
+
+	items = g_strsplit_set (value, " ", -1);
+	for (iter = items; iter && *iter; iter++) {
+		if (strlen (*iter)) {
+			char **keys, *key, *val;
+
+			keys = g_strsplit_set (*iter, "=", 2);
+			if (keys && *keys) {
+				key = *keys;
+				val = *(keys + 1);
+				if (val && strlen(key) && strlen(val))
+					func (setting, key, val, data);
+			}
+
+			g_strfreev (keys);
 		}
 	}
+	g_strfreev (items);
+}
 
-	if (!nm_setting_bond_add_option (s_bond, key, sanitized ? sanitized : value))
-		PLUGIN_WARN (IFCFG_PLUGIN_NAME, "    warning: invalid bonding option '%s'", key);
-	g_free (sanitized);
+static void
+handle_bond_option (NMSetting *setting,
+                    const char *key,
+                    const char *value,
+                    gpointer data)
+{
+	NMSettingBond *s_bond = NM_SETTING_BOND (setting);
+	
+	if (!strcmp (key, NM_SETTING_BOND_OPTION_ARP_IP_TARGET)) {
+		char **arp_ip_target;
+		char *sanitized = NULL, *j;
+		const char *p = value;
+
+		/* Remove any quotes or +/- from arp_ip_target */
+		if (value[0]) {
+			if (*p == '\'' || *p == '"')
+				p++;
+			j = sanitized = g_malloc0 (strlen (p) + 1);
+			while (*p) {
+				if (*p != '+' && *p != '-' && *p != '\'' && *p != '"')
+					*j++ = *p;
+				p++;
+			}
+			value = sanitized;
+		}
+
+		arp_ip_target = g_strsplit (",", value, -1);
+		g_object_set (s_bond, NM_SETTING_BOND_ARP_IP_TARGET, arp_ip_target, NULL);
+		g_strfreev (arp_ip_target);
+		g_free (sanitized);
+	} else {
+		GValue gval = G_VALUE_INIT;
+
+		/* We take advantage of the fact that ifcfg files and NMSettingBond use
+		 * the same property names (which are also the ones the kernel uses).
+		 * GObject will transform our string values to guints or gboolean as
+		 * needed.
+		 */
+
+		if (!g_object_class_find_property (G_OBJECT_GET_CLASS (setting), key)) {
+			PLUGIN_WARN (IFCFG_PLUGIN_NAME, "    warning: unrecognized bond property '%s'", key);
+			return;
+		}
+
+		g_value_init (&gval, G_TYPE_STRING);
+		g_value_set_string (&gval, value);
+		g_object_set_property (G_OBJECT (setting), key, &gval);
+		g_value_unset (&gval);
+	}
 }
 
 static NMSetting *
@@ -4105,26 +4163,8 @@ make_bond_setting (shvarFile *ifcfg,
 
 	value = svGetValue (ifcfg, "BONDING_OPTS", FALSE);
 	if (value) {
-		char **items, **iter;
-
-		items = g_strsplit_set (value, " ", -1);
-		for (iter = items; iter && *iter; iter++) {
-			if (strlen (*iter)) {
-				char **keys, *key, *val;
-
-				keys = g_strsplit_set (*iter, "=", 2);
-				if (keys && *keys) {
-					key = *keys;
-					val = *(keys + 1);
-					if (val && strlen(key) && strlen(val))
-						handle_bond_option (s_bond, key, val);
-				}
-
-				g_strfreev (keys);
-			}
-		}
+		handle_ifcfg_rh_opts (NM_SETTING (s_bond), value, handle_bond_option, NULL);
 		g_free (value);
-		g_strfreev (items);
 	}
 
 	return (NMSetting *) s_bond;
@@ -4266,17 +4306,13 @@ team_connection_from_ifcfg (const char *file,
 	return connection;
 }
 
-typedef void (*BridgeOptFunc) (NMSetting *setting,
-                               gboolean stp,
-                               const char *key,
-                               const char *value);
-
 static void
 handle_bridge_option (NMSetting *setting,
-                      gboolean stp,
                       const char *key,
-                      const char *value)
+                      const char *value,
+                      gpointer data)
 {
+	gboolean stp = GPOINTER_TO_INT (data);
 	guint32 u = 0;
 
 	if (!strcmp (key, "priority")) {
@@ -4307,33 +4343,6 @@ handle_bridge_option (NMSetting *setting,
 			PLUGIN_WARN (IFCFG_PLUGIN_NAME, "    warning: invalid ageing_time value '%s'", value);
 	} else
 			PLUGIN_WARN (IFCFG_PLUGIN_NAME, "    warning: unhandled bridge option '%s'", key);
-}
-
-static void
-handle_bridging_opts (NMSetting *setting,
-                      gboolean stp,
-                      const char *value,
-                      BridgeOptFunc func)
-{
-	char **items, **iter;
-
-	items = g_strsplit_set (value, " ", -1);
-	for (iter = items; iter && *iter; iter++) {
-		if (strlen (*iter)) {
-			char **keys, *key, *val;
-
-			keys = g_strsplit_set (*iter, "=", 2);
-			if (keys && *keys) {
-				key = *keys;
-				val = *(keys + 1);
-				if (val && strlen(key) && strlen(val))
-					func (setting, stp, key, val);
-			}
-
-			g_strfreev (keys);
-		}
-	}
-	g_strfreev (items);
 }
 
 static NMSetting *
@@ -4391,7 +4400,8 @@ make_bridge_setting (shvarFile *ifcfg,
 
 	value = svGetValue (ifcfg, "BRIDGING_OPTS", FALSE);
 	if (value) {
-		handle_bridging_opts (NM_SETTING (s_bridge), stp, value, handle_bridge_option);
+		handle_ifcfg_rh_opts (NM_SETTING (s_bridge), value, handle_bridge_option,
+		                      GINT_TO_POINTER (stp));
 		g_free (value);
 	}
 
@@ -4442,9 +4452,9 @@ bridge_connection_from_ifcfg (const char *file,
 
 static void
 handle_bridge_port_option (NMSetting *setting,
-                           gboolean stp,
                            const char *key,
-                           const char *value)
+                           const char *value,
+                           gpointer data)
 {
 	guint32 u = 0;
 

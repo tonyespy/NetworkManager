@@ -12101,9 +12101,9 @@ test_read_bond_main (void)
 	        "bond-main", "failed to verify %s: DEVICE=%s does not match bond0",
 	        TEST_IFCFG_BOND_MAIN, nm_setting_bond_get_interface_name (s_bond));
 
-	ASSERT (g_strcmp0 (nm_setting_bond_get_option_by_name (s_bond, NM_SETTING_BOND_OPTION_MIIMON), "100") == 0,
-	        "bond-main", "failed to verify %s: miimon=%s does not match 100",
-	        TEST_IFCFG_BOND_MAIN, nm_setting_bond_get_option_by_name (s_bond, NM_SETTING_BOND_OPTION_MIIMON));
+	ASSERT (nm_setting_bond_get_miimon (s_bond) == 100,
+	        "bond-main", "failed to verify %s: miimon=%u does not match 100",
+	        TEST_IFCFG_BOND_MAIN, nm_setting_bond_get_miimon (s_bond));
 
 	g_free (unmanaged);
 	g_free (keyfile);

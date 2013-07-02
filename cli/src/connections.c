@@ -3725,7 +3725,7 @@ cleanup_vlan:
 				             bond_primary);
 				goto cleanup_bond;
 			}
-			nm_setting_bond_add_option (s_bond, NM_SETTING_BOND_OPTION_PRIMARY, bond_primary);
+			g_object_set (s_bond, NM_SETTING_BOND_PRIMARY, bond_primary, NULL);
 		}
 		if (bond_miimon)
 			nm_setting_bond_add_option (s_bond, NM_SETTING_BOND_OPTION_MIIMON, bond_miimon);
