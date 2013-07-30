@@ -21,6 +21,7 @@
 #ifndef __NETWORKMANAGER_SESSION_MONITOR_H__
 #define __NETWORKMANAGER_SESSION_MONITOR_H__
 
+#include <unistd.h>
 #include <glib-object.h>
 
 #include "nm-types.h"
@@ -40,6 +41,10 @@ typedef struct _NMSessionMonitorClass    NMSessionMonitorClass;
 
 GType             nm_session_monitor_get_type     (void) G_GNUC_CONST;
 NMSessionMonitor *nm_session_monitor_get          (void);
+
+gboolean          nm_session_monitor_uid_to_user      (uid_t uid,
+                                                       const char **out_user, 
+                                                       GError **error);
 
 gboolean          nm_session_monitor_user_has_session (NMSessionMonitor *monitor,
                                                        const char *username,
