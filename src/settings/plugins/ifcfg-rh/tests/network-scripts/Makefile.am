@@ -82,6 +82,7 @@ EXTRA_DIST = \
 	ifcfg-test-bridge-main \
 	ifcfg-test-bridge-component \
 	ifcfg-test-bridge-missing-stp \
+	ifcfg-test-bridge-l2 \
 	ifcfg-test-vlan-interface \
 	ifcfg-test-vlan-only-vlanid \
 	ifcfg-test-vlan-only-device \

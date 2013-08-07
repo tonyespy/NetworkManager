@@ -11349,6 +11349,38 @@ test_read_bridge_missing_stp (void)
 	g_object_unref (connection);
 }
 
+static void
+test_read_bridge_layer2_only (void)
+{
+	NMConnection *connection;
+	GError *error = NULL;
+	NMSettingBridge *s_bridge;
+	NMSettingIP4Config *s_ip4;
+	NMSettingIP6Config *s_ip6;
+
+	connection = connection_from_file (TEST_IFCFG_DIR"/network-scripts/ifcfg-test-bridge-l2",
+	                                   NULL, TYPE_ETHERNET, NULL, NULL,
+	                                   NULL, NULL, NULL, &error, NULL);
+	g_assert_no_error (error);
+	g_assert (connection);
+	g_assert (nm_connection_verify (connection, &error));
+
+	s_bridge = nm_connection_get_setting_bridge (connection);
+	g_assert (s_bridge);
+
+	g_assert_cmpstr (nm_setting_bridge_get_interface_name (s_bridge), ==, "br0");
+
+	s_ip4 = nm_connection_get_setting_ip4_config (connection);
+	g_assert (s_ip4);
+	g_assert_cmpstr (nm_setting_ip4_config_get_method (s_ip4), ==, "disabled");
+
+	s_ip6 = nm_connection_get_setting_ip6_config (connection);
+	g_assert (s_ip6);
+	g_assert_cmpstr (nm_setting_ip6_config_get_method (s_ip6), ==, "ignore");
+
+	g_object_unref (connection);
+}
+
 #define TEST_IFCFG_VLAN_INTERFACE TEST_IFCFG_DIR"/network-scripts/ifcfg-test-vlan-interface"
 
 static void
@@ -12638,6 +12670,7 @@ int main (int argc, char **argv)
 	test_read_bridge_component ();
 	test_write_bridge_component ();
 	test_read_bridge_missing_stp ();
+	g_test_add_func (TPATH "bridge/layer2-only", test_read_bridge_layer2_only);
 
 	/* Stuff we expect to fail for now */
 	test_write_wired_pppoe ();

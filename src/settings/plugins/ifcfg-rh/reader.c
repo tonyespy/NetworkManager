@@ -1213,12 +1213,41 @@ error:
 	return success;
 }
 
+#define IF_HAS_RETURN(i, k) \
+	tmp = svGetValue (i, k, FALSE); \
+	if (tmp) { \
+		g_free (tmp); \
+		return TRUE; \
+	}
+
+static gboolean
+has_ip4_details (shvarFile *ifcfg)
+{
+	char *tmp;
+
+	IF_HAS_RETURN (ifcfg, "IPADDR");
+	IF_HAS_RETURN (ifcfg, "PREFIX");
+	IF_HAS_RETURN (ifcfg, "NETMASK");
+
+	IF_HAS_RETURN (ifcfg, "IPADDR0");
+	IF_HAS_RETURN (ifcfg, "PREFIX0");
+	IF_HAS_RETURN (ifcfg, "NETMASK0");
+
+	IF_HAS_RETURN (ifcfg, "IPADDR1");
+	IF_HAS_RETURN (ifcfg, "PREFIX1");
+	IF_HAS_RETURN (ifcfg, "NETMASK1");
+
+	IF_HAS_RETURN (ifcfg, "IPADDR2");
+	IF_HAS_RETURN (ifcfg, "PREFIX2");
+	IF_HAS_RETURN (ifcfg, "NETMASK2");
+
+	return FALSE;
+}
 
 static NMSetting *
 make_ip4_setting (shvarFile *ifcfg,
                   const char *network_file,
                   const char *iscsiadm_path,
-                  gboolean can_disable_ip4,
                   GError **error)
 {
 	NMSettingIP4Config *s_ip4 = NULL;
@@ -1287,8 +1316,21 @@ make_ip4_setting (shvarFile *ifcfg,
 			              NM_SETTING_IP4_CONFIG_NEVER_DEFAULT, never_default,
 			              NULL);
 			return NM_SETTING (s_ip4);
-		} else if (!g_ascii_strcasecmp (value, "none") || !g_ascii_strcasecmp (value, "static")) {
-			/* Static IP */
+		} else if (!g_ascii_strcasecmp (value, "none")) {
+			if (!has_ip4_details (ifcfg)) {
+				/* BOOTPROTO=none and no IP addresses means disabled; if there
+				 * are IP addresses though, use manual/static for backwards
+				 * compatibility.
+				 */
+				method = NM_SETTING_IP4_CONFIG_METHOD_DISABLED;
+			}
+		} else if (!g_ascii_strcasecmp (value, "static")) {
+			if (!has_ip4_details (ifcfg)) {
+				g_set_error (error, IFCFG_PLUGIN_ERROR, 0,
+					         "BOOTPROTO=static but no IP addresses given");
+				g_free (value);
+				goto done;
+			}
 		} else if (strlen (value)) {
 			g_set_error (error, IFCFG_PLUGIN_ERROR, 0,
 			             "Unknown BOOTPROTO '%s'", value);
@@ -1297,55 +1339,16 @@ make_ip4_setting (shvarFile *ifcfg,
 		}
 		g_free (value);
 	} else {
-		char *tmp_ip4, *tmp_prefix, *tmp_netmask;
-		char *tmp_ip4_0, *tmp_prefix_0, *tmp_netmask_0;
-		char *tmp_ip4_1, *tmp_prefix_1, *tmp_netmask_1;
-		char *tmp_ip4_2, *tmp_prefix_2, *tmp_netmask_2;
-
-		/* If there is no BOOTPROTO, no IPADDR, no PREFIX, no NETMASK, but
-		 * valid IPv6 configuration, assume that IPv4 is disabled.  Otherwise,
-		 * if there is no IPv6 configuration, assume DHCP is to be used.
-		 * Happens with minimal ifcfg files like the following that anaconda
-		 * sometimes used to write out:
+		/* If there is no BOOTPROTO, no IPADDR, no PREFIX, no NETMASK, assume
+		 * assume that IPv4 should be set to DHCP to handle minimal ifcfg files
+		 * like the following that anaconda sometimes used to write out:
 		 *
 		 * DEVICE=eth0
 		 * HWADDR=11:22:33:44:55:66
-		 *
 		 */
-		tmp_ip4 = svGetValue (ifcfg, "IPADDR", FALSE);
-		tmp_prefix = svGetValue (ifcfg, "PREFIX", FALSE);
-		tmp_netmask = svGetValue (ifcfg, "NETMASK", FALSE);
-		tmp_ip4_0 = svGetValue (ifcfg, "IPADDR0", FALSE);
-		tmp_prefix_0 = svGetValue (ifcfg, "PREFIX0", FALSE);
-		tmp_netmask_0 = svGetValue (ifcfg, "NETMASK0", FALSE);
-		tmp_ip4_1 = svGetValue (ifcfg, "IPADDR1", FALSE);
-		tmp_prefix_1 = svGetValue (ifcfg, "PREFIX1", FALSE);
-		tmp_netmask_1 = svGetValue (ifcfg, "NETMASK1", FALSE);
-		tmp_ip4_2 = svGetValue (ifcfg, "IPADDR2", FALSE);
-		tmp_prefix_2 = svGetValue (ifcfg, "PREFIX2", FALSE);
-		tmp_netmask_2 = svGetValue (ifcfg, "NETMASK2", FALSE);
-		if (   !tmp_ip4   && !tmp_prefix   && !tmp_netmask
-		    && !tmp_ip4_0 && !tmp_prefix_0 && !tmp_netmask_0
-		    && !tmp_ip4_1 && !tmp_prefix_1 && !tmp_netmask_1
-		    && !tmp_ip4_2 && !tmp_prefix_2 && !tmp_netmask_2) {
-			if (can_disable_ip4)
-				/* Nope, no IPv4 */
-				method = NM_SETTING_IP4_CONFIG_METHOD_DISABLED;
-			else
-				method = NM_SETTING_IP4_CONFIG_METHOD_AUTO;
-		}
-		g_free (tmp_ip4);
-		g_free (tmp_prefix);
-		g_free (tmp_netmask);
-		g_free (tmp_ip4_0);
-		g_free (tmp_prefix_0);
-		g_free (tmp_netmask_0);
-		g_free (tmp_ip4_1);
-		g_free (tmp_prefix_1);
-		g_free (tmp_netmask_1);
-		g_free (tmp_ip4_2);
-		g_free (tmp_prefix_2);
-		g_free (tmp_netmask_2);
+
+		method = has_ip4_details (ifcfg) ? NM_SETTING_IP4_CONFIG_METHOD_MANUAL :
+					NM_SETTING_IP4_CONFIG_METHOD_AUTO;
 	}
 
 	g_object_set (s_ip4,
@@ -4331,7 +4334,6 @@ connection_from_file (const char *filename,
 	NMSetting *s_ip4, *s_ip6, *s_port;
 	const char *ifcfg_name = NULL;
 	gboolean nm_controlled = TRUE;
-	gboolean can_disable_ip4 = FALSE;
 	char *unmanaged = NULL;
 
 	g_return_val_if_fail (filename != NULL, NULL);
@@ -4485,16 +4487,10 @@ connection_from_file (const char *filename,
 	} else if (utils_ignore_ip_config (connection)) {
 		PLUGIN_WARN (IFCFG_PLUGIN_NAME, "    warning: ignoring IP6 configuration");
 		g_object_unref (s_ip6);
-	} else {
-		const char *method;
-
+	} else
 		nm_connection_add_setting (connection, s_ip6);
-		method = nm_setting_ip6_config_get_method (NM_SETTING_IP6_CONFIG (s_ip6));
-		if (method && strcmp (method, NM_SETTING_IP6_CONFIG_METHOD_IGNORE))
-			can_disable_ip4 = TRUE;
-	}
 
-	s_ip4 = make_ip4_setting (parsed, network_file, iscsiadm_path, can_disable_ip4, error);
+	s_ip4 = make_ip4_setting (parsed, network_file, iscsiadm_path, error);
 	if (!s_ip4) {
 		g_object_unref (connection);
 		connection = NULL;

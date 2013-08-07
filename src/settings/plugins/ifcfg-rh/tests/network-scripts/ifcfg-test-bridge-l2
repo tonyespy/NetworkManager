@@ -1,0 +1,4 @@
+DEVICE=br0
+ONBOOT=yes
+BOOTPROTO=none
+TYPE=Bridge
