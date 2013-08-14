@@ -1175,10 +1175,17 @@ link_changed_cb (NMPlatform *platform, int ifindex, NMPlatformLink *info, NMPlat
 static void
 link_changed (NMDevice *device, NMPlatformLink *info)
 {
+	NMDeviceClass *klass = NM_DEVICE_GET_CLASS (device);
+	NMConnection *connection = nm_device_get_connection (device);
+
 	/* Update carrier from link event if applicable. */
 	if (   device_has_capability (device, NM_DEVICE_CAP_CARRIER_DETECT)
 	    && !device_has_capability (device, NM_DEVICE_CAP_NONSTANDARD_CARRIER))
 		nm_device_set_carrier (device, info->connected);
+
+	/* Update the runtime connection according to the current link status. */
+	if (connection && klass->update_connection)
+		klass->update_connection (device, connection);
 }
 
 static void
@@ -6216,6 +6223,9 @@ static void
 update_ip_config (NMDevice *self)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+	const NMIP4Config *ip4_config = NULL;
+	const NMIP6Config *ip6_config = NULL;
+	NMConnection *connection = nm_device_get_connection (self);
 	int ifindex;
 
 	ifindex = nm_device_get_ip_ifindex (self);
@@ -6232,6 +6242,7 @@ update_ip_config (NMDevice *self)
 			nm_ip4_config_subtract (priv->ext_ip4_config, priv->vpn4_config);
 
 		ip4_config_merge_and_apply (self, NULL, FALSE, NULL);
+		ip4_config = priv->ip4_config;
 	}
 
 	/* IPv6 */
@@ -6246,6 +6257,17 @@ update_ip_config (NMDevice *self)
 			nm_ip6_config_subtract (priv->ext_ip6_config, priv->vpn6_config);
 
 		ip6_config_merge_and_apply (self, FALSE, NULL);
+		ip6_config = priv->ip6_config;
+	}
+
+	if (connection) {
+		NMSettingIP4Config *s_ip4 = nm_connection_get_setting_ip4_config (connection);
+		NMSettingIP6Config *s_ip6 = nm_connection_get_setting_ip6_config (connection);
+
+		if (s_ip4 && ip4_config)
+			nm_ip4_config_update_setting (ip4_config, s_ip4);
+		if (s_ip6 && ip6_config)
+			nm_ip6_config_update_setting (ip6_config, s_ip6);
 	}
 }
 
