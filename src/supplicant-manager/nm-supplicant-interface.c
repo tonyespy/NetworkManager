@@ -1204,6 +1204,16 @@ string_to_gvalue (const char *str)
 }
 
 static GValue *
+bool_to_gvalue (gboolean b)
+{
+	GValue *val = g_slice_new0 (GValue);
+
+	g_value_init (val, G_TYPE_BOOLEAN);
+	g_value_set_boolean (val, b);
+	return val;
+}
+
+static GValue *
 byte_array_array_to_gvalue (const GPtrArray *array)
 {
 	GValue *val = g_slice_new0 (GValue);
@@ -1229,6 +1239,13 @@ nm_supplicant_interface_request_scan (NMSupplicantInterface *self, const GPtrArr
 	g_hash_table_insert (hash, "Type", string_to_gvalue ("active"));
 	if (ssids)
 		g_hash_table_insert (hash, "SSIDs", byte_array_array_to_gvalue (ssids));
+
+	/* If connected, we don't want an NM-triggered broadcast scan to trigger
+	 * a roaming attempt; let background scanning in the supplicant make that
+	 * decision instead.
+	 */
+	if (priv->state >= NM_SUPPLICANT_INTERFACE_STATE_AUTHENTICATING)
+		g_hash_table_insert (hash, "AllowRoam", bool_to_gvalue (FALSE));
 
 	call = dbus_g_proxy_begin_call (priv->iface_proxy, "Scan",
 	                                scan_request_cb,
