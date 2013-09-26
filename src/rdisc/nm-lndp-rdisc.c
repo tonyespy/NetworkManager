@@ -50,10 +50,18 @@ G_DEFINE_TYPE (NMLNDPRDisc, nm_lndp_rdisc, NM_TYPE_RDISC)
 NMRDisc *
 nm_lndp_rdisc_new (int ifindex, const char *ifname)
 {
-	NMRDisc *rdisc = g_object_new (NM_TYPE_LNDP_RDISC, NULL);
+	NMRDisc *rdisc;
+	struct ndp *ndp = NULL;
+	int error;
 
-	g_assert (rdisc);
+	error = ndp_open (&ndp);
+	if (error) {
+		nm_log_warn (LOGD_IP6, "(%s): failed to initialize IPv6 NDP: %d", ifname, error);
+		return NULL;
+	}
 
+	rdisc = g_object_new (NM_TYPE_LNDP_RDISC, NULL);
+	NM_LNDP_RDISC_GET_PRIVATE (rdisc)->ndp = ndp;
 	rdisc->ifindex = ifindex;
 	rdisc->ifname = g_strdup (ifname);
 
@@ -594,11 +602,6 @@ start (NMRDisc *rdisc)
 static void
 nm_lndp_rdisc_init (NMLNDPRDisc *lndp_rdisc)
 {
-	NMLNDPRDiscPrivate *priv = NM_LNDP_RDISC_GET_PRIVATE (lndp_rdisc);
-	int error;
-	
-	error = ndp_open (&priv->ndp);
-	g_assert (!error);
 }
 
 static void

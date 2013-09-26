@@ -3167,12 +3167,13 @@ addrconf6_start (NMDevice *self)
 	}
 
 	priv->rdisc = nm_lndp_rdisc_new (nm_device_get_ip_ifindex (self), nm_device_get_ip_iface (self));
-	nm_platform_sysctl_set (priv->ip6_accept_ra_path, "0");
-
 	if (!priv->rdisc) {
-		nm_log_err (LOGD_IP6, "Failed to start router discovery.");
+		nm_log_err (LOGD_IP6, "(%s): failed to start router discovery.",
+		            nm_device_get_ip_iface (self));
 		return FALSE;
 	}
+
+	nm_platform_sysctl_set (priv->ip6_accept_ra_path, "0");
 
 	priv->rdisc_config_changed_sigid = g_signal_connect (
 			priv->rdisc, NM_RDISC_CONFIG_CHANGED, G_CALLBACK (rdisc_config_changed), self);
