@@ -1067,7 +1067,12 @@ nm_platform_ip6_address_get_all (int ifindex)
 }
 
 gboolean
-nm_platform_ip4_address_add (int ifindex, in_addr_t address, int plen, guint32 lifetime, guint32 preferred)
+nm_platform_ip4_address_add (int ifindex,
+                             in_addr_t address,
+                             in_addr_t peer_address,
+                             int plen,
+                             guint32 lifetime,
+                             guint32 preferred)
 {
 	reset_error ();
 
@@ -1078,7 +1083,7 @@ nm_platform_ip4_address_add (int ifindex, in_addr_t address, int plen, guint32 l
 	g_return_val_if_fail (klass->ip4_address_add, FALSE);
 
 	debug ("address: adding or updating IPv4 address");
-	return klass->ip4_address_add (platform, ifindex, address, plen, lifetime, preferred);
+	return klass->ip4_address_add (platform, ifindex, address, peer_address, plen, lifetime, preferred);
 }
 
 gboolean
@@ -1254,7 +1259,7 @@ nm_platform_ip4_address_sync (int ifindex, const GArray *known_addresses)
 		} else
 			lifetime = preferred = NM_PLATFORM_LIFETIME_PERMANENT;
 
-		if (!nm_platform_ip4_address_add (ifindex, known_address->address, known_address->plen, lifetime, preferred))
+		if (!nm_platform_ip4_address_add (ifindex, known_address->address, known_address->peer_address, known_address->plen, lifetime, preferred))
 			return FALSE;
 	}
 
@@ -1719,6 +1724,7 @@ nm_platform_ip4_address_cmp (const NMPlatformIP4Address *a, const NMPlatformIP4A
 {
 	_CMP_POINTER (a, b);
 	_CMP_FIELD_MEMCMP (a, b, address);
+	_CMP_FIELD_MEMCMP (a, b, peer_address);
 	_CMP_FIELD (a, b, ifindex);
 	_CMP_FIELD (a, b, plen);
 	_CMP_FIELD (a, b, timestamp);

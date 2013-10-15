@@ -872,8 +872,10 @@ nm_vpn_connection_ip4_config_get (DBusGProxy *proxy,
 		address.address = g_value_get_uint (val);
 
 	val = (GValue *) g_hash_table_lookup (config_hash, NM_VPN_PLUGIN_IP4_CONFIG_PTP);
-	if (val)
+	if (val) {
 		nm_ip4_config_set_ptp_address (config, g_value_get_uint (val));
+		address.peer_address = g_value_get_uint (val);
+	}
 
 	val = (GValue *) g_hash_table_lookup (config_hash, NM_VPN_PLUGIN_IP4_CONFIG_PREFIX);
 	if (val)

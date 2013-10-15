@@ -539,6 +539,7 @@ impl_ppp_manager_set_ip4_config (NMPPPManager *manager,
 	if (val) {
 		nm_ip4_config_set_gateway (config, g_value_get_uint (val));
 		nm_ip4_config_set_ptp_address (config, g_value_get_uint (val));
+		address.peer_address = g_value_get_uint (val);
 	}
 
 	val = (GValue *) g_hash_table_lookup (config_hash, NM_PPP_IP4_CONFIG_ADDRESS);
