@@ -395,7 +395,7 @@ nm_device_init (NMDevice *self)
 	priv->rfkill_type = RFKILL_TYPE_UNKNOWN;
 	priv->autoconnect = DEFAULT_AUTOCONNECT;
 	priv->available_connections = g_hash_table_new_full (g_direct_hash, g_direct_equal, g_object_unref, NULL);
-	priv->pending_actions = g_array_sized_new (TRUE, TRUE, sizeof (GQuark), 3);
+	priv->pending_actions = g_array_sized_new (FALSE, TRUE, sizeof (GQuark), 4);
 }
 
 static void
