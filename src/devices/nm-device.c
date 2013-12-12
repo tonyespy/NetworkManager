@@ -395,7 +395,7 @@ nm_device_init (NMDevice *self)
 	priv->rfkill_type = RFKILL_TYPE_UNKNOWN;
 	priv->autoconnect = DEFAULT_AUTOCONNECT;
 	priv->available_connections = g_hash_table_new_full (g_direct_hash, g_direct_equal, g_object_unref, NULL);
-	priv->pending_actions = g_array_sized_new (FALSE, TRUE, sizeof (GQuark), 5);
+	priv->pending_actions = g_array_sized_new (TRUE, TRUE, sizeof (GQuark), 3);
 }
 
 static void
@@ -5374,7 +5374,6 @@ finalize (GObject *object)
 		g_object_unref (priv->fw_manager);
 
 	g_array_free (priv->pending_actions, TRUE);
-	priv->pending_actions = NULL;
 
 	g_free (priv->udi);
 	g_free (priv->path);
@@ -7176,7 +7175,7 @@ nm_device_add_pending_action (NMDevice *device, const char *action)
 		}
 	}
 
-	g_array_prepend_val (priv->pending_actions, qaction);
+	g_array_append_val (priv->pending_actions, qaction);
 	nm_log_dbg (LOGD_DEVICE, "(%s): add_pending_action (%d): '%s'",
 	            nm_device_get_iface (device),
 	            priv->pending_actions->len,
@@ -7205,7 +7204,7 @@ nm_device_remove_pending_action (NMDevice *device, const char *action)
 	/* Shouldn't ever add the same pending action twice */
 	for (i = 0; i < priv->pending_actions->len; i++) {
 		if (qaction == g_array_index (priv->pending_actions, GQuark, i)) {
-			g_array_remove_index_fast (priv->pending_actions, i);
+			g_array_remove_index (priv->pending_actions, i);
 			nm_log_dbg (LOGD_DEVICE, "(%s): remove_pending_action (%d): '%s'",
 			            nm_device_get_iface (device),
 			            priv->pending_actions->len,
