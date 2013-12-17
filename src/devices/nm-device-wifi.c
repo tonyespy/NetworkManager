@@ -621,26 +621,26 @@ done:
 static void
 update_seen_bssids_cache (NMDeviceWifi *self, NMAccessPoint *ap)
 {
-	NMActRequest *req;
 	NMConnection *connection;
+	const struct ether_addr *bssid;
 
 	g_return_if_fail (NM_IS_DEVICE_WIFI (self));
+	g_return_if_fail (NM_IS_AP (ap));
 
-	if (ap == NULL)
+	if (nm_device_get_state (NM_DEVICE (self)) != NM_DEVICE_STATE_ACTIVATED)
 		return;
 
-	/* Don't cache the BSSID for Ad-Hoc APs */
+	/* Don't cache the BSSID for Ad-Hoc nodes or hotspot */
 	if (nm_ap_get_mode (ap) != NM_802_11_MODE_INFRA)
 		return;
 
-	if (nm_device_get_state (NM_DEVICE (self)) == NM_DEVICE_STATE_ACTIVATED) {
-		req = nm_device_get_act_request (NM_DEVICE (self));
-		if (req) {
-			connection = nm_act_request_get_connection (req);
-			nm_settings_connection_add_seen_bssid (NM_SETTINGS_CONNECTION (connection),
-			                                       nm_ap_get_address (ap));
-		}
-	}
+	bssid = nm_ap_get_address (ap);
+	if (!nm_ethernet_address_is_valid (bssid))
+		return;
+
+	connection = nm_device_get_connection (NM_DEVICE (self));
+	if (connection)
+		nm_settings_connection_add_seen_bssid (NM_SETTINGS_CONNECTION (connection), bssid);
 }
 
 static void
@@ -3310,7 +3310,11 @@ done:
 		set_current_ap (self, NULL, TRUE, FALSE);
 	}
 
-	/* No need to update seen BSSIDs cache, that is done by set_current_ap() already */
+	/* Ensure the seen BSSIDs cache is updated, which is only allowed when
+	 * the device is fully activated.
+	 */
+	if (priv->current_ap)
+		update_seen_bssids_cache (self, priv->current_ap);
 
 	/* Reset scan interval to something reasonable */
 	priv->scan_interval = SCAN_INTERVAL_MIN + (SCAN_INTERVAL_STEP * 2);

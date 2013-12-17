@@ -1799,6 +1799,7 @@ nm_settings_connection_add_seen_bssid (NMSettingsConnection *connection,
 	guint n;
 
 	g_return_if_fail (seen_bssid != NULL);
+	g_return_if_fail (nm_ethernet_address_is_valid (seen_bssid));
 
 	if (g_hash_table_lookup (priv->seen_bssids, seen_bssid))
 		return;  /* Already in the list */
