@@ -29,9 +29,7 @@
 gboolean
 nm_dnsmasq_utils_get_range (const NMPlatformIP4Address *addr,
                             char *out_first,
-                            const gsize out_first_len,
                             char *out_last,
-                            const gsize out_last_len,
                             char **out_error_desc)
 {
 	guint32 host = addr->address;
@@ -40,9 +38,7 @@ nm_dnsmasq_utils_get_range (const NMPlatformIP4Address *addr,
 	guint32 first, last, reserved;
 
 	g_return_val_if_fail (out_first != NULL, FALSE);
-	g_return_val_if_fail (out_first_len >= INET_ADDRSTRLEN, FALSE);
 	g_return_val_if_fail (out_last != NULL, FALSE);
-	g_return_val_if_fail (out_last_len >= INET_ADDRSTRLEN, FALSE);
 
 	if (prefix > 30) {
 		if (out_error_desc)
@@ -73,17 +69,8 @@ nm_dnsmasq_utils_get_range (const NMPlatformIP4Address *addr,
 		first = host + htonl (CLAMP (reserved, 0, 8)) + htonl (1);
 	}
 
-	if (!inet_ntop (AF_INET, (void *) &first, out_first, out_first_len)) {
-		if (out_error_desc)
-			*out_error_desc = g_strdup_printf ("Failed to convert first DHCP range address 0x%04x.", first);
-		return FALSE;
-	}
-
-	if (!inet_ntop (AF_INET, (void *) &last, out_last, out_last_len)) {
-		if (out_error_desc)
-			*out_error_desc = g_strdup_printf ("Failed to convert last DHCP range address 0x%04x.", last);
-		return FALSE;
-	}
+	nm_utils_inet4_ntop (first, out_first);
+	nm_utils_inet4_ntop (last, out_last);
 
 	return TRUE;
 }

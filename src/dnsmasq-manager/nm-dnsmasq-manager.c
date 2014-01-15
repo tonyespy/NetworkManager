@@ -253,10 +253,9 @@ create_dm_cmd_line (const char *iface,
 	NMCmdLine *cmd;
 	GString *s;
 	const NMPlatformIP4Address *tmp;
-	guint32 addr;
-	char first[INET_ADDRSTRLEN + 15];
-	char last[INET_ADDRSTRLEN + 15];
-	char localaddr[INET_ADDRSTRLEN + 1];
+	char first[INET_ADDRSTRLEN];
+	char last[INET_ADDRSTRLEN];
+	char localaddr[INET_ADDRSTRLEN];
 	char *error_desc = NULL;
 
 	dm_binary = nm_find_dnsmasq ();
@@ -299,20 +298,12 @@ create_dm_cmd_line (const char *iface,
 	nm_cmd_line_add_string (cmd, "--strict-order");
 
 	s = g_string_new ("--listen-address=");
-	addr = tmp->address;
-	if (!inet_ntop (AF_INET, &addr, &localaddr[0], INET_ADDRSTRLEN)) {
-		char *err_msg = g_strdup_printf ("error converting IP4 address 0x%X",
-		                                 ntohl (addr));
-		g_set_error_literal (error, NM_DNSMASQ_MANAGER_ERROR, NM_DNSMASQ_MANAGER_ERROR_NOT_FOUND, err_msg);
-		nm_log_warn (LOGD_SHARING, "%s", err_msg);
-		g_free (err_msg);
-		goto error;
-	}
+	nm_utils_inet4_ntop (tmp->address, localaddr);
 	g_string_append (s, localaddr);
 	nm_cmd_line_add_string (cmd, s->str);
 	g_string_free (s, TRUE);
 
-	if (!nm_dnsmasq_utils_get_range (tmp, first, sizeof (first), last, sizeof (last), &error_desc)) {
+	if (!nm_dnsmasq_utils_get_range (tmp, first, last, &error_desc)) {
 		g_set_error_literal (error,
 		                     NM_DNSMASQ_MANAGER_ERROR,
 		                     NM_DNSMASQ_MANAGER_ERROR_INVALID_IP_RANGE,

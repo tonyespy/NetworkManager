@@ -26,9 +26,7 @@
 
 gboolean nm_dnsmasq_utils_get_range (const NMPlatformIP4Address *addr,
                                      char *out_first,
-                                     const gsize out_first_len,
                                      char *out_last,
-                                     const gsize out_last_len,
                                      char **out_error_desc);
 
 #endif /* NM_DNSMASQ_UTILS_H */
