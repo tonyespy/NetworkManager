@@ -2766,6 +2766,8 @@ reserve_shared_ip (NMSettingIP4Config *s_ip4, NMPlatformIP4Address *address)
 	if (G_UNLIKELY (shared_ips == NULL))
 		shared_ips = g_hash_table_new (g_direct_hash, g_direct_equal);
 
+	memset (address, 0, sizeof (*address));
+
 	if (s_ip4 && nm_setting_ip4_config_get_num_addresses (s_ip4)) {
 		/* Use the first user-supplied address */
 		NMIP4Address *user = nm_setting_ip4_config_get_address (s_ip4, 0);
