@@ -1139,17 +1139,6 @@ nm_device_has_carrier (NMDevice *device)
 	return NM_DEVICE_GET_PRIVATE (device)->carrier;
 }
 
-/* Returns %TRUE if @device is unavailable for connections because it
- * needs carrier but does not have it.
- */
-static gboolean
-nm_device_is_unavailable_because_of_carrier (NMDevice *device)
-{
-	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (device);
-
-	return !priv->carrier && !priv->ignore_carrier;
-}
-
 #define LINK_DISCONNECT_DELAY 4
 
 static gboolean
@@ -2923,7 +2912,7 @@ act_stage3_ip4_config_start (NMDevice *self,
 
 	if (   strcmp (method, NM_SETTING_IP4_CONFIG_METHOD_MANUAL) != 0
 	    && nm_device_is_master (self)
-	    && nm_device_is_unavailable_because_of_carrier (self)) {
+	    && !priv->carrier) {
 		nm_log_info (LOGD_IP4 | LOGD_DEVICE,
 		             "(%s): IPv4 config waiting until carrier is on",
 		             nm_device_get_ip_iface (self));
@@ -3681,7 +3670,7 @@ act_stage3_ip6_config_start (NMDevice *self,
 
 	if (   strcmp (method, NM_SETTING_IP6_CONFIG_METHOD_MANUAL) != 0
 	    && nm_device_is_master (self)
-	    && nm_device_is_unavailable_because_of_carrier (self)) {
+	    && !priv->carrier) {
 		nm_log_info (LOGD_IP6 | LOGD_DEVICE,
 		             "(%s): IPv6 config waiting until carrier is on", ip_iface);
 		return NM_ACT_STAGE_RETURN_WAIT;
@@ -4892,10 +4881,13 @@ nm_device_is_activating (NMDevice *device)
 static gboolean
 can_interrupt_activation (NMDevice *device)
 {
+	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (device);
+
 	/* Devices that support carrier detect can interrupt activation
-	 * if the link becomes inactive.
+	 * if the link becomes inactive and carrier is honored.
 	 */
-	return nm_device_is_unavailable_because_of_carrier (device);
+	return !priv->carrier && !priv->ignore_carrier;
+
 }
 
 gboolean
