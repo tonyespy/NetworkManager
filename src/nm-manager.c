@@ -386,8 +386,8 @@ active_connection_state_changed (NMActiveConnection *active,
 }
 
 /**
- * nm_active_connection_add():
- * @manager: the #NMManager
+ * active_connection_add():
+ * @self: the #NMManager
  * @active: the #NMActiveConnection to manage
  *
  * Begins to track and manage @active.  Increases the refcount of @active.
@@ -3079,7 +3079,7 @@ _internal_activation_auth_done (NMActiveConnection *active,
 
 /**
  * nm_manager_activate_connection():
- * @manager: the #NMManager
+ * @self: the #NMManager
  * @connection: the #NMConnection to activate on @device
  * @specific_object: the specific object path, if any, for the activation
  * @device: the #NMDevice to activate @connection on
