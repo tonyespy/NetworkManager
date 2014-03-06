@@ -136,6 +136,9 @@ nm_sources = \
 	rdisc/nm-rdisc.c \
 	rdisc/nm-rdisc.h \
 	\
+	ip4ll/nm-ip4ll.c \
+	ip4ll/nm-ip4ll.h \
+	\
 	posix-signals/nm-posix-signals.c \
 	posix-signals/nm-posix-signals.h \
 	\
