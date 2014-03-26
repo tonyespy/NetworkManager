@@ -697,6 +697,15 @@ verify (NMSetting *setting, GSList *all_settings, GError **error)
 		return FALSE;
 	}
 
+	/* If one of master or slave_type is set, the other must also be set */
+	if ((priv->master || priv->slave_type) && !(priv->master && priv->slave_type)) {
+		g_set_error (error,
+		             NM_SETTING_CONNECTION_ERROR,
+		             NM_SETTING_CONNECTION_ERROR_INVALID_PROPERTY,
+		             priv->master ? NM_SETTING_CONNECTION_SLAVE_TYPE : NM_SETTING_CONNECTION_MASTER);
+		return FALSE;
+	}
+
 	/*
 	 * Bonding: Slaves are not allowed to have any IP configuration.
 	 */
