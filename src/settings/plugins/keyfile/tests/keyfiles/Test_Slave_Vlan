@@ -1,0 +1,18 @@
+[connection]
+# VM
+id=vlan3
+uuid=5aa46e95-8c37-45f1-b683-8b0268818189
+type=vlan
+master=105acc55-5bbf-483f-95fe-a9d86a0284f2
+slave-type=bridge
+
+[vlan]
+parent=p118p1
+id=3
+interface-name=vlan3
+
+[ipv4]
+method=disabled
+
+[ipv6]
+method=ignore

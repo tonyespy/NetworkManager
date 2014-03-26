@@ -3294,11 +3294,75 @@ test_read_missing_vlan_setting (void)
 	g_object_unref (connection);
 }
 
+static void
+test_read_master_slave (void)
+{
+	NMConnection *master, *slave;
+	NMSettingConnection *s_con;
+	const char *expected_master_uuid = "105acc55-5bbf-483f-95fe-a9d86a0284f2";
+	gboolean success;
+	GError *error = NULL;
+	NMSettingIP4Config *s_ip4;
+	NMSettingIP6Config *s_ip6;
+	NMSettingVlan *s_vlan;
+
+	/* Master */
+	master = nm_keyfile_plugin_connection_from_file (TEST_KEYFILES_DIR"/Test_Master", &error);
+	g_assert_no_error (error);
+	g_assert (master);
+
+	success = nm_connection_verify (master, &error);
+	g_assert_no_error (error);
+	g_assert (success);
+
+	s_con = nm_connection_get_setting_connection (master);
+	g_assert (s_con);
+	g_assert_cmpstr (nm_setting_connection_get_connection_type (s_con), ==, NM_SETTING_BRIDGE_SETTING_NAME);
+	g_assert (nm_setting_connection_get_master (s_con) == NULL);
+	g_assert_cmpstr (nm_setting_connection_get_uuid (s_con), ==, expected_master_uuid);
+	g_assert_cmpstr (nm_setting_connection_get_interface_name (s_con), ==, "vmbr0");
+	g_assert (nm_connection_get_setting_bridge (master));
+
+	/* Slave */
+	slave = nm_keyfile_plugin_connection_from_file (TEST_KEYFILES_DIR"/Test_Slave_Vlan", &error);
+	g_assert_no_error (error);
+	g_assert (slave);
+
+	success = nm_connection_verify (slave, &error);
+	g_assert_no_error (error);
+	g_assert (success);
+
+	s_con = nm_connection_get_setting_connection (slave);
+	g_assert (s_con);
+	g_assert_cmpstr (nm_setting_connection_get_connection_type (s_con), ==, NM_SETTING_VLAN_SETTING_NAME);
+	g_assert_cmpstr (nm_setting_connection_get_master (s_con), ==, expected_master_uuid);
+	g_assert_cmpstr (nm_setting_connection_get_slave_type (s_con), ==, NM_SETTING_BRIDGE_SETTING_NAME);
+	g_assert_cmpstr (nm_setting_connection_get_interface_name (s_con), ==, "vlan3");
+
+	s_vlan = nm_connection_get_setting_vlan (slave);
+	g_assert (s_vlan);
+	g_assert_cmpstr (nm_setting_vlan_get_parent (s_vlan), ==, "p118p1");
+	g_assert_cmpstr (nm_setting_vlan_get_interface_name (s_vlan), ==, "vlan3");
+	g_assert_cmpint (nm_setting_vlan_get_id (s_vlan), ==, 3);
+
+	s_ip4 = nm_connection_get_setting_ip4_config (slave);
+	if (s_ip4)
+		g_assert_cmpstr (nm_setting_ip4_config_get_method (s_ip4), ==, NM_SETTING_IP4_CONFIG_METHOD_DISABLED);
+	s_ip6 = nm_connection_get_setting_ip6_config (slave);
+	if (s_ip6)
+		g_assert_cmpstr (nm_setting_ip6_config_get_method (s_ip6), ==, NM_SETTING_IP6_CONFIG_METHOD_IGNORE);
+
+	g_object_unref (master);
+	g_object_unref (slave);
+}
+
+#define TPATH "/settings/plugins/keyfile/"
+
 int main (int argc, char **argv)
 {
 	GError *error = NULL;
-	char *base;
 
+	g_test_init (&argc, &argv, NULL);
 	g_type_init ();
 
 	if (!nm_utils_init (&error))
@@ -3357,9 +3421,8 @@ int main (int argc, char **argv)
 
 	test_read_missing_vlan_setting ();
 
-	base = g_path_get_basename (argv[0]);
-	fprintf (stdout, "%s: SUCCESS\n", base);
-	g_free (base);
-	return 0;
+	g_test_add_func (TPATH "master-slave-config", test_read_master_slave);
+
+	return g_test_run ();
 }
 

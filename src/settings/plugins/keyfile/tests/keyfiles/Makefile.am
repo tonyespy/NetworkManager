@@ -19,7 +19,9 @@ KEYFILES = \
 	Test_Bridge_Component \
 	Test_New_Wired_Group_Name \
 	Test_New_Wireless_Group_Names \
-	Test_Missing_Vlan_Setting
+	Test_Missing_Vlan_Setting \
+	Test_Master \
+	Test_Slave_Vlan
 
 CERTS = \
 	test-ca-cert.pem \

@@ -1,0 +1,17 @@
+[connection]
+id=vmbr0
+interface-name=vmbr0
+uuid=105acc55-5bbf-483f-95fe-a9d86a0284f2
+type=bridge
+
+[bridge]
+interface-name=vmbr0
+stp=false
+
+[ipv4]
+method=manual
+address1=10.3.1.1/24;0.0.0.0
+
+[ipv6]
+method=ignore
+
