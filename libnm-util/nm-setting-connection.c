@@ -861,6 +861,21 @@ verify (NMSetting *setting, GSList *all_settings, GError **error)
 		return FALSE;
 	}
 
+	/* If one of master or slave_type is set, the other must also be set */
+	if ((priv->master || priv->slave_type) && !(priv->master && priv->slave_type)) {
+		g_set_error (error,
+		             NM_SETTING_CONNECTION_ERROR,
+		             NM_SETTING_CONNECTION_ERROR_INVALID_PROPERTY,
+		             _("%s is required if %s is set"),
+		             priv->master ? NM_SETTING_CONNECTION_SLAVE_TYPE : NM_SETTING_CONNECTION_MASTER,
+		             priv->master ? NM_SETTING_CONNECTION_MASTER : NM_SETTING_CONNECTION_SLAVE_TYPE);
+		/* Invalid property is the one that is *not* set */
+		g_prefix_error (error, "%s.%s: ",
+		                NM_SETTING_CONNECTION_SETTING_NAME,
+		                priv->master ? NM_SETTING_CONNECTION_SLAVE_TYPE : NM_SETTING_CONNECTION_MASTER);
+		return FALSE;
+	}
+
 	is_slave = (   !g_strcmp0 (priv->slave_type, NM_SETTING_BOND_SETTING_NAME)
 	            || !g_strcmp0 (priv->slave_type, NM_SETTING_BRIDGE_SETTING_NAME)
 	            || !g_strcmp0 (priv->slave_type, NM_SETTING_TEAM_SETTING_NAME));
