@@ -289,6 +289,9 @@ read_field (char **current, char **error, const char *characters, const char *de
 			/* success, more data available */
 			*error = NULL;
 			*(*current)++ = '\0';
+			/* Handle trailing delimiter */
+			if (!*current[0])
+				*current = NULL;
 			return start;
 		} else {
 			/* error, bad character */
