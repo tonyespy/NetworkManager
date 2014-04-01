@@ -142,6 +142,7 @@ enum {
 	PROP_MASTER,
 	PROP_HW_ADDRESS,
 	PROP_HAS_PENDING_ACTION,
+	PROP_ADMIN_UP,
 	LAST_PROP
 };
 
@@ -235,6 +236,7 @@ typedef struct {
 	gpointer        act_source6_func;
 
 	/* Link stuff */
+	gboolean        admin_up;  /* IFF_UP */
 	guint           link_connected_id;
 	guint           link_disconnected_id;
 	guint           carrier_defer_id;
@@ -393,6 +395,9 @@ nm_device_init (NMDevice *self)
 	priv->autoconnect = DEFAULT_AUTOCONNECT;
 	priv->available_connections = g_hash_table_new_full (g_direct_hash, g_direct_equal, g_object_unref, NULL);
 	priv->ip6_saved_properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, g_free);
+
+	/* Assume up; if we get a platform link we'll read the kernel value */
+	priv->admin_up = TRUE;
 }
 
 static inline gboolean
@@ -1137,6 +1142,12 @@ nm_device_set_carrier (NMDevice *device, gboolean carrier)
 	}
 }
 
+gboolean
+nm_device_get_admin_up (NMDevice *device)
+{
+	return NM_DEVICE_GET_PRIVATE (device)->admin_up;
+}
+
 static void
 link_changed_cb (NMPlatform *platform, int ifindex, NMPlatformLink *info, NMPlatformReason reason, NMDevice *device)
 {
@@ -1193,6 +1204,10 @@ link_changed_cb (NMPlatform *platform, int ifindex, NMPlatformLink *info, NMPlat
 		if (klass->link_changed)
 			klass->link_changed (device, info);
 
+		if (priv->admin_up == !!info->up) {
+			priv->admin_up = !!info->up;
+			g_object_notify (G_OBJECT (device), NM_DEVICE_ADMIN_UP);
+		}
 	} else if (priv->ip_iface && ifindex == nm_device_get_ip_ifindex (device)) {
 		if (info->name[0] && strcmp (priv->ip_iface, info->name)) {
 			nm_log_info (LOGD_DEVICE, "(%s): interface index %d renamed ip_iface (%d) from '%s' to '%s'",
@@ -5803,6 +5818,7 @@ set_property (GObject *object, guint prop_id,
 			priv->ifindex = platform_device->ifindex;
 			g_free (priv->driver);
 			priv->driver = g_strdup (platform_device->driver);
+			priv->admin_up = !!platform_device->up;
 		}
 		break;
 	case PROP_UDI:
@@ -6316,6 +6332,14 @@ nm_device_class_init (NMDeviceClass *klass)
 		 g_param_spec_boolean (NM_DEVICE_HAS_PENDING_ACTION,
 		                       "Has pending action",
 		                       "Has pending action",
+		                       FALSE,
+		                       G_PARAM_READABLE));
+
+	g_object_class_install_property
+		(object_class, PROP_ADMIN_UP,
+		 g_param_spec_boolean (NM_DEVICE_ADMIN_UP,
+		                       "Administratively up",
+		                       "Administratively up",
 		                       FALSE,
 		                       G_PARAM_READABLE));
 

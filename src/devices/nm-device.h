@@ -69,6 +69,7 @@
 #define NM_DEVICE_MASTER           "master"       /* Internal only */
 #define NM_DEVICE_HW_ADDRESS       "hw-address"   /* Internal only */
 #define NM_DEVICE_HAS_PENDING_ACTION "has-pending-action" /* Internal only */
+#define NM_DEVICE_ADMIN_UP         "admin-up"     /* Internal only */
 
 /* Internal signals */
 #define NM_DEVICE_AUTH_REQUEST          "auth-request"
@@ -369,6 +370,8 @@ gboolean   nm_device_connection_is_available (NMDevice *device,
 gboolean nm_device_notify_component_added (NMDevice *device, GObject *component);
 
 gboolean nm_device_owns_iface (NMDevice *device, const char *iface);
+
+gboolean nm_device_get_admin_up (NMDevice *device);
 
 G_END_DECLS
 
