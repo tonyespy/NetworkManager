@@ -105,6 +105,7 @@ enum {
 	IP6_CONFIG_CHANGED,
 	REMOVED,
 	RECHECK_AUTO_ACTIVATE,
+	ADMIN_UP,
 	LAST_SIGNAL,
 };
 static guint signals[LAST_SIGNAL] = { 0 };
@@ -235,6 +236,7 @@ typedef struct {
 	gpointer        act_source6_func;
 
 	/* Link stuff */
+	gboolean        admin_up;  /* IFF_UP */
 	guint           link_connected_id;
 	guint           link_disconnected_id;
 	guint           carrier_defer_id;
@@ -1196,6 +1198,15 @@ link_changed_cb (NMPlatform *platform, int ifindex, NMPlatformLink *info, NMPlat
 		if (klass->link_changed)
 			klass->link_changed (device, info);
 
+		if (priv->admin_up != info->up) {
+			priv->admin_up = info->up;
+
+			/* If this is the first time a device that we're waiting to come up
+			 * has come up, notify the manager.
+			 */
+			if (priv->admin_up && !nm_device_get_managed_flag (device, NM_MANAGED_ADMIN_UP))
+				g_signal_emit (device, signals[ADMIN_UP], 0);
+		}
 	} else if (priv->ip_iface && ifindex == nm_device_get_ip_ifindex (device)) {
 		if (info->name[0] && strcmp (priv->ip_iface, info->name)) {
 			nm_log_info (LOGD_DEVICE, "(%s): interface index %d renamed ip_iface (%d) from '%s' to '%s'",
@@ -6376,6 +6387,13 @@ nm_device_class_init (NMDeviceClass *klass)
 		              0, NULL, NULL, NULL,
 		              G_TYPE_NONE, 0);
 
+	signals[ADMIN_UP] =
+		g_signal_new (NM_DEVICE_ADMIN_UP,
+		              G_OBJECT_CLASS_TYPE (object_class),
+		              G_SIGNAL_RUN_FIRST,
+		              0, NULL, NULL, NULL,
+		              G_TYPE_NONE, 0);
+
 	nm_dbus_manager_register_exported_type (nm_dbus_manager_get (),
 	                                        G_TYPE_FROM_CLASS (klass),
 	                                        &dbus_glib_nm_device_object_info);
@@ -7164,6 +7182,8 @@ nm_device_get_managed_flag (NMDevice *device, NMManagedFlags flag)
 		if (!(priv->managed_flags & NM_MANAGED_INTERNAL))
 			return FALSE;
 		else if (!(priv->managed_flags & NM_MANAGED_USER))
+			return FALSE;
+		else if (!(priv->managed_flags & NM_MANAGED_ADMIN_UP))
 			return FALSE;
 		else if (!(priv->managed_flags & NM_MANAGED_DEFAULT))
 			return (priv->state != NM_DEVICE_STATE_UNMANAGED);

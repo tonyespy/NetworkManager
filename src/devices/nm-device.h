@@ -76,6 +76,7 @@
 #define NM_DEVICE_IP6_CONFIG_CHANGED    "ip6-config-changed"
 #define NM_DEVICE_REMOVED               "removed"
 #define NM_DEVICE_RECHECK_AUTO_ACTIVATE "recheck-auto-activate"
+#define NM_DEVICE_ADMIN_UP              "admin-up"
 
 
 G_BEGIN_DECLS
@@ -303,6 +304,8 @@ RfKillType nm_device_get_rfkill_type (NMDevice *device);
  * @NM_MANAGED_INTERNAL: whether managed by internal decision (ie, because NM
  *   is sleeping or not managed the device for some other reason)
  * @NM_MANAGED_USER: whether managed by user decision (ie, not in unmanaged-specs)
+ * @NM_MANAGED_ADMIN_UP: whether managed because device is administratively
+ *   enabled (IFF_UP)
  */
 typedef enum {
 	NM_MANAGED_UNKNOWN   = 0x00,
@@ -310,10 +313,11 @@ typedef enum {
 	NM_MANAGED_DEFAULT   = 0x01,
 	NM_MANAGED_INTERNAL  = 0x02,
 	NM_MANAGED_USER      = 0x04,
+	NM_MANAGED_ADMIN_UP  = 0x08,
 
 	/* Boundary values */
-	NM_MANAGED_LAST      = NM_MANAGED_USER,
-	NM_MANAGED_ALL       = NM_MANAGED_DEFAULT | NM_MANAGED_INTERNAL | NM_MANAGED_USER,
+	NM_MANAGED_LAST      = NM_MANAGED_ADMIN_UP,
+	NM_MANAGED_ALL       = NM_MANAGED_DEFAULT | NM_MANAGED_INTERNAL | NM_MANAGED_USER | NM_MANAGED_ADMIN_UP,
 } NMManagedFlags;
 
 gboolean nm_device_get_managed (NMDevice *device);

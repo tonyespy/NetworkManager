@@ -1735,6 +1735,64 @@ get_existing_connection (NMManager *manager, NMDevice *device)
 	return added ? NM_CONNECTION (added) : NULL;
 }
 
+static void
+assume_connection (NMManager *self, NMDevice *device, NMConnection *connection)
+{
+	NMActiveConnection *active, *master_ac = NULL;
+	NMAuthSubject *subject;
+	GError *error = NULL;
+
+	nm_log_dbg (LOGD_DEVICE, "(%s): will attempt to assume connection '%s'",
+	            nm_device_get_iface (device),
+	            nm_connection_get_id (connection));
+
+	/* Move device to DISCONNECTED to activate the connection */
+	nm_device_state_changed (device,
+	                         NM_DEVICE_STATE_DISCONNECTED,
+	                         NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED);
+
+	subject = nm_auth_subject_new_internal ();
+	active = _new_active_connection (self, connection, NULL, device, subject, &error);
+	if (active) {
+		/* If the device is a slave or VLAN, find the master ActiveConnection */
+		if (find_master (self, connection, device, NULL, NULL, &master_ac, NULL) && master_ac)
+			nm_active_connection_set_master (active, master_ac);
+
+		nm_active_connection_set_assumed (active, TRUE);
+		nm_active_connection_export (active);
+		active_connection_add (self, active);
+		nm_device_queue_activation (device, NM_ACT_REQUEST (active));
+		g_object_unref (active);
+	} else {
+		nm_log_warn (LOGD_DEVICE, "(%s): assumed connection '%s' failed to activate: (%d) %s",
+		             nm_device_get_iface (device),
+		             nm_connection_get_id (connection),
+		             error ? error->code : -1,
+		             error && error->message ? error->message : "(unknown)");
+		g_error_free (error);
+	}
+	g_object_unref (subject);
+}
+
+static void
+device_admin_up (NMDevice *device, gpointer user_data)
+{
+	NMManager *self = NM_MANAGER (user_data);
+	NMConnection *connection = NULL;
+
+	if (nm_device_get_managed_flag (device, NM_MANAGED_USER) &&
+	    nm_device_get_managed_flag (device, NM_MANAGED_INTERNAL))
+		connection = get_existing_connection (self, device);
+
+	nm_device_set_managed (device,
+	                       NM_MANAGED_ADMIN_UP,
+	                       TRUE,
+	                       connection ? NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED :
+	                                    NM_DEVICE_STATE_REASON_NOW_MANAGED);
+	if (nm_device_get_managed (device) && connection)
+		assume_connection (self, device, connection);
+}
+
 /**
  * add_device:
  * @self: the #NMManager
@@ -1752,12 +1810,13 @@ add_device (NMManager *self, NMDevice *device, gboolean generate_con)
 	char *path;
 	static guint32 devcount = 0;
 	const GSList *unmanaged_specs;
-	gboolean user_unmanaged, sleeping;
+	gboolean user_unmanaged, sleeping, wait_for_up;
 	NMConnection *connection = NULL;
 	gboolean enabled = FALSE;
 	RfKillType rtype;
 	NMDeviceType devtype;
 	GSList *iter, *remove = NULL;
+	int ifindex;
 
 	devtype = nm_device_get_device_type (device);
 
@@ -1793,6 +1852,10 @@ add_device (NMManager *self, NMDevice *device, gboolean generate_con)
 
 	g_signal_connect (device, NM_DEVICE_REMOVED,
 	                  G_CALLBACK (device_removed_cb),
+	                  self);
+
+	g_signal_connect (device, NM_DEVICE_ADMIN_UP,
+	                  G_CALLBACK (device_admin_up),
 	                  self);
 
 	if (priv->startup) {
@@ -1838,17 +1901,26 @@ add_device (NMManager *self, NMDevice *device, gboolean generate_con)
 	type_desc = nm_device_get_type_desc (device);
 	g_assert (type_desc);
 	driver = nm_device_get_driver (device);
+	ifindex = nm_device_get_ifindex (device);
 	if (!driver)
 		driver = "unknown";
 	nm_log_info (LOGD_HW, "(%s): new %s device (driver: '%s' ifindex: %d)",
-	             iface, type_desc, driver, nm_device_get_ifindex (device));
+	             iface, type_desc, driver, ifindex);
 
 	unmanaged_specs = nm_settings_get_unmanaged_specs (priv->settings);
 	user_unmanaged = nm_device_spec_match_list (device, unmanaged_specs);
 	sleeping = manager_sleeping (self);
+
+	/* Don't manage downed software devices until the user brings them up */
+	wait_for_up = (generate_con &&
+	               nm_device_is_software (device) &&
+	               !nm_platform_link_is_up (ifindex) &&
+	               !nm_device_get_default_unmanaged (device));
+
 	nm_device_set_initial_managed_flags (device,
 	                                     NM_MANAGED_USER, !user_unmanaged,
 	                                     NM_MANAGED_INTERNAL, !sleeping,
+	                                     NM_MANAGED_ADMIN_UP, !wait_for_up,
 	                                     NM_MANAGED_UNKNOWN);
 
 	path = g_strdup_printf ("/org/freedesktop/NetworkManager/Devices/%d", devcount++);
@@ -1858,8 +1930,8 @@ add_device (NMManager *self, NMDevice *device, gboolean generate_con)
 	g_free (path);
 
 	/* Don't generate a connection e.g. for devices NM just created, or
-	 * for the loopback, or when we're sleeping. */
-	if (generate_con && !user_unmanaged && !sleeping)
+	 * for the loopback, or when we're not managing the device yet. */
+	if (generate_con && !user_unmanaged && !sleeping && !wait_for_up)
 		connection = get_existing_connection (self, device);
 
 	/* Start the device if it'supposed to be managed.  Note that this will
@@ -1882,42 +1954,8 @@ add_device (NMManager *self, NMDevice *device, gboolean generate_con)
 	system_create_virtual_devices (self);
 
 	/* If the device has a connection it can assume, do that now */
-	if (connection) {
-		NMActiveConnection *active;
-		NMAuthSubject *subject;
-		GError *error = NULL;
-
-		nm_log_dbg (LOGD_DEVICE, "(%s): will attempt to assume connection",
-		            nm_device_get_iface (device));
-
-		/* Move device to DISCONNECTED to activate the connection */
-		nm_device_state_changed (device,
-		                         NM_DEVICE_STATE_DISCONNECTED,
-		                         NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED);
-
-		subject = nm_auth_subject_new_internal ();
-		active = _new_active_connection (self, connection, NULL, device, subject, &error);
-		if (active) {
-			NMActiveConnection *master_ac = NULL;
-
-			/* If the device is a slave or VLAN, find the master ActiveConnection */
-			if (find_master (self, connection, device, NULL, NULL, &master_ac, NULL) && master_ac)
-				nm_active_connection_set_master (active, master_ac);
-
-			nm_active_connection_set_assumed (active, TRUE);
-			nm_active_connection_export (active);
-			active_connection_add (self, active);
-			nm_device_queue_activation (device, NM_ACT_REQUEST (active));
-			g_object_unref (active);
-		} else {
-			nm_log_warn (LOGD_DEVICE, "assumed connection %s failed to activate: (%d) %s",
-			             nm_connection_get_path (connection),
-			             error ? error->code : -1,
-			             error && error->message ? error->message : "(unknown)");
-			g_error_free (error);
-		}
-		g_object_unref (subject);
-	}
+	if (connection)
+		assume_connection (self, device, connection);
 }
 
 static NMDevice *
