@@ -295,12 +295,33 @@ void nm_device_set_enabled (NMDevice *device, gboolean enabled);
 
 RfKillType nm_device_get_rfkill_type (NMDevice *device);
 
+/**
+ * NMManagedFlags:
+ * @NM_MANAGED_UNKNOWN: placeholder value
+ * @NM_MANAGED_COMPOSITE: same as %NM_MANAGED_UNKNOWN, used for readability
+ * @NM_MANAGED_DEFAULT: whether managed by default (ie, not set for Generic devices)
+ * @NM_MANAGED_INTERNAL: whether managed by internal decision (ie, not set for
+ *   devices in unmanaged specs, or because NM is sleeping)
+ */
+typedef enum {
+	NM_MANAGED_UNKNOWN   = 0x00,
+	NM_MANAGED_COMPOSITE = NM_MANAGED_UNKNOWN,
+	NM_MANAGED_DEFAULT   = 0x01,
+	NM_MANAGED_INTERNAL  = 0x02,
+
+	/* Boundary values */
+	NM_MANAGED_LAST      = NM_MANAGED_INTERNAL,
+	NM_MANAGED_ALL       = NM_MANAGED_DEFAULT | NM_MANAGED_INTERNAL,
+} NMManagedFlags;
+
 gboolean nm_device_get_managed (NMDevice *device);
-void nm_device_set_manager_managed (NMDevice *device,
-                                    gboolean managed,
-                                    NMDeviceStateReason reason);
-void nm_device_set_default_unmanaged (NMDevice *device,
-                                      gboolean default_unmanaged);
+gboolean nm_device_get_default_unmanaged (NMDevice *device);
+gboolean nm_device_get_managed_flag (NMDevice *device, NMManagedFlags flag);
+void nm_device_set_managed (NMDevice *device,
+                            NMManagedFlags flag,
+                            gboolean managed,
+                            NMDeviceStateReason reason);
+void nm_device_set_initial_managed_flags (NMDevice *device, ...);
 
 gboolean nm_device_get_is_nm_owned (NMDevice *device);
 gboolean nm_device_set_is_nm_owned (NMDevice *device,

@@ -127,7 +127,9 @@ nm_device_generic_new (NMPlatformLink *platform_device)
 static void
 nm_device_generic_init (NMDeviceGeneric *self)
 {
-	nm_device_set_default_unmanaged (NM_DEVICE (self), TRUE);
+	nm_device_set_initial_managed_flags (NM_DEVICE (self),
+	                                     NM_MANAGED_DEFAULT, FALSE,
+	                                     NM_MANAGED_UNKNOWN);
 }
 
 static void
