@@ -303,19 +303,25 @@ RfKillType nm_device_get_rfkill_type (NMDevice *device);
  * @NM_UNMANAGED_INTERNAL: %TRUE when unmanaged by internal decision (ie,
  *   because NM is sleeping or not managed for some other reason)
  * @NM_UNMANAGED_USER: %TRUE when unmanaged by user decision (via unmanaged-specs)
+ * @NM_MANAGED_ADMIN_DOWN: whether unmanaged because device is administratively
+ *   down (!IFF_UP)
  */
 typedef enum {
-	NM_UNMANAGED_NONE     = 0x00,
-	NM_UNMANAGED_DEFAULT  = 0x01,
-	NM_UNMANAGED_INTERNAL = 0x02,
-	NM_UNMANAGED_USER     = 0x04,
+	NM_UNMANAGED_NONE       = 0x00,
+	NM_UNMANAGED_DEFAULT    = 0x01,
+	NM_UNMANAGED_INTERNAL   = 0x02,
+	NM_UNMANAGED_USER       = 0x04,
+	NM_UNMANAGED_ADMIN_DOWN = 0x08,
 
 	/* Boundary value */
 	__NM_UNMANAGED_LAST,
-	NM_UNMANAGED_LAST     = __NM_UNMANAGED_LAST - 1,
+	NM_UNMANAGED_LAST       = __NM_UNMANAGED_LAST - 1,
 } NMUnmanagedFlags;
 
 gboolean nm_device_get_managed (NMDevice *device);
+gboolean nm_device_would_be_managed (NMDevice *device,
+                                     NMUnmanagedFlags flag,
+                                     gboolean unmanaged);
 gboolean nm_device_get_default_unmanaged (NMDevice *device);
 gboolean nm_device_get_unmanaged_flag (NMDevice *device, NMUnmanagedFlags flag);
 void nm_device_set_unmanaged (NMDevice *device,

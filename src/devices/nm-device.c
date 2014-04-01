@@ -1204,7 +1204,7 @@ link_changed_cb (NMPlatform *platform, int ifindex, NMPlatformLink *info, NMPlat
 		if (klass->link_changed)
 			klass->link_changed (device, info);
 
-		if (priv->admin_up == !!info->up) {
+		if (priv->admin_up != !!info->up) {
 			priv->admin_up = !!info->up;
 			g_object_notify (G_OBJECT (device), NM_DEVICE_ADMIN_UP);
 		}
@@ -7140,6 +7140,25 @@ nm_device_queued_ip_config_change_clear (NMDevice *self)
 	}
 }
 
+static gboolean
+_get_managed_from_flags (NMDevice *device, NMUnmanagedFlags flags)
+{
+	gboolean managed;
+
+	g_return_val_if_fail (NM_IS_DEVICE (device), FALSE);
+
+	/* Return the composite of all managed flags.  However, if the device
+	 * is a default-unmanaged device, and would be managed except for the
+	 * default-unmanaged flag (eg, only NM_UNMANAGED_DEFAULT is set) then
+	 * the device is managed whenever it's not in the UNMANAGED state.
+	 */
+	managed = !(flags & ~NM_UNMANAGED_DEFAULT);
+	if (managed && (flags & NM_UNMANAGED_DEFAULT))
+		managed = (nm_device_get_state (device) != NM_DEVICE_STATE_UNMANAGED);
+
+	return managed;
+}
+
 /**
  * nm_device_get_managed():
  * @device: the #NMDevice
@@ -7149,23 +7168,39 @@ nm_device_queued_ip_config_change_clear (NMDevice *self)
 gboolean
 nm_device_get_managed (NMDevice *device)
 {
-	NMDevicePrivate *priv;
-	gboolean managed;
+	g_return_val_if_fail (NM_IS_DEVICE (device), FALSE);
+
+	return _get_managed_from_flags (device, NM_DEVICE_GET_PRIVATE (device)->unmanaged_flags);
+}
+
+/**
+ * nm_device_would_be_managed():
+ * @device: the #NMDevice
+ * @flag: the #NMUnmanageFlag to check
+ * @unmanaged: the value for @flag
+ *
+ * Checks if a device would be managed or not if the unmanaged flag @flag
+ * was changed to @value, without actually changing @flag to @value.
+ *
+ * Returns: %TRUE if the device would be managed if @flag was changed to
+ * @value, %FALSE if not
+ */
+gboolean
+nm_device_would_be_managed (NMDevice *device,
+                            NMUnmanagedFlags flag,
+                            gboolean unmanaged)
+{
+	NMUnmanagedFlags new_flags;
 
 	g_return_val_if_fail (NM_IS_DEVICE (device), FALSE);
 
-	priv = NM_DEVICE_GET_PRIVATE (device);
+	new_flags = NM_DEVICE_GET_PRIVATE (device)->unmanaged_flags;
+	if (unmanaged)
+		new_flags |= flag;
+	else
+		new_flags &= ~flag;
 
-	/* Return the composite of all managed flags.  However, if the device
-	 * is a default-unmanaged device, and would be managed except for the
-	 * default-unmanaged flag (eg, only NM_UNMANAGED_DEFAULT is set) then
-	 * the device is managed whenever it's not in the UNMANAGED state.
-	 */
-	managed = !(priv->unmanaged_flags & ~NM_UNMANAGED_DEFAULT);
-	if (managed && (priv->unmanaged_flags & NM_UNMANAGED_DEFAULT))
-		managed = (priv->state != NM_DEVICE_STATE_UNMANAGED);
-
-	return managed;
+	return _get_managed_from_flags (device, new_flags);
 }
 
 /**
