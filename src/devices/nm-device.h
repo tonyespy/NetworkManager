@@ -300,18 +300,20 @@ RfKillType nm_device_get_rfkill_type (NMDevice *device);
  * @NM_MANAGED_UNKNOWN: placeholder value
  * @NM_MANAGED_COMPOSITE: same as %NM_MANAGED_UNKNOWN, used for readability
  * @NM_MANAGED_DEFAULT: whether managed by default (ie, not set for Generic devices)
- * @NM_MANAGED_INTERNAL: whether managed by internal decision (ie, not set for
- *   devices in unmanaged specs, or because NM is sleeping)
+ * @NM_MANAGED_INTERNAL: whether managed by internal decision (ie, because NM
+ *   is sleeping or not managed the device for some other reason)
+ * @NM_MANAGED_USER: whether managed by user decision (ie, not in unmanaged-specs)
  */
 typedef enum {
 	NM_MANAGED_UNKNOWN   = 0x00,
 	NM_MANAGED_COMPOSITE = NM_MANAGED_UNKNOWN,
 	NM_MANAGED_DEFAULT   = 0x01,
 	NM_MANAGED_INTERNAL  = 0x02,
+	NM_MANAGED_USER      = 0x04,
 
 	/* Boundary values */
-	NM_MANAGED_LAST      = NM_MANAGED_INTERNAL,
-	NM_MANAGED_ALL       = NM_MANAGED_DEFAULT | NM_MANAGED_INTERNAL,
+	NM_MANAGED_LAST      = NM_MANAGED_USER,
+	NM_MANAGED_ALL       = NM_MANAGED_DEFAULT | NM_MANAGED_INTERNAL | NM_MANAGED_USER,
 } NMManagedFlags;
 
 gboolean nm_device_get_managed (NMDevice *device);

@@ -1203,7 +1203,7 @@ system_unmanaged_devices_changed_cb (NMSettings *settings,
 
 		managed = !nm_device_spec_match_list (device, unmanaged_specs);
 		nm_device_set_managed (device,
-		                       NM_MANAGED_INTERNAL,
+		                       NM_MANAGED_USER,
 		                       managed,
 		                       managed ? NM_DEVICE_STATE_REASON_NOW_MANAGED :
 		                                 NM_DEVICE_STATE_REASON_NOW_UNMANAGED);
@@ -1752,7 +1752,7 @@ add_device (NMManager *self, NMDevice *device, gboolean generate_con)
 	char *path;
 	static guint32 devcount = 0;
 	const GSList *unmanaged_specs;
-	gboolean unmanaged = FALSE;
+	gboolean user_unmanaged, sleeping;
 	NMConnection *connection = NULL;
 	gboolean enabled = FALSE;
 	RfKillType rtype;
@@ -1843,28 +1843,33 @@ add_device (NMManager *self, NMDevice *device, gboolean generate_con)
 	nm_log_info (LOGD_HW, "(%s): new %s device (driver: '%s' ifindex: %d)",
 	             iface, type_desc, driver, nm_device_get_ifindex (device));
 
+	unmanaged_specs = nm_settings_get_unmanaged_specs (priv->settings);
+	user_unmanaged = nm_device_spec_match_list (device, unmanaged_specs);
+	sleeping = manager_sleeping (self);
+	nm_device_set_initial_managed_flags (device,
+	                                     NM_MANAGED_USER, !user_unmanaged,
+	                                     NM_MANAGED_INTERNAL, !sleeping,
+	                                     NM_MANAGED_UNKNOWN);
+
 	path = g_strdup_printf ("/org/freedesktop/NetworkManager/Devices/%d", devcount++);
 	nm_device_set_path (device, path);
 	nm_dbus_manager_register_object (priv->dbus_mgr, path, device);
 	nm_log_info (LOGD_CORE, "(%s): exported as %s", iface, path);
 	g_free (path);
 
-	unmanaged_specs = nm_settings_get_unmanaged_specs (priv->settings);
-	unmanaged = nm_device_spec_match_list (device, unmanaged_specs);
-
 	/* Don't generate a connection e.g. for devices NM just created, or
-	 * for the loopback */
-	if (generate_con && !unmanaged)
+	 * for the loopback, or when we're sleeping. */
+	if (generate_con && !user_unmanaged && !sleeping)
 		connection = get_existing_connection (self, device);
 
-	/* Start the device if it's supposed to be managed */
-	if (   !manager_sleeping (self)
-	    && !unmanaged) {
-		nm_device_set_managed (device,
-		                       NM_MANAGED_INTERNAL,
-		                       TRUE,
-		                       connection ? NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED :
-		                                    NM_DEVICE_STATE_REASON_NOW_MANAGED);
+	/* Start the device if it'supposed to be managed.  Note that this will
+	 * manage default-unmanaged devices if they have a generated connection.
+	 */
+	if (nm_device_get_managed (device) || connection) {
+		nm_device_state_changed (device,
+		                         NM_DEVICE_STATE_UNAVAILABLE,
+		                         connection ? NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED :
+		                                      NM_DEVICE_STATE_REASON_NOW_MANAGED);
 	}
 
 	nm_settings_device_added (priv->settings, device);

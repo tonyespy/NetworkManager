@@ -7163,6 +7163,8 @@ nm_device_get_managed_flag (NMDevice *device, NMManagedFlags flag)
 		/* Return the composite of all managed flags */
 		if (!(priv->managed_flags & NM_MANAGED_INTERNAL))
 			return FALSE;
+		else if (!(priv->managed_flags & NM_MANAGED_USER))
+			return FALSE;
 		else if (!(priv->managed_flags & NM_MANAGED_DEFAULT))
 			return (priv->state != NM_DEVICE_STATE_UNMANAGED);
 
