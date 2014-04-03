@@ -105,6 +105,8 @@ nm_sources = \
 	dhcp-manager/nm-dhcp-dhclient-utils.h \
 	dhcp-manager/nm-dhcp-dhcpcd.c \
 	dhcp-manager/nm-dhcp-dhcpcd.h \
+	dhcp-manager/gdhcp/nm-gdhcp.c \
+	dhcp-manager/gdhcp/nm-gdhcp.h \
 	dhcp-manager/nm-dhcp-manager.c \
 	dhcp-manager/nm-dhcp-manager.h \
 	\
@@ -272,6 +274,15 @@ nm_sources += \
 	platform/wifi/wifi-utils-wext.h
 endif
 
+gdhcp_sources = \
+	dhcp-manager/gdhcp/client.c \
+	dhcp-manager/gdhcp/common.c \
+	dhcp-manager/gdhcp/common.h \
+	dhcp-manager/gdhcp/gdhcp.h \
+	dhcp-manager/gdhcp/ipv4ll.c \
+	dhcp-manager/gdhcp/ipv4ll.h \
+	dhcp-manager/gdhcp/server.c \
+	dhcp-manager/gdhcp/unaligned.h
 
 GLIB_GENERATED = nm-enum-types.h nm-enum-types.c
 GLIB_MKENUMS_H_FLAGS = --identifier-prefix NM
@@ -354,6 +365,7 @@ endif
 
 libNetworkManager_la_SOURCES = \
 	$(nm_sources) \
+	$(gdhcp_sources) \
 	$(glue_sources)
 
 libNetworkManager_la_LIBADD = \
