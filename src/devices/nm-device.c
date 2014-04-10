@@ -183,6 +183,7 @@ typedef struct {
 	char *        path;
 	char *        iface;   /* may change, could be renamed by user */
 	int           ifindex;
+	NMLinkType    link_type;
 	gboolean      is_software;
 	char *        ip_iface;
 	int           ip_ifindex;
@@ -574,6 +575,30 @@ nm_device_set_ip_iface (NMDevice *self, const char *iface)
 	if (g_strcmp0 (old_ip_iface, priv->ip_iface))
 		g_object_notify (G_OBJECT (self), NM_DEVICE_IP_IFACE);
 	g_free (old_ip_iface);
+}
+
+static NMUtilsIPv6IfaceId
+get_ip_iface_identifier (NMDevice *self)
+{
+	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+	const guint8 *hwaddr = NULL;
+	size_t hwaddr_len = 0;
+	NMUtilsIPv6IfaceId iid;
+
+	if (priv->link_type == NM_LINK_TYPE_UNKNOWN)
+		return 0;
+
+	hwaddr = nm_platform_link_get_address (nm_device_get_ip_ifindex (self), &hwaddr_len);
+	if (!hwaddr_len)
+		return 0;
+
+	iid = nm_utils_get_ipv6_interface_identifier (priv->link_type, hwaddr, hwaddr_len);
+	if (!iid) {
+		nm_log_warn (LOGD_HW, "(%s): failed to generate interface identifier "
+		             "for link type %u hwaddr_len %zu",
+		             nm_device_get_ip_iface (self), priv->link_type, hwaddr_len);
+	}
+	return iid;
 }
 
 const char *
@@ -3684,15 +3709,9 @@ static void
 addrconf6_start_with_link_ready (NMDevice *self)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
-	const guint8 *hw_addr;
-	size_t hw_addr_len = 0;
+	NMUtilsIPv6IfaceId iid;
 
 	g_assert (priv->rdisc);
-
-	/* FIXME: what if interface has no lladdr, like PPP? */
-	hw_addr = nm_platform_link_get_address (nm_device_get_ip_ifindex (self), &hw_addr_len);
-	if (hw_addr_len)
-		nm_rdisc_set_lladdr (priv->rdisc, (const char *) hw_addr, hw_addr_len);
 
 	nm_device_ipv6_sysctl_set (self, "accept_ra", "1");
 	nm_device_ipv6_sysctl_set (self, "accept_ra_defrtr", "0");
@@ -3701,7 +3720,8 @@ addrconf6_start_with_link_ready (NMDevice *self)
 
 	priv->rdisc_config_changed_sigid = g_signal_connect (priv->rdisc, NM_RDISC_CONFIG_CHANGED,
 	                                                     G_CALLBACK (rdisc_config_changed), self);
-
+	iid = NM_DEVICE_GET_CLASS (self)->get_ip_iface_identifier (self);
+	nm_rdisc_set_iid (priv->rdisc, iid);
 	nm_rdisc_start (priv->rdisc);
 }
 
@@ -7102,6 +7122,7 @@ nm_device_init (NMDevice *self)
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 
 	priv->type = NM_DEVICE_TYPE_UNKNOWN;
+	priv->link_type = NM_LINK_TYPE_UNKNOWN;
 	priv->capabilities = NM_DEVICE_CAP_NM_SUPPORTED;
 	priv->state = NM_DEVICE_STATE_UNMANAGED;
 	priv->state_reason = NM_DEVICE_STATE_REASON_NONE;
@@ -7356,6 +7377,7 @@ set_property (GObject *object, guint prop_id,
 			g_free (priv->iface);
 			priv->iface = g_strdup (platform_device->name);
 			priv->ifindex = platform_device->ifindex;
+			priv->link_type = platform_device->type;
 			g_free (priv->driver);
 			priv->driver = g_strdup (platform_device->driver);
 		}
@@ -7619,6 +7641,7 @@ nm_device_class_init (NMDeviceClass *klass)
 	klass->bring_up = bring_up;
 	klass->take_down = take_down;
 	klass->carrier_changed = carrier_changed;
+	klass->get_ip_iface_identifier = get_ip_iface_identifier;
 
 	/* Properties */
 	g_object_class_install_property

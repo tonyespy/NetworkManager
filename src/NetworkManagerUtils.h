@@ -32,6 +32,7 @@
 #include "nm-setting-ip6-config.h"
 #include "nm-connection.h"
 #include "nm-setting-private.h"
+#include "nm-platform.h"
 
 gboolean nm_ethernet_address_is_valid (const struct ether_addr *test_addr);
 
@@ -135,5 +136,15 @@ const char *ASSERT_VALID_PATH_COMPONENT (const char *name) G_GNUC_WARN_UNUSED_RE
 const char *nm_utils_ip6_property_path (const char *ifname, const char *property);
 
 gboolean nm_utils_is_specific_hostname (const char *name);
+
+/* IPv6 Interface Identifer helpers */
+typedef guint64 NMUtilsIPv6IfaceId;
+
+NMUtilsIPv6IfaceId nm_utils_get_ipv6_interface_identifier (NMLinkType link_type,
+                                                           const guint8 *hwaddr,
+                                                           guint len);
+
+void nm_utils_ipv6_addr_set_interface_identfier (struct in6_addr *addr,
+                                                 NMUtilsIPv6IfaceId iid);
 
 #endif /* NETWORK_MANAGER_UTILS_H */
