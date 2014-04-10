@@ -32,6 +32,7 @@
 #include "nm-setting-ip6-config.h"
 #include "nm-connection.h"
 #include "nm-setting-private.h"
+#include "nm-platform.h"
 
 gboolean nm_ethernet_address_is_valid (const struct ether_addr *test_addr);
 
@@ -106,5 +107,36 @@ gint64 nm_utils_get_monotonic_timestamp_ms (void);
 gint32 nm_utils_get_monotonic_timestamp_s (void);
 
 const char *nm_utils_ip6_property_path (const char *ifname, const char *property);
+
+/* IPv6 Interface Identifer helpers */
+
+/**
+ * NMUtilsIPv6IfaceId:
+ * @id: convenience member for validity checking; never use directly
+ * @id_u8: the 64-bit Interface Identifier
+ *
+ * Holds a 64-bit IPv6 Interface Identifier.  The IID is a sequence of bytes
+ * and should not normally be treated as a %guint64, but this is done for
+ * convenience of validity checking and initialization.
+ */
+typedef struct {
+	union {
+		guint64 id;
+		guint8  id_u8[8];
+	};
+} NMUtilsIPv6IfaceId;
+
+#define NM_UTILS_IPV6_IFACE_ID_INIT { .id = 0 };
+
+gboolean nm_utils_get_ipv6_interface_identifier (NMLinkType link_type,
+                                                 const guint8 *hwaddr,
+                                                 guint len,
+                                                 NMUtilsIPv6IfaceId *out_iid);
+
+void nm_utils_ipv6_addr_set_interface_identfier (struct in6_addr *addr,
+                                                 const NMUtilsIPv6IfaceId iid);
+
+void nm_utils_ipv6_interface_identfier_get_from_addr (NMUtilsIPv6IfaceId *iid,
+                                                      const struct in6_addr *addr);
 
 #endif /* NETWORK_MANAGER_UTILS_H */

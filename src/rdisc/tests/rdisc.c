@@ -37,7 +37,6 @@ main (int argc, char **argv)
 	NMRDisc *(*new) (int ifindex, const char *ifname);
 	int ifindex = 1;
 	const char *ifname;
-	char mac[6] = { 0x02, 0xaa, 0xbb, 0xcc, 0xdd, 0xee };
 
 	g_type_init ();
 	loop = g_main_loop_new (NULL, FALSE);
@@ -65,8 +64,6 @@ main (int argc, char **argv)
 	rdisc = new (ifindex, ifname);
 	if (!rdisc)
 		return EXIT_FAILURE;
-
-	nm_rdisc_set_lladdr (rdisc, mac, 6);
 
 	nm_rdisc_start (rdisc);
 	g_main_loop_run (loop);
