@@ -422,6 +422,7 @@ AM_CPPFLAGS += \
 	$(LIBSOUP_CFLAGS) \
 	$(SYSTEMD_LOGIN_CFLAGS) \
 	$(SYSTEMD_DHCP_CFLAGS) \
+	$(SYSTEMD_INHIBIT_CFLAGS) \
 	\
 	-DBINDIR=\"$(bindir)\" \
 	-DDATADIR=\"$(datadir)\" \
@@ -459,6 +460,7 @@ libNetworkManager_la_LIBADD = \
 	$(GUDEV_LIBS) \
 	$(LIBNL_LIBS) \
 	$(SYSTEMD_LOGIN_LIBS) \
+	$(SYSTEMD_INHIBIT_LIBS) \
 	$(LIBNDP_LIBS) \
 	$(LIBDL) \
 	$(LIBM)

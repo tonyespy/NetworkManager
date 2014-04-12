@@ -25,6 +25,7 @@
 #include <glib/gi18n.h>
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
+#include <systemd/sd-daemon.h>
 
 #include "nm-logging.h"
 #include "nm-dbus-manager.h"
@@ -193,6 +194,10 @@ on_proxy_acquired (GObject *object,
 static void
 nm_sleep_monitor_init (NMSleepMonitor *self)
 {
+	if (!sd_booted()) {
+		nm_log_warn (LOGD_SUSPEND, "Skipping Sleep Monitor setup, system not booted with systemd");
+		return;
+	}
 	self->inhibit_fd = -1;
 	g_dbus_proxy_new_for_bus (G_BUS_TYPE_SYSTEM,
 	                          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START |
