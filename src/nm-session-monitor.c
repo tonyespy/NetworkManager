@@ -240,6 +240,7 @@ nm_session_monitor_finalize_systemd (NMSessionMonitor *monitor)
 
 	g_source_destroy (monitor->sd.source);
 	g_source_unref (monitor->sd.source);
+	monitor->sd.source = NULL;
 }
 #endif /* SESSION_TRACKING_SYSTEMD */
 
@@ -339,8 +340,10 @@ free_database (NMSessionMonitor *self)
 		self->ck.database = NULL;
 	}
 
-	g_hash_table_remove_all (self->ck.sessions_by_uid);
-	g_hash_table_remove_all (self->ck.sessions_by_user);
+	if (self->ck.sessions_by_uid) {
+		g_hash_table_remove_all (self->ck.sessions_by_uid);
+		g_hash_table_remove_all (self->ck.sessions_by_user);
+	}
 }
 
 static gboolean
@@ -510,8 +513,12 @@ nm_session_monitor_init_consolekit (NMSessionMonitor *monitor)
 static void
 nm_session_monitor_finalize_consolekit (NMSessionMonitor *monitor)
 {
-	g_object_unref (monitor->ck.database_monitor);
+	g_clear_object (&monitor->ck.database_monitor);
 	free_database (monitor);
+	g_hash_table_destroy (monitor->ck.sessions_by_uid);
+	monitor->ck.sessions_by_uid = NULL;
+	g_hash_table_destroy (monitor->ck.sessions_by_user);
+	monitor->ck.sessions_by_user = NULL;
 }
 #endif /* SESSION_TRACKING_CONSOLEKIT */
 
