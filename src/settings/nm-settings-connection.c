@@ -97,7 +97,6 @@ static guint signals[LAST_SIGNAL] = { 0 };
 
 typedef struct {
 	NMAgentManager *agent_mgr;
-	NMSessionMonitor *session_monitor;
 	guint session_changed_id;
 
 	NMSettingsConnectionFlags flags;
@@ -267,7 +266,7 @@ nm_settings_connection_recheck_visibility (NMSettingsConnection *self)
 		const char *puser;
 
 		if (nm_setting_connection_get_permission (s_con, i, NULL, &puser, NULL)) {
-			if (nm_session_monitor_user_has_session (priv->session_monitor, puser, NULL, NULL)) {
+			if (nm_session_monitor_user_has_session (puser, NULL)) {
 				set_visible (self, TRUE);
 				return;
 			}
@@ -1069,7 +1068,7 @@ auth_start (NMSettingsConnection *self,
 
 	/* Ensure the caller can view this connection */
 	if (!nm_auth_is_subject_in_acl (NM_CONNECTION (self),
-	                                priv->session_monitor,
+	                                nm_session_monitor_get (),
 	                                subject,
 	                                &error_desc)) {
 		error = g_error_new_literal (NM_SETTINGS_ERROR,
@@ -1426,7 +1425,7 @@ impl_settings_connection_update_helper (NMSettingsConnection *self,
 	 * invisible to yourself.
 	 */
 	if (!nm_auth_is_subject_in_acl (tmp ? tmp : NM_CONNECTION (self),
-	                                priv->session_monitor,
+	                                nm_session_monitor_get (),
 	                                subject,
 	                                &error_desc)) {
 		error = g_error_new_literal (NM_SETTINGS_ERROR,
@@ -2170,11 +2169,7 @@ nm_settings_connection_init (NMSettingsConnection *self)
 
 	priv->visible = FALSE;
 
-	priv->session_monitor = nm_session_monitor_get ();
-	priv->session_changed_id = g_signal_connect (priv->session_monitor,
-	                                             NM_SESSION_MONITOR_CHANGED,
-	                                             G_CALLBACK (session_changed_cb),
-	                                             self);
+	priv->session_changed_id = nm_session_monitor_connect (session_changed_cb, self);
 
 	priv->agent_mgr = nm_agent_manager_get ();
 
@@ -2225,7 +2220,7 @@ dispose (GObject *object)
 	set_visible (self, FALSE);
 
 	if (priv->session_changed_id) {
-		g_signal_handler_disconnect (priv->session_monitor, priv->session_changed_id);
+		g_signal_handler_disconnect (nm_session_monitor_get (), priv->session_changed_id);
 		priv->session_changed_id = 0;
 	}
 	g_clear_object (&priv->agent_mgr);
