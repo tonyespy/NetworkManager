@@ -63,7 +63,6 @@ struct _NMSessionMonitor {
 		GFileMonitor *database_monitor;
 		time_t database_mtime;
 		GHashTable *sessions_by_uid;
-		GHashTable *sessions_by_user;
 	} ck;
 #endif
 
@@ -206,7 +205,6 @@ sd_finalize (NMSessionMonitor *monitor)
 
 #ifdef SESSION_TRACKING_CONSOLEKIT
 typedef struct {
-	char *user;
 	uid_t uid;
 	gboolean local;
 	gboolean active;
@@ -215,7 +213,6 @@ typedef struct {
 static void
 ck_session_free (CkSession *session)
 {
-	g_free (session->user);
 	memset (session, 0, sizeof (CkSession));
 	g_free (session);
 }
@@ -241,7 +238,6 @@ ck_session_new (GKeyFile *keyfile, const char *group, GError **error)
 {
 	GError *local = NULL;
 	CkSession *session;
-	const char *uname = NULL;
 
 	session = g_new0 (CkSession, 1);
 	g_assert (session);
@@ -265,11 +261,6 @@ ck_session_new (GKeyFile *keyfile, const char *group, GError **error)
 	if (local)
 		goto error;
 
-	uname = nm_session_monitor_uid_to_user (session->uid, error);
-	if (!uname)
-		return FALSE;
-	session->user = g_strdup (uname);
-
 	return session;
 
 error:
@@ -284,7 +275,6 @@ ck_session_merge (CkSession *src, CkSession *dest)
 	g_return_if_fail (src != NULL);
 	g_return_if_fail (dest != NULL);
 
-	g_warn_if_fail (g_strcmp0 (src->user, dest->user) == 0);
 	g_warn_if_fail (src->uid == dest->uid);
 
 	dest->local = (dest->local || src->local);
@@ -299,10 +289,8 @@ ck_free_database (NMSessionMonitor *self)
 		self->ck.database = NULL;
 	}
 
-	if (self->ck.sessions_by_uid) {
+	if (self->ck.sessions_by_uid)
 		g_hash_table_remove_all (self->ck.sessions_by_uid);
-		g_hash_table_remove_all (self->ck.sessions_by_user);
-	}
 }
 
 static gboolean
@@ -349,13 +337,12 @@ ck_reload_database (NMSessionMonitor *self, GError **error)
 		if (!session)
 			goto error;
 
-		found = g_hash_table_lookup (self->ck.sessions_by_user, (gpointer) session->user);
+		found = g_hash_table_lookup (self->ck.sessions_by_uid, GUINT_TO_POINTER (session->uid));
 		if (found) {
 			ck_session_merge (session, found);
 			ck_session_free (session);
 		} else {
 			/* Entirely new user */
-			g_hash_table_insert (self->ck.sessions_by_user, (gpointer) session->user, session);
 			g_hash_table_insert (self->ck.sessions_by_uid, GUINT_TO_POINTER (session->uid), session);
 		}
 	}
@@ -446,9 +433,8 @@ ck_init (NMSessionMonitor *monitor)
 	GFile *file;
 
 	/* Sessions-by-user is responsible for destroying the Session objects */
-	monitor->ck.sessions_by_user = g_hash_table_new_full (g_str_hash, g_str_equal,
+	monitor->ck.sessions_by_uid = g_hash_table_new_full (g_direct_hash, g_direct_equal,
 	                                                      NULL, (GDestroyNotify) ck_session_free);
-	monitor->ck.sessions_by_uid = g_hash_table_new (g_direct_hash, g_direct_equal);
 
 	if (!ck_ensure_database (monitor, &error)) {
 		nm_log_dbg (LOGD_CORE, "Error loading " CKDB_PATH ": %s", error->message);
@@ -476,8 +462,6 @@ ck_finalize (NMSessionMonitor *monitor)
 	ck_free_database (monitor);
 	g_hash_table_destroy (monitor->ck.sessions_by_uid);
 	monitor->ck.sessions_by_uid = NULL;
-	g_hash_table_destroy (monitor->ck.sessions_by_user);
-	monitor->ck.sessions_by_user = NULL;
 }
 #endif /* SESSION_TRACKING_CONSOLEKIT */
 
