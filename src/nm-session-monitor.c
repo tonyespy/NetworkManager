@@ -71,8 +71,6 @@ struct _NMSessionMonitor {
 
 struct _NMSessionMonitorClass {
 	GObjectClass parent_class;
-
-	void (*changed) (NMSessionMonitor *monitor);
 };
 
 G_DEFINE_TYPE (NMSessionMonitor, nm_session_monitor, G_TYPE_OBJECT);
@@ -230,10 +228,10 @@ ck_check_key (GKeyFile *keyfile, const char *group, const char *key, GError **er
 
 	if (!error) {
 		g_set_error (error,
-			         NM_MANAGER_ERROR,
-			         NM_MANAGER_ERROR_FAILED,
-			         "ConsoleKit database " CKDB_PATH " group '%s' had no '%s' key",
-			         group, key);
+		             NM_MANAGER_ERROR,
+		             NM_MANAGER_ERROR_FAILED,
+		             "ConsoleKit database " CKDB_PATH " group '%s' had no '%s' key",
+		             group, key);
 	}
 	return FALSE;
 }
@@ -653,7 +651,6 @@ nm_session_monitor_class_init (NMSessionMonitorClass *klass)
 	signals[CHANGED] = g_signal_new (NM_SESSION_MONITOR_CHANGED,
 	                                 NM_TYPE_SESSION_MONITOR,
 	                                 G_SIGNAL_RUN_LAST,
-	                                 G_STRUCT_OFFSET (NMSessionMonitorClass, changed),
-	                                 NULL, NULL, NULL,
+	                                 0, NULL, NULL, NULL,
 	                                 G_TYPE_NONE, 0);
 }
