@@ -1699,9 +1699,6 @@ try_fill_ssid_for_hidden_ap (NMAccessPoint *ap)
 	}
 }
 
-#define MAC_FMT "%02x:%02x:%02x:%02x:%02x:%02x"
-#define MAC_ARG(x) ((guint8*)(x))[0],((guint8*)(x))[1],((guint8*)(x))[2],((guint8*)(x))[3],((guint8*)(x))[4],((guint8*)(x))[5]
-
 /*
  * merge_scanned_ap
  *
