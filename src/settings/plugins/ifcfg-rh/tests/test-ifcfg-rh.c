@@ -1407,6 +1407,41 @@ test_read_wired_ipv6_manual (void)
 	g_object_unref (connection);
 }
 
+static void
+test_read_wired_ipv6_manual2 (void)
+{
+	NMConnection *connection;
+	NMSettingIP6Config *s_ip6;
+	GError *error = NULL;
+	const char *expected_address1 = "fd00:10:30::23:5";
+	NMIP6Address *ip6_addr;
+	struct in6_addr addr;
+	gboolean success;
+
+	connection = connection_from_file (TEST_IFCFG_DIR"/network-scripts/ifcfg-test-wired-ipv6-manual2",
+	                                   NULL, TYPE_ETHERNET, NULL, NULL, NULL, NULL, NULL, &error, NULL);
+	g_assert_no_error (error);
+	g_assert (connection);
+	success = nm_connection_verify (connection, &error);
+	g_assert_no_error (error);
+	g_assert (success);
+	
+	/* ===== IPv6 SETTING ===== */
+	s_ip6 = nm_connection_get_setting_ip6_config (connection);
+	g_assert (s_ip6);
+	g_assert_cmpstr (nm_setting_ip6_config_get_method (s_ip6), ==, NM_SETTING_IP6_CONFIG_METHOD_MANUAL);
+	g_assert (nm_setting_ip6_config_get_never_default (s_ip6) == FALSE);
+
+	g_assert_cmpint (nm_setting_ip6_config_get_num_addresses (s_ip6), ==, 1);
+	ip6_addr = nm_setting_ip6_config_get_address (s_ip6, 0);
+	g_assert (ip6_addr);
+	g_assert_cmpint (nm_ip6_address_get_prefix (ip6_addr), ==, 80);
+	g_assert (inet_pton (AF_INET6, expected_address1, &addr) > 0);
+	g_assert (IN6_ARE_ADDR_EQUAL (nm_ip6_address_get_address (ip6_addr), &addr));
+
+	g_object_unref (connection);
+}
+
 #define TEST_IFCFG_WIRED_IPV6_ONLY TEST_IFCFG_DIR"/network-scripts/ifcfg-test-wired-ipv6-only"
 
 static void
@@ -13681,6 +13716,7 @@ int main (int argc, char **argv)
 	g_test_add_data_func (TPATH "wired/ipv4-manual-3", &read_wired_ipv4_manual_info[2], test_read_wired_ipv4_manual);
 	g_test_add_data_func (TPATH "wired/ipv4-manual-4", &read_wired_ipv4_manual_info[3], test_read_wired_ipv4_manual);
 	test_read_wired_ipv6_manual ();
+	test_read_wired_ipv6_manual2 ();
 	test_read_wired_ipv6_only ();
 	test_read_wired_dhcp6_only ();
 	test_read_onboot_no ();

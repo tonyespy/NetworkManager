@@ -74,6 +74,7 @@ EXTRA_DIST = \
 	ifcfg-test-wired-ipv4-manual-4 \
 	ifcfg-test-wired-ipv6-manual \
 	route6-test-wired-ipv6-manual \
+	ifcfg-test-wired-ipv6-manual2 \
 	ifcfg-test-wired-static-no-prefix-8 \
 	ifcfg-test-wired-static-no-prefix-16 \
 	ifcfg-test-wired-static-no-prefix-24 \
