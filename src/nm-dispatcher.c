@@ -177,6 +177,7 @@ typedef struct {
 	DispatcherFunc callback;
 	gpointer user_data;
 	guint idle_id;
+	gint64 start;
 } DispatchInfo;
 
 static void
@@ -234,10 +235,14 @@ validate_element (guint request_id, GValue *val, GType expected_type, guint idx,
 }
 
 static void
-dispatcher_results_process (guint request_id, DispatcherAction action, GPtrArray *results)
+dispatcher_results_process (guint request_id,
+                            DispatcherAction action,
+                            gint64 start,
+                            GPtrArray *results)
 {
 	guint i;
 	const Monitor *monitor = _get_monitor_by_action (action);
+	guint elapsed_ms = (guint) ((g_get_monotonic_time () - start) / 1000);
 
 	g_return_if_fail (results != NULL);
 
@@ -304,6 +309,9 @@ dispatcher_results_process (guint request_id, DispatcherAction action, GPtrArray
 			             err ? err : "", script_validation_msg);
 		}
 	}
+
+	nm_log_dbg (LOGD_DISPATCH, "(%u) dispatch time %ums",
+	            request_id, elapsed_ms);
 }
 
 static void
@@ -324,7 +332,7 @@ dispatcher_done_cb (DBusGProxy *proxy, DBusGProxyCall *call, gpointer user_data)
 	if (dbus_g_proxy_end_call (proxy, call, &error,
 	                           DISPATCHER_TYPE_RESULT_ARRAY, &results,
 	                           G_TYPE_INVALID)) {
-		dispatcher_results_process (info->request_id, info->action, results);
+		dispatcher_results_process (info->request_id, info->action, info->start, results);
 		free_results (results);
 	} else {
 		g_assert (error);
@@ -492,6 +500,7 @@ _dispatcher_call (DispatcherAction action,
 	/* Send the action to the dispatcher */
 	if (blocking) {
 		GPtrArray *results = NULL;
+		gint64 start = g_get_monotonic_time ();
 
 		success = dbus_g_proxy_call_with_timeout (proxy, "Action",
 		                                          CALL_TIMEOUT,
@@ -512,7 +521,7 @@ _dispatcher_call (DispatcherAction action,
 		                                          DISPATCHER_TYPE_RESULT_ARRAY, &results,
 		                                          G_TYPE_INVALID);
 		if (success) {
-			dispatcher_results_process (reqid, action, results);
+			dispatcher_results_process (reqid, action, start, results);
 			free_results (results);
 		} else {
 			nm_log_warn (LOGD_DISPATCH, "(%u) failed: (%d) %s", reqid, error->code, error->message);
@@ -524,6 +533,7 @@ _dispatcher_call (DispatcherAction action,
 		info->request_id = reqid;
 		info->callback = callback;
 		info->user_data = user_data;
+		info->start = g_get_monotonic_time ();
 		dbus_g_proxy_begin_call_with_timeout (proxy, "Action",
 		                                      dispatcher_done_cb,
 		                                      info,

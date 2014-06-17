@@ -106,6 +106,7 @@ typedef struct {
 	GPid pid;
 	DispatchResult result;
 	char *error;
+	gint64 start;
 } ScriptInfo;
 
 struct Request {
@@ -285,8 +286,10 @@ script_watch_cb (GPid pid, gint status, gpointer user_data)
 	}
 
 	if (script->result == DISPATCH_RESULT_SUCCESS) {
-		if (script->request->debug)
-			g_message ("Script '%s' complete", script->script);
+		if (script->request->debug) {
+			g_message ("Script '%s' complete (%u ms)", script->script,
+			           (guint) (g_get_monotonic_time () - script->start) / 1000);
+		}
 	} else {
 		script->result = DISPATCH_RESULT_FAILED;
 		g_warning ("%s", script->error);
@@ -403,6 +406,7 @@ dispatch_one_script (Request *request)
 	if (g_spawn_async ("/", argv, request->envp, G_SPAWN_DO_NOT_REAP_CHILD, child_setup, request, &script->pid, &error)) {
 		request->script_watch_id = g_child_watch_add (script->pid, (GChildWatchFunc) script_watch_cb, script);
 		request->script_timeout_id = g_timeout_add_seconds (SCRIPT_TIMEOUT, script_timeout_cb, script);
+		script->start = g_get_monotonic_time ();
 	} else {
 		g_warning ("Failed to execute script '%s': (%d) %s",
 		           script->script, error->code, error->message);
