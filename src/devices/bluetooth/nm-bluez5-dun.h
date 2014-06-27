@@ -23,8 +23,23 @@
 
 #include <glib.h>
 
+typedef struct NMBluez5DunContext;
+
+typedef void (*NMBluez5DunFindChannelFunc) (NMBluez5DunContext ctx,
+                                            int rfcomm_channel,
+                                            GError *error,
+                                            gpointer user_data);
+
+NMBluez5DunContext *nm_bluez5_dun_find_channel (const guint8 adapter[ETH_ALEN],
+                                                const guint8 remote[ETH_ALEN],
+                                                NMBluez5DunFindChannelFunc callback,
+                                                gpointer user_data);
+
+void nm_bluez5_dun_find_channel_cancel (gconstpointer id);
+
 gboolean nm_bluez5_dun_connect (const guint8 adapter[ETH_ALEN],
                                 const guint8 remote[ETH_ALEN],
+                                int rfcomm_channel,
                                 int *out_rfcomm_fd,
                                 char **out_rfcomm_dev,
                                 int *out_rfcomm_id,

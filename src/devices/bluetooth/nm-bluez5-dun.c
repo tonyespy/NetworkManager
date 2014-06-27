@@ -60,6 +60,104 @@ setba (bdaddr_t *dst, const guint8 src[ETH_ALEN])
 		d[i] = s[5-i];
 }
 
+typedef struct {
+	sdp_session_t              *session;
+	guint                       watch_id;
+	NMBluez5DunFindChannelFunc  callback;
+	gpointer                    user_data;
+} SdpInfo;
+
+static void
+sdp_search_cleanup (SdpInfo *info)
+{
+	sdp_close (info->session);
+	if (info->watch_id)
+		g_source_remove (info->watch_id);
+	g_free (info);
+}
+
+static gboolean
+sdp_connect_watch (GIOChannel *channel, GIOCondition condition, gpointer user_data)
+{
+	SdpInfo *info = user_data;
+	sdp_list_t *search, *attrs;
+	uuid_t svclass;
+	uint16_t attr;
+	int fd, err, fd_err = 0;
+	socklen_t len = sizeof (fd_err);
+
+	info->watch_id = 0;
+
+	fd = g_io_channel_unix_get_fd (channel);
+	if (getsockopt (fd, SOL_SOCKET, SO_ERROR, &fd_err, &len) < 0)
+		err = -errno;
+	else
+		err = -fd_err;
+
+	if (err != 0)
+		goto failed;
+
+	if (sdp_set_notify (info->session, search_completed_cb, ctxt) < 0) {
+		err = -EIO;
+		goto failed;
+	}
+
+	sdp_uuid16_create (&svclass, DIALUP_NET_SVCLASS_ID);
+	search = sdp_list_append (NULL, &svclass);
+	attr = SDP_ATTR_PROTO_DESC_LIST;
+	attrs = sdp_list_append (NULL, &attr);
+
+	if (!sdp_service_search_attr_async (info->session, search, SDP_ATTR_REQ_INDIVIDUAL, attrs)) {
+		/* Set callback responsible for update the internal SDP transaction */
+		info->watch_id = g_io_add_watch (channel,
+		                                 G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
+		                                 sdp_search_process_cb,
+		                                 info);
+	}
+
+done:
+	sdp_list_free (attrs, NULL);
+	sdp_list_free (search, NULL);
+	return G_SOURCE_REMOVE;
+}
+
+gconstpointer
+nm_bluez5_dun_find_channel (const guint8 adapter[ETH_ALEN],
+                            const guint8 remote[ETH_ALEN],
+                            NMBluez5DunFindChannelFunc callback,
+                            gpointer user_data,
+                            GError **error)
+{
+	SdpInfo *info;
+	sdp_session_t *s;
+	GError *error = NULL;
+	bdaddr_t src, dst;
+	GSimpleAsyncResult *simple;
+	GIOChannel *channel;
+
+	setba (&src, adapter);
+	setba (&dst, remote);
+	s = sdp_connect (&src, &dst, SDP_NON_BLOCKING);
+	if (!s) {
+		g_set_error (error, NM_BT_ERROR, NM_BT_ERROR_DUN_CONNECT_FAILED,
+		             "(" MAC_FMT "): failed to connect to the SDP server: (%d) %s",
+		             MAC_ARG (adapter), errno, strerror (errno));
+		return NULL;
+	}
+
+	info = g_slice_new0 (SdpInfo);
+	info->session = s;
+	info->callback = callback;
+	info->user_data = user_data;
+	channel = g_io_channel_unix_new (sdp_get_socket (s));
+	info->watch_id = g_io_add_watch (channel,
+	                                 G_IO_OUT | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
+	                                 sdp_connect_watch,
+	                                 info);
+	g_io_channel_unref (channel);
+	return info;
+}
+
 static gboolean
 dun_create_tty (int sk,
                 const guint8 adapter[ETH_ALEN],
@@ -113,27 +211,10 @@ dun_create_tty (int sk,
 	return TRUE;
 }
 
-static int
-sdp_find_dun_channel (const guint8 adapter[ETH_ALEN],
-                      const guint8 remote[ETH_ALEN],
-                      GError **error)
-{
-	sdp_session_t *s;
 	sdp_list_t *srch, *attrs, *rsp;
 	uuid_t svclass;
 	uint16_t attr;
 	int ch = 0;
-	bdaddr_t src, dst;
-
-	setba (&src, adapter);
-	setba (&dst, remote);
-	s = sdp_connect (&src, &dst, 0);
-	if (!s) {
-		g_set_error (error, NM_BT_ERROR, NM_BT_ERROR_DUN_CONNECT_FAILED,
-		             "(" MAC_FMT "): failed to connect to the SDP server: (%d) %s",
-		             MAC_ARG (adapter), errno, strerror (errno));
-		return -1;
-	}
 
 	sdp_uuid16_create (&svclass, DIALUP_NET_SVCLASS_ID);
 	srch = sdp_list_append (NULL, &svclass);
@@ -160,19 +241,16 @@ sdp_find_dun_channel (const guint8 adapter[ETH_ALEN],
 gboolean
 nm_bluez5_dun_connect (const guint8 adapter[ETH_ALEN],
                        const guint8 remote[ETH_ALEN],
+                       int rfcomm_channel,
                        int *out_rfcomm_fd,
                        char **out_rfcomm_dev,
                        int *out_rfcomm_id,
                        GError **error)
 {
 	struct sockaddr_rc sa;
-	int sk, ch;
+	int sk;
 
-	/* Find the DUN channel number */
-	/* FIXME: cache the channel number for subsequent connects */
-	ch = sdp_find_dun_channel (adapter, remote, error);
-	if (ch < 0)
-		return FALSE;
+	g_return_val_if_fail (rfcomm_channel >= 0), FALSE);
 
 	sk = socket (AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
 	if (sk < 0) {
@@ -190,7 +268,7 @@ nm_bluez5_dun_connect (const guint8 adapter[ETH_ALEN],
 		            MAC_ARG (adapter), errno, strerror (errno));
 	}
 
-	sa.rc_channel = ch;
+	sa.rc_channel = rfcomm_channel;
 	setba (&sa.rc_bdaddr, remote);
 	if (connect (sk, (struct sockaddr *) &sa, sizeof (sa)) ) {
 		g_set_error (error, NM_BT_ERROR, NM_BT_ERROR_DUN_CONNECT_FAILED,
@@ -202,7 +280,7 @@ nm_bluez5_dun_connect (const guint8 adapter[ETH_ALEN],
 	nm_log_dbg (LOGD_BT, "(" MAC_FMT "): connected to " MAC_FMT "on channel %d",
 	            MAC_ARG (adapter), MAC_ARG (remote), ch);
 
-	if (!dun_create_tty (sk, adapter, remote, ch, out_rfcomm_dev, out_rfcomm_id, error))
+	if (!dun_create_tty (sk, adapter, remote, rfcomm_channel, out_rfcomm_dev, out_rfcomm_id, error))
 		goto error;
 
 	*out_rfcomm_fd = sk;
