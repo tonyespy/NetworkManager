@@ -25,26 +25,26 @@
 
 typedef struct NMBluez5DunContext;
 
-typedef void (*NMBluez5DunFindChannelFunc) (NMBluez5DunContext ctx,
-                                            int rfcomm_channel,
-                                            GError *error,
-                                            gpointer user_data);
+typedef void (*NMBluez5DunFunc) (NMBluez5DunContext *context,
+                                 int rfcomm_channel,
+                                 const char *rfcomm_dev,
+                                 GError *error,
+                                 gpointer user_data);
 
-NMBluez5DunContext *nm_bluez5_dun_find_channel (const guint8 adapter[ETH_ALEN],
-                                                const guint8 remote[ETH_ALEN],
-                                                NMBluez5DunFindChannelFunc callback,
-                                                gpointer user_data);
+NMBluez5DunContext *nm_bluez5_dun_new (const guint8 adapter[ETH_ALEN],
+                                       const guint8 remote[ETH_ALEN],
+                                       int rfcomm_channel,
+                                       NMBluez5DunFunc callback,
+                                       gpointer user_data,
+                                       GError **error);
 
-void nm_bluez5_dun_find_channel_cancel (gconstpointer id);
+gboolean nm_bluez5_dun_connect (NMBluez5DunContext *context, GError **error);
 
-gboolean nm_bluez5_dun_connect (const guint8 adapter[ETH_ALEN],
-                                const guint8 remote[ETH_ALEN],
-                                int rfcomm_channel,
-                                int *out_rfcomm_fd,
-                                char **out_rfcomm_dev,
-                                int *out_rfcomm_id,
-                                GError **error);
+/* Clean up connection resources */
+void nm_bluez5_dun_cleanup (NMBluez5DunContext *context);
 
-void nm_bluez5_dun_cleanup (int sk, int rfcomm_id);
+/* Clean up and dispose all resources */
+void nm_bluez5_dun_free (NMBluez5DunContext *context);
 
 #endif  /* _NM_BLUEZ5_UTILS_H_ */
+
