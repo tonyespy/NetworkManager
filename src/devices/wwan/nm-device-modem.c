@@ -236,12 +236,6 @@ device_state_changed (NMDevice *device,
 	                               reason);
 }
 
-static guint
-get_hw_address_length (NMDevice *device, gboolean *out_permanent)
-{
-	return 0;
-}
-
 static gboolean
 check_connection_compatible (NMDevice *device,
                              NMConnection *connection,
@@ -492,7 +486,6 @@ nm_device_modem_class_init (NMDeviceModemClass *mclass)
 	object_class->get_property = get_property;
 	object_class->set_property = set_property;
 
-	device_class->get_hw_address_length = get_hw_address_length;
 	device_class->check_connection_compatible = check_connection_compatible;
 	device_class->complete_connection = complete_connection;
 	device_class->deactivate = deactivate;
