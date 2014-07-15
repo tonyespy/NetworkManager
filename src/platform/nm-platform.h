@@ -29,6 +29,7 @@
 #include <linux/if_addr.h>
 
 #include <NetworkManager.h>
+#include <nm-utils.h>
 #include "gsystem-local-alloc.h"
 
 #define NM_TYPE_PLATFORM            (nm_platform_get_type ())
@@ -39,6 +40,14 @@
 #define NM_PLATFORM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), NM_TYPE_PLATFORM, NMPlatformClass))
 
 /******************************************************************/
+
+/**
+ * NM_PLATFORM_HWADDR_LEN_MAX:
+ *
+ * The maximum length of a hardware address that NMPlatform supports.
+ */
+#define NM_PLATFORM_HWADDR_LEN_MAX 20 /* INFINIBAND_ALEN */
+G_STATIC_ASSERT (NM_PLATFORM_HWADDR_LEN_MAX == NM_UTILS_HWADDR_LEN_MAX);
 
 /* workaround for older libnl version, that does not define these flags. */
 #ifndef IFA_F_MANAGETEMPADDR

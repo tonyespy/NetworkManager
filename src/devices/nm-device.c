@@ -195,7 +195,7 @@ typedef struct {
 	RfKillType    rfkill_type;
 	gboolean      firmware_missing;
 	GHashTable *  available_connections;
-	guint8        hw_addr[NM_UTILS_HWADDR_LEN_MAX];
+	guint8        hw_addr[NM_PLATFORM_HWADDR_LEN_MAX];
 	guint         hw_addr_len;
 	char *        physical_port_id;
 
@@ -7379,7 +7379,8 @@ set_property (GObject *object, guint prop_id,
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (object);
 	NMPlatformLink *platform_device;
 	const char *hw_addr;
- 
+	guint hw_addr_len;
+
 	switch (prop_id) {
 	case PROP_PLATFORM_DEVICE:
 		platform_device = g_value_get_pointer (value);
@@ -7457,7 +7458,9 @@ set_property (GObject *object, guint prop_id,
 		priv->is_master = g_value_get_boolean (value);
 		break;
 	case PROP_HW_ADDRESS:
-		priv->hw_addr_len = nm_device_get_hw_address_length (NM_DEVICE (object), NULL);
+		hw_addr_len = nm_device_get_hw_address_length (NM_DEVICE (object), NULL);
+		g_return_if_fail (hw_addr_len <= NM_PLATFORM_HWADDR_LEN_MAX);
+		priv->hw_addr_len = hw_addr_len;
 
 		hw_addr = g_value_get_string (value);
 		if (!hw_addr)
