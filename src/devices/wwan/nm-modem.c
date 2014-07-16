@@ -596,6 +596,7 @@ nm_modem_emit_ip6_config_result (NMModem *self,
                                  NMIP6Config *config,
                                  GError *error)
 {
+	NMModemPrivate *priv = NM_MODEM_GET_PRIVATE (self);
 	guint i, num;
 	gboolean do_slaac = TRUE;
 
@@ -613,10 +614,11 @@ nm_modem_emit_ip6_config_result (NMModem *self,
 		for (i = 0; i < num; i++) {
 			const NMPlatformIP6Address * addr = nm_ip6_config_get_address (config, i);
 
-			if (!IN6_IS_ADDR_LINKLOCAL (&addr->address)) {
+			if (IN6_IS_ADDR_LINKLOCAL (&addr->address)) {
+				if (!priv->iid)
+					priv->iid = ((guint64 *)(&addr->address.s6_addr))[1];
+			} else
 				do_slaac = FALSE;
-				break;
-			}
 		}
 	}
 	g_assert (config || do_slaac);
@@ -1018,7 +1020,7 @@ nm_modem_get_iid (NMModem *self)
 	/* Only handle PPPv6 Interface Identifer for now; ethernet interfaces
 	 * are handled by the generic NMDevice MAC-address based scheme.
 	 */
-	return (priv->ip6_method == NM_MODEM_IP_METHOD_PPP) ? priv->iid : 0;
+	return priv->iid;
 }
 
 /*****************************************************************************/
