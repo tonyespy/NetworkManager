@@ -183,7 +183,6 @@ typedef struct {
 	char *        path;
 	char *        iface;   /* may change, could be renamed by user */
 	int           ifindex;
-	NMLinkType    link_type;
 	gboolean      is_software;
 	char *        ip_iface;
 	int           ip_ifindex;
@@ -582,23 +581,28 @@ nm_device_set_ip_iface (NMDevice *self, const char *iface)
 static NMUtilsIPv6IfaceId
 get_ip_iface_identifier (NMDevice *self)
 {
-	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+	NMLinkType link_type;
 	const guint8 *hwaddr = NULL;
 	size_t hwaddr_len = 0;
 	NMUtilsIPv6IfaceId iid;
+	int ifindex;
 
-	if (priv->link_type == NM_LINK_TYPE_UNKNOWN)
-		return 0;
+	/* If we get here, we *must* have a kernel netdev, which implies an ifindex */
+	ifindex = nm_device_get_ip_ifindex (self);
+	g_assert (ifindex);
 
-	hwaddr = nm_platform_link_get_address (nm_device_get_ip_ifindex (self), &hwaddr_len);
+	link_type = nm_platform_link_get_type (ifindex);
+	g_return_val_if_fail (link_type > NM_LINK_TYPE_UNKNOWN, 0);
+
+	hwaddr = nm_platform_link_get_address (ifindex, &hwaddr_len);
 	if (!hwaddr_len)
 		return 0;
 
-	iid = nm_utils_get_ipv6_interface_identifier (priv->link_type, hwaddr, hwaddr_len);
+	iid = nm_utils_get_ipv6_interface_identifier (link_type, hwaddr, hwaddr_len);
 	if (!iid) {
 		nm_log_warn (LOGD_HW, "(%s): failed to generate interface identifier "
 		             "for link type %u hwaddr_len %zu",
-		             nm_device_get_ip_iface (self), priv->link_type, hwaddr_len);
+		             nm_device_get_ip_iface (self), link_type, hwaddr_len);
 	}
 	return iid;
 }
@@ -7180,7 +7184,6 @@ nm_device_init (NMDevice *self)
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 
 	priv->type = NM_DEVICE_TYPE_UNKNOWN;
-	priv->link_type = NM_LINK_TYPE_UNKNOWN;
 	priv->capabilities = NM_DEVICE_CAP_NM_SUPPORTED;
 	priv->state = NM_DEVICE_STATE_UNMANAGED;
 	priv->state_reason = NM_DEVICE_STATE_REASON_NONE;
@@ -7435,7 +7438,6 @@ set_property (GObject *object, guint prop_id,
 			g_free (priv->iface);
 			priv->iface = g_strdup (platform_device->name);
 			priv->ifindex = platform_device->ifindex;
-			priv->link_type = platform_device->type;
 			g_free (priv->driver);
 			priv->driver = g_strdup (platform_device->driver);
 		}
