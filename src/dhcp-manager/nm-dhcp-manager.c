@@ -37,6 +37,7 @@
 #include "nm-dhcp-manager.h"
 #include "nm-dhcp-dhclient.h"
 #include "nm-dhcp-dhcpcd.h"
+#include "nm-dhcp-systemd.h"
 #include "nm-logging.h"
 #include "nm-dbus-manager.h"
 #include "nm-config.h"
@@ -312,6 +313,9 @@ get_client_type (const char *client, GError **error)
 		}
 		return NM_TYPE_DHCP_DHCPCD;
 	}
+
+	if (!strcmp (client, "internal"))
+		return NM_TYPE_DHCP_SYSTEMD;
 
 	g_set_error (error,
 	             NM_MANAGER_ERROR, NM_MANAGER_ERROR_FAILED,
