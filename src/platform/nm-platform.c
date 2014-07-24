@@ -215,6 +215,21 @@ nm_platform_check_support_kernel_extended_ifa_flags ()
 	return klass->check_support_kernel_extended_ifa_flags (platform);
 }
 
+gboolean
+nm_platform_check_support_kernel_ipv6ll_addr_disable (void)
+{
+	static int supported = -1;
+
+	g_return_val_if_fail (NM_IS_PLATFORM (platform), FALSE);
+
+	if (!klass->check_support_kernel_ipv6ll_addr_disable)
+		return FALSE;
+
+	if (supported < 0)
+		supported = klass->check_support_kernel_ipv6ll_addr_disable (platform) ? 1 : 0;
+	return !!supported;
+}
+
 /******************************************************************/
 
 /**
@@ -727,6 +742,42 @@ nm_platform_link_uses_arp (int ifindex)
 	g_return_val_if_fail (klass->link_uses_arp, FALSE);
 
 	return klass->link_uses_arp (platform, ifindex);
+}
+
+/**
+ * nm_platform_link_get_kernel_ip6vll_addr_enabled:
+ * @ifindex: Interface index
+ *
+ * Check whether the kernel handles IPv6LL address creation for the link.
+ */
+gboolean
+nm_platform_link_get_kernel_ipv6ll_addr_enabled (int ifindex)
+{
+	reset_error ();
+
+	g_return_val_if_fail (ifindex >= 0, FALSE);
+	g_return_val_if_fail (klass->check_support_kernel_ipv6ll_addr_disable, FALSE);
+	g_return_val_if_fail (klass->link_get_kernel_ipv6ll_addr_enabled, FALSE);
+
+	return klass->link_get_kernel_ipv6ll_addr_enabled (platform, ifindex);
+}
+
+/**
+ * nm_platform_link_set_kernel_ip6vll_addr_enabled:
+ * @ifindex: Interface index
+ *
+ * Set whether the kernel handles IPv6LL address creation for the link.
+ */
+gboolean
+nm_platform_link_set_kernel_ipv6ll_addr_enabled (int ifindex, gboolean enabled)
+{
+	reset_error ();
+
+	g_return_val_if_fail (ifindex >= 0, FALSE);
+	g_return_val_if_fail (klass->check_support_kernel_ipv6ll_addr_disable, FALSE);
+	g_return_val_if_fail (klass->link_set_kernel_ipv6ll_addr_enabled, FALSE);
+
+	return klass->link_set_kernel_ipv6ll_addr_enabled (platform, ifindex, enabled);
 }
 
 /**

@@ -386,6 +386,13 @@ PKG_CHECK_MODULES(LIBNL, libnl-3.0 >= 3.2.8 libnl-route-3.0 libnl-genl-3.0)
 AC_SUBST(LIBNL_CFLAGS)
 AC_SUBST(LIBNL_LIBS)
 
+AC_MSG_CHECKING([libnl rtnl_link_inet6_get_addr_gen_mode() support])
+AC_CHECK_LIB([nl-route-3], [rtnl_link_inet6_get_addr_gen_mode],
+	ac_have_addr_gen_mode="1",
+	ac_have_addr_gen_mode="0")
+AC_DEFINE_UNQUOTED(HAVE_LIBNL_INET6_ADDR_GEN_MODE,
+	$ac_have_addr_gen_mode, [Define if libnl has rtnl_link_inet6_get_addr_gen_mode()])
+
 # uuid library
 PKG_CHECK_MODULES(UUID, uuid)
 AC_SUBST(UUID_CFLAGS)
