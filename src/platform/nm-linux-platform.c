@@ -39,6 +39,9 @@
 #include <netlink/cache.h>
 #include <netlink/route/link.h>
 #include <netlink/route/link/vlan.h>
+#if HAVE_LIBNL_INET6_ADDR_GEN_MODE
+#include <netlink/route/link/inet6.h>
+#endif
 #include <netlink/route/addr.h>
 #include <netlink/route/route.h>
 #include <gudev/gudev.h>
@@ -70,6 +73,7 @@ typedef struct {
 	GHashTable *udev_devices;
 
 	int support_kernel_extended_ifa_flags;
+	gboolean support_user_ipv6ll;
 } NMLinuxPlatformPrivate;
 
 #define NM_LINUX_PLATFORM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_LINUX_PLATFORM, NMLinuxPlatformPrivate))
@@ -504,6 +508,14 @@ check_support_kernel_extended_ifa_flags (NMPlatform *platform)
 	}
 
 	return priv->support_kernel_extended_ifa_flags > 0;
+}
+
+static gboolean
+check_support_user_ipv6ll (NMPlatform *platform)
+{
+	g_return_val_if_fail (NM_IS_LINUX_PLATFORM (platform), FALSE);
+
+	return NM_LINUX_PLATFORM_GET_PRIVATE (platform)->support_user_ipv6ll;
 }
 
 
@@ -1180,8 +1192,20 @@ announce_object (NMPlatform *platform, const struct nl_object *object, ObjectSta
 	switch (object_type) {
 	case LINK:
 		{
-			NMPlatformLink device;
 			struct rtnl_link *rtnl_link = (struct rtnl_link *) object;
+			NMPlatformLink device;
+
+#if HAVE_LIBNL_INET6_ADDR_GEN_MODE
+			/* If we ever see a link with valid IPv6 link-local address
+			 * generation modes, the kernel supports it.
+			 */
+			if (priv->support_user_ipv6ll == FALSE) {
+				uint8_t mode;
+
+				if (rtnl_link_inet6_get_addr_gen_mode (rtnl_link, &mode) == 0)
+					priv->support_user_ipv6ll = TRUE;
+			}
+#endif
 
 			if (!init_link (platform, &device, rtnl_link))
 				return;
@@ -1980,6 +2004,64 @@ static gboolean
 link_set_noarp (NMPlatform *platform, int ifindex)
 {
 	return link_change_flags (platform, ifindex, IFF_NOARP, TRUE);
+}
+
+static gboolean
+link_get_user_ipv6ll_enabled (NMPlatform *platform, int ifindex)
+{
+#if HAVE_LIBNL_INET6_ADDR_GEN_MODE
+	NMLinuxPlatformPrivate *priv = NM_LINUX_PLATFORM_GET_PRIVATE (platform);
+
+	if (priv->support_user_ipv6ll) {
+		auto_nl_object struct rtnl_link *rtnllink = link_get (platform, ifindex);
+		uint8_t mode = 0;
+
+		if (rtnllink) {
+			if (rtnl_link_inet6_get_addr_gen_mode (rtnllink, &mode) != 0) {
+				/* Default to "disabled" on error */
+				return FALSE;
+			}
+			return mode == IN6_ADDR_GEN_MODE_NONE;
+		}
+	}
+#endif
+	return FALSE;
+}
+
+static struct rtnl_link *
+_nm_rtnl_link_alloc (int ifindex, const char*name)
+{
+	struct rtnl_link *rtnllink;
+
+	rtnllink = rtnl_link_alloc ();
+	if (!rtnllink)
+		g_error ("rtnl_link_alloc() failed with out of memory");
+
+	if (ifindex > 0)
+		rtnl_link_set_ifindex (rtnllink, ifindex);
+	if (name)
+		rtnl_link_set_name (rtnllink, name);
+	return rtnllink;
+}
+
+static gboolean
+link_set_user_ipv6ll_enabled (NMPlatform *platform, int ifindex, gboolean enabled)
+{
+#if HAVE_LIBNL_INET6_ADDR_GEN_MODE
+	NMLinuxPlatformPrivate *priv = NM_LINUX_PLATFORM_GET_PRIVATE (platform);
+
+	if (priv->support_user_ipv6ll) {
+		auto_nl_object struct rtnl_link *change = _nm_rtnl_link_alloc (ifindex, NULL);
+		guint8 mode = enabled ? IN6_ADDR_GEN_MODE_NONE : IN6_ADDR_GEN_MODE_EUI64;
+		char buf[32];
+
+		rtnl_link_inet6_set_addr_gen_mode (change, mode);
+		debug ("link: change %d: set IPv6 address generation mode to %s",
+		       ifindex, rtnl_link_inet6_addrgenmode2str (mode, buf, sizeof (buf)));
+		return link_change (platform, ifindex, change);
+	}
+#endif
+	return FALSE;
 }
 
 static gboolean
@@ -3450,6 +3532,9 @@ nm_linux_platform_class_init (NMLinuxPlatformClass *klass)
 	platform_class->link_is_connected = link_is_connected;
 	platform_class->link_uses_arp = link_uses_arp;
 
+	platform_class->link_get_user_ipv6ll_enabled = link_get_user_ipv6ll_enabled;
+	platform_class->link_set_user_ipv6ll_enabled = link_set_user_ipv6ll_enabled;
+
 	platform_class->link_get_address = link_get_address;
 	platform_class->link_set_address = link_set_address;
 	platform_class->link_get_mtu = link_get_mtu;
@@ -3500,4 +3585,5 @@ nm_linux_platform_class_init (NMLinuxPlatformClass *klass)
 	platform_class->ip6_route_exists = ip6_route_exists;
 
 	platform_class->check_support_kernel_extended_ifa_flags = check_support_kernel_extended_ifa_flags;
+	platform_class->check_support_user_ipv6ll = check_support_user_ipv6ll;
 }
