@@ -268,6 +268,7 @@ typedef struct {
 	NMIP6Config *  vpn6_config;  /* routes added by a VPN which uses this device */
 	NMIP6Config *  wwan_ip6_config;
 	NMIP6Config *  ext_ip6_config; /* Stuff added outside NM */
+	gboolean       nm_ipv6ll; /* TRUE if NM handles the device's IPv6LL address */
 
 	NMRDisc *      rdisc;
 	gulong         rdisc_changed_id;
@@ -563,6 +564,9 @@ nm_device_set_ip_iface (NMDevice *self, const char *iface)
 	if (priv->ip_iface) {
 		priv->ip_ifindex = nm_platform_link_get_ifindex (priv->ip_iface);
 		if (priv->ip_ifindex > 0) {
+			if (nm_platform_check_support_user_ipv6ll ())
+				nm_platform_link_set_user_ipv6ll_enabled (priv->ip_ifindex, TRUE);
+
 			if (!nm_platform_link_is_up (priv->ip_ifindex))
 				nm_platform_link_set_up (priv->ip_ifindex);
 		} else {
@@ -608,6 +612,17 @@ get_ip_iface_identifier (NMDevice *self, NMUtilsIPv6IfaceId *out_iid)
 		_LOGW (LOGD_HW, "failed to generate interface identifier "
 		       "for link type %u hwaddr_len %zu", link_type, hwaddr_len);
 	}
+	return success;
+}
+
+static gboolean
+nm_device_get_ip_iface_identifier (NMDevice *self, NMUtilsIPv6IfaceId *iid)
+{
+	gboolean success;
+
+	success = NM_DEVICE_GET_CLASS (self)->get_ip_iface_identifier (self, iid);
+	if (!success)
+		_LOGW (LOGD_IP6, "failed to get interface identifier");
 	return success;
 }
 
@@ -1132,7 +1147,12 @@ device_ip_link_changed (NMDevice *self, NMPlatformLink *info)
 }
 
 static void
-link_changed_cb (NMPlatform *platform, int ifindex, NMPlatformLink *info, NMPlatformSignalChangeType change_type, NMPlatformReason reason, NMDevice *self)
+link_changed_cb (NMPlatform *platform,
+                 int ifindex,
+                 NMPlatformLink *info,
+                 NMPlatformSignalChangeType change_type,
+                 NMPlatformReason reason,
+                 NMDevice *self)
 {
 	if (change_type != NM_PLATFORM_SIGNAL_CHANGED)
 		return;
@@ -3368,6 +3388,51 @@ linklocal6_complete (NMDevice *self)
 		g_return_if_fail (FALSE);
 }
 
+static void
+check_and_add_ipv6ll_addr (NMDevice *self)
+{
+	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+	int ip_ifindex = nm_device_get_ip_ifindex (self);
+	NMUtilsIPv6IfaceId iid;
+	struct in6_addr lladdr;
+	guint i, n;
+
+	if (priv->nm_ipv6ll == FALSE)
+		return;
+
+	if (priv->ip6_config) {
+		n = nm_ip6_config_get_num_addresses (priv->ip6_config);
+		for (i = 0; i < n; i++) {
+			const NMPlatformIP6Address *addr;
+
+			addr = nm_ip6_config_get_address (priv->ip6_config, i);
+			if (IN6_IS_ADDR_LINKLOCAL (&addr->address)) {
+				/* Already have an LL address, nothing to do */
+				return;
+			}
+		}
+	}
+
+	/* No IPv6 link-local address exists, but other addresses do.  We must
+	 * add the LL address to remain conformant with RFC 3513 chapter 2.1
+	 * ("Addressing Model"): "All interfaces are required to have at least
+	 * one link-local unicast address"
+	 */
+	if (!nm_device_get_ip_iface_identifier (self, &iid))
+		return;
+
+	memset (&lladdr, 0, sizeof (lladdr));
+	lladdr.s6_addr16[0] = htons (0xfe80);
+	nm_utils_ipv6_addr_set_interface_identfier (&lladdr, iid);
+	nm_platform_ip6_address_add (ip_ifindex,
+	                             lladdr,
+	                             in6addr_any,
+	                             64,
+	                             NM_PLATFORM_LIFETIME_PERMANENT,
+	                             NM_PLATFORM_LIFETIME_PERMANENT,
+	                             0);
+}
+
 static NMActStageReturn
 linklocal6_start (NMDevice *self)
 {
@@ -3385,6 +3450,8 @@ linklocal6_start (NMDevice *self)
 
 	method = nm_utils_get_ip_config_method (connection, NM_TYPE_SETTING_IP6_CONFIG);
 	_LOGD (LOGD_DEVICE, "linklocal6: starting IPv6 with method '%s', but the device has no link-local addresses configured. Wait.", method);
+
+	check_and_add_ipv6ll_addr (self);
 
 	priv->linklocal6_timeout_id = g_timeout_add_seconds (5, linklocal6_timeout_cb, self);
 
@@ -3630,10 +3697,8 @@ addrconf6_start_with_link_ready (NMDevice *self)
 
 	g_assert (priv->rdisc);
 
-	if (!NM_DEVICE_GET_CLASS (self)->get_ip_iface_identifier (self, &iid)) {
-		_LOGW (LOGD_IP6, "failed to get interface identifier");
+	if (!nm_device_get_ip_iface_identifier (self, &iid))
 		return FALSE;
-	}
 	nm_rdisc_set_iid (priv->rdisc, iid);
 
 	/* Apply any manual configuration before starting RA */
@@ -3763,6 +3828,21 @@ restore_ip6_properties (NMDevice *self)
 		nm_device_ipv6_sysctl_set (self, key, value);
 }
 
+static inline void
+set_disable_ipv6 (NMDevice *self, const char *value, gboolean disable_ipv6ll)
+{
+	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+
+	if (nm_platform_check_support_user_ipv6ll () == FALSE)
+		nm_device_ipv6_sysctl_set (self, "disable_ipv6", value);
+	else if (disable_ipv6ll && G_UNLIKELY (priv->nm_ipv6ll == FALSE)) {
+		int ifindex = nm_device_get_ip_ifindex (self);
+
+		if (ifindex > 0)
+			priv->nm_ipv6ll = nm_platform_link_set_user_ipv6ll_enabled (ifindex, TRUE);
+	}
+}
+
 static NMSettingIP6ConfigPrivacy
 use_tempaddr_clamp (NMSettingIP6ConfigPrivacy use_tempaddr)
 {
@@ -3889,7 +3969,7 @@ act_stage3_ip6_config_start (NMDevice *self,
 	}
 
 	/* Re-enable IPv6 on the interface */
-	nm_device_ipv6_sysctl_set (self, "disable_ipv6", "0");
+	set_disable_ipv6 (self, "0", FALSE);
 
 	/* Enable/disable IPv6 Privacy Extensions.
 	 * If a global value is configured by sysadmin (e.g. /etc/sysctl.conf),
@@ -5908,17 +5988,24 @@ queued_ip_config_change (gpointer user_data)
 
 	priv->queued_ip_config_id = 0;
 	update_ip_config (self, FALSE);
+
+	if (priv->ip6_config)
+		check_and_add_ipv6ll_addr (self);
+
 	return FALSE;
 }
 
 static void
-device_ip_changed (NMPlatform *platform, int ifindex, gpointer platform_object, NMPlatformSignalChangeType change_type, NMPlatformReason reason, gpointer user_data)
+device_ip_changed (NMPlatform *platform,
+                   int ifindex,
+                   gpointer platform_object,
+                   NMPlatformSignalChangeType change_type,
+                   NMPlatformReason reason,
+                   NMDevice *self)
 {
-	NMDevice *self = user_data;
+	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 
 	if (nm_device_get_ip_ifindex (self) == ifindex) {
-		NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
-
 		if (!priv->queued_ip_config_id)
 			priv->queued_ip_config_id = g_idle_add (queued_ip_config_change, self);
 
@@ -6544,7 +6631,7 @@ nm_device_cleanup (NMDevice *self, NMDeviceStateReason reason)
 	_cleanup_generic_pre (self, TRUE);
 
 	/* Turn off kernel IPv6 */
-	nm_device_ipv6_sysctl_set (self, "disable_ipv6", "1");
+	set_disable_ipv6 (self, "1", FALSE);
 	nm_device_ipv6_sysctl_set (self, "accept_ra", "0");
 	nm_device_ipv6_sysctl_set (self, "use_tempaddr", "0");
 
@@ -6666,7 +6753,7 @@ _set_state_full (NMDevice *self,
 		if (old_state == NM_DEVICE_STATE_UNMANAGED) {
 			save_ip6_properties (self);
 			if (reason != NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED) {
-				nm_device_ipv6_sysctl_set (self, "disable_ipv6", "1");
+				set_disable_ipv6 (self, "1", TRUE);
 				nm_device_ipv6_sysctl_set (self, "accept_ra_defrtr", "0");
 				nm_device_ipv6_sysctl_set (self, "accept_ra_pinfo", "0");
 				nm_device_ipv6_sysctl_set (self, "accept_ra_rtr_pref", "0");
