@@ -283,6 +283,7 @@ typedef struct {
 	IpState        ip6_state;
 	NMIP6Config *  vpn6_config;  /* routes added by a VPN which uses this device */
 	NMIP6Config *  ext_ip6_config; /* Stuff added outside NM */
+	gboolean       nm_ipv6ll; /* TRUE if NM handles the device's IPv6LL address */
 
 	NMRDisc *      rdisc;
 	gulong         rdisc_config_changed_sigid;
@@ -444,8 +445,41 @@ restore_ip6_properties (NMDevice *self)
 	gpointer key, value;
 
 	g_hash_table_iter_init (&iter, priv->ip6_saved_properties);
-	while (g_hash_table_iter_next (&iter, &key, &value))
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		/* Don't touch "disable_ipv6" if we're doing userland IPv6LL */
+		if (!priv->nm_ipv6ll && strcmp (key, "disable_ipv6") == 0)
+			continue;
 		nm_device_ipv6_sysctl_set (self, key, value);
+	}
+}
+
+static inline void
+set_disable_ipv6 (NMDevice *self, const char *value)
+{
+	/* We only touch disable_ipv6 when NM is not managing the IPv6LL address */
+	if (NM_DEVICE_GET_PRIVATE (self)->nm_ipv6ll == FALSE)
+		nm_device_ipv6_sysctl_set (self, "disable_ipv6", value);
+}
+
+static inline void
+set_nm_ipv6ll (NMDevice *self, gboolean enable)
+{
+	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+	int ifindex = nm_device_get_ip_ifindex (self);
+
+	if (!nm_platform_check_support_user_ipv6ll ())
+		return;
+
+	priv->nm_ipv6ll = enable;
+	if (ifindex > 0) {
+		const char *detail = enable ? "enable" : "disable";
+
+		nm_log_dbg (LOGD_IP6, "(%s): will %s userland IPv6LL", detail, nm_device_get_ip_iface (self));
+		if (!nm_platform_link_set_user_ipv6ll_enabled (ifindex, enable)) {
+			nm_log_warn (LOGD_IP6, "(%s): failed to %s userspace IPv6LL address handling", detail,
+			             nm_device_get_ip_iface (self));
+		}
+	}
 }
 
 /*
@@ -728,6 +762,9 @@ nm_device_set_ip_iface (NMDevice *self, const char *iface)
 	if (priv->ip_iface) {
 		priv->ip_ifindex = nm_platform_link_get_ifindex (priv->ip_iface);
 		if (priv->ip_ifindex > 0) {
+			if (nm_platform_check_support_user_ipv6ll ())
+				nm_platform_link_set_user_ipv6ll_enabled (priv->ip_ifindex, TRUE);
+
 			if (!nm_platform_link_is_up (priv->ip_ifindex))
 				nm_platform_link_set_up (priv->ip_ifindex);
 		} else {
@@ -775,6 +812,12 @@ get_ip_iface_identifier (NMDevice *self, NMUtilsIPv6IfaceId *out_iid)
 		             nm_device_get_ip_iface (self), link_type, hwaddr_len);
 	}
 	return success;
+}
+
+static gboolean
+nm_device_get_ip_iface_identifier (NMDevice *self, NMUtilsIPv6IfaceId *iid)
+{
+	return NM_DEVICE_GET_CLASS (self)->get_ip_iface_identifier (self, iid);
 }
 
 const guint8 *
@@ -3390,6 +3433,55 @@ linklocal6_complete (NMDevice *self)
 		g_return_if_fail (FALSE);
 }
 
+static void
+check_and_add_ipv6ll_addr (NMDevice *self)
+{
+	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+	int ip_ifindex = nm_device_get_ip_ifindex (self);
+	NMUtilsIPv6IfaceId iid;
+	struct in6_addr lladdr;
+	guint i, n;
+
+	if (priv->nm_ipv6ll == FALSE)
+		return;
+
+	if (priv->ip6_config) {
+		n = nm_ip6_config_get_num_addresses (priv->ip6_config);
+		for (i = 0; i < n; i++) {
+			const NMPlatformIP6Address *addr;
+
+			addr = nm_ip6_config_get_address (priv->ip6_config, i);
+			if (IN6_IS_ADDR_LINKLOCAL (&addr->address)) {
+				/* Already have an LL address, nothing to do */
+				return;
+			}
+		}
+	}
+
+	if (!nm_device_get_ip_iface_identifier (self, &iid)) {
+		nm_log_warn (LOGD_IP6, "(%s): failed to get interface identifier; IPv6 may be broken",
+		             nm_device_get_ip_iface (self));
+		return;
+	}
+
+	memset (&lladdr, 0, sizeof (lladdr));
+	lladdr.s6_addr16[0] = htons (0xfe80);
+	nm_utils_ipv6_addr_set_interface_identfier (&lladdr, iid);
+	nm_log_dbg (LOGD_IP6, "(%s): adding IPv6LL address %s",
+	            nm_device_get_ip_iface (self), nm_utils_inet6_ntop (&lladdr, NULL));
+	if (!nm_platform_ip6_address_add (ip_ifindex,
+	                                  lladdr,
+	                                  in6addr_any,
+	                                  64,
+	                                  NM_PLATFORM_LIFETIME_PERMANENT,
+	                                  NM_PLATFORM_LIFETIME_PERMANENT,
+	                                  0)) {
+		nm_log_warn (LOGD_IP6, "(%s): failed to add IPv6 link-local address %s",
+		             nm_device_get_ip_iface (self),
+		             nm_utils_inet6_ntop (&lladdr, NULL));
+	}
+}
+
 static NMActStageReturn
 linklocal6_start (NMDevice *self)
 {
@@ -3408,6 +3500,8 @@ linklocal6_start (NMDevice *self)
 	method = nm_utils_get_ip_config_method (connection, NM_TYPE_SETTING_IP6_CONFIG);
 	nm_log_dbg (LOGD_DEVICE, "[%s] linklocal6: starting IPv6 with method '%s', but the device has no link-local addresses configured. Wait.",
 	            nm_device_get_iface (self), method);
+
+	check_and_add_ipv6ll_addr (self);
 
 	priv->linklocal6_timeout_id = g_timeout_add_seconds (5, linklocal6_timeout_cb, self);
 
@@ -3629,8 +3723,9 @@ addrconf6_start_with_link_ready (NMDevice *self)
 
 	g_assert (priv->rdisc);
 
-	if (!NM_DEVICE_GET_CLASS (self)->get_ip_iface_identifier (self, &iid)) {
-		nm_log_warn (LOGD_IP6, "(%s): failed to get interface identifier", nm_device_get_ip_iface (self));
+	if (!nm_device_get_ip_iface_identifier (self, &iid)) {
+		nm_log_warn (LOGD_IP6, "(%s): failed to get interface identifier; IPv6 cannot continue",
+		             nm_device_get_ip_iface (self));
 		return FALSE;
 	}
 	nm_rdisc_set_iid (priv->rdisc, iid);
@@ -3828,7 +3923,7 @@ act_stage3_ip6_config_start (NMDevice *self,
 	}
 
 	/* Re-enable IPv6 on the interface */
-	nm_device_ipv6_sysctl_set (self, "disable_ipv6", "0");
+	set_disable_ipv6 (self, "0");
 
 	/* Enable/disable IPv6 Privacy Extensions.
 	 * If a global value is configured by sysadmin (e.g. /etc/sysctl.conf),
@@ -4940,7 +5035,7 @@ nm_device_cleanup (NMDevice *self, NMDeviceStateReason reason)
 	aipd_cleanup (self);
 
 	/* Turn off kernel IPv6 */
-	nm_device_ipv6_sysctl_set (self, "disable_ipv6", "1");
+	set_disable_ipv6 (self, "1");
 	nm_device_ipv6_sysctl_set (self, "accept_ra", "0");
 	nm_device_ipv6_sysctl_set (self, "use_tempaddr", "0");
 
@@ -5736,6 +5831,9 @@ dispose (GObject *object)
 		nm_device_set_ip6_config (self, NULL, TRUE, &ignored);
 
 		nm_device_take_down (self, FALSE);
+
+		/* Let the kernel manage IPv6LL again */
+		set_nm_ipv6ll (self, FALSE);
 
 		restore_ip6_properties (self);
 
@@ -6687,6 +6785,7 @@ nm_device_state_changed (NMDevice *device,
 			if (nm_device_get_act_request (device))
 				nm_device_cleanup (device, reason);
 			nm_device_take_down (device, TRUE);
+			set_nm_ipv6ll (device, FALSE);
 			restore_ip6_properties (device);
 		}
 		break;
@@ -6694,7 +6793,8 @@ nm_device_state_changed (NMDevice *device,
 		if (old_state == NM_DEVICE_STATE_UNMANAGED) {
 			save_ip6_properties (device);
 			if (reason != NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED) {
-				nm_device_ipv6_sysctl_set (device, "disable_ipv6", "1");
+				set_nm_ipv6ll (device, TRUE);
+				set_disable_ipv6 (device, "1");
 				nm_device_ipv6_sysctl_set (device, "accept_ra_defrtr", "0");
 				nm_device_ipv6_sysctl_set (device, "accept_ra_pinfo", "0");
 				nm_device_ipv6_sysctl_set (device, "accept_ra_rtr_pref", "0");
@@ -6719,6 +6819,12 @@ nm_device_state_changed (NMDevice *device,
 			nm_device_cleanup (device, reason);
 		break;
 	case NM_DEVICE_STATE_DISCONNECTED:
+		/* Ensure devices that previously assumed a connection now have
+		 * userspace IPv6LL enabled.
+		 */
+		if (reason != NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED)
+			set_nm_ipv6ll (device, TRUE);
+
 		if (old_state > NM_DEVICE_STATE_UNAVAILABLE)
 			nm_device_cleanup (device, reason);
 		break;
@@ -7121,6 +7227,15 @@ queued_ip_config_change (gpointer user_data)
 
 	priv->queued_ip_config_id = 0;
 	update_ip_config (self, FALSE);
+
+	/* If no IPv6 link-local address exists but other addresses do then we
+	 * must add the LL address to remain conformant with RFC 3513 chapter 2.1
+	 * ("Addressing Model"): "All interfaces are required to have at least
+	 * one link-local unicast address".
+	 */
+	if (priv->ip6_config && nm_ip6_config_get_num_addresses (priv->ip6_config))
+		check_and_add_ipv6ll_addr (self);
+
 	return FALSE;
 }
 
