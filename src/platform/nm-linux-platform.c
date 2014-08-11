@@ -2448,7 +2448,7 @@ link_get_user_ipv6ll_enabled (NMPlatform *platform, int ifindex)
 		}
 	}
 #endif
-	g_return_val_if_reached (FALSE);
+	return FALSE;
 }
 
 static gboolean
@@ -2468,7 +2468,7 @@ link_set_user_ipv6ll_enabled (NMPlatform *platform, int ifindex, gboolean enable
 		return link_change (platform, ifindex, change);
 	}
 #endif
-	g_return_val_if_reached (FALSE);
+	return FALSE;
 }
 
 static gboolean

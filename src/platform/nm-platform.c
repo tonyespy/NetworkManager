@@ -748,7 +748,11 @@ nm_platform_link_uses_arp (int ifindex)
  * nm_platform_link_get_user_ip6vll_enabled:
  * @ifindex: Interface index
  *
- * Check whether NM handles IPv6LL address creation for the link.
+ * Check whether NM handles IPv6LL address creation for the link.  If the
+ * platform or OS doesn't support changing the IPv6LL address mode, this call
+ * will fail and return %FALSE.
+ *
+ * Returns: %TRUE if NM handles the IPv6LL address for @ifindex
  */
 gboolean
 nm_platform_link_get_user_ipv6ll_enabled (int ifindex)
@@ -757,16 +761,21 @@ nm_platform_link_get_user_ipv6ll_enabled (int ifindex)
 
 	g_return_val_if_fail (ifindex >= 0, FALSE);
 	g_return_val_if_fail (klass->check_support_user_ipv6ll, FALSE);
-	g_return_val_if_fail (klass->link_get_user_ipv6ll_enabled, FALSE);
 
-	return klass->link_get_user_ipv6ll_enabled (platform, ifindex);
+	if (klass->link_get_user_ipv6ll_enabled)
+		return klass->link_get_user_ipv6ll_enabled (platform, ifindex);
+	return FALSE;
 }
 
 /**
  * nm_platform_link_set_user_ip6vll_enabled:
  * @ifindex: Interface index
  *
- * Set whether NM handles IPv6LL address creation for the link.
+ * Set whether NM handles IPv6LL address creation for the link.  If the
+ * platform or OS doesn't support changing the IPv6LL address mode, this call
+ * will fail and return %FALSE.
+ *
+ * Returns: %TRUE if the operation was successful, %FALSE if it failed.
  */
 gboolean
 nm_platform_link_set_user_ipv6ll_enabled (int ifindex, gboolean enabled)
@@ -775,9 +784,10 @@ nm_platform_link_set_user_ipv6ll_enabled (int ifindex, gboolean enabled)
 
 	g_return_val_if_fail (ifindex >= 0, FALSE);
 	g_return_val_if_fail (klass->check_support_user_ipv6ll, FALSE);
-	g_return_val_if_fail (klass->link_set_user_ipv6ll_enabled, FALSE);
 
-	return klass->link_set_user_ipv6ll_enabled (platform, ifindex, enabled);
+	if (klass->link_set_user_ipv6ll_enabled)
+		return klass->link_set_user_ipv6ll_enabled (platform, ifindex, enabled);
+	return FALSE;
 }
 
 /**
