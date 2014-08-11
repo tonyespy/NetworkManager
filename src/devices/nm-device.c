@@ -618,12 +618,7 @@ get_ip_iface_identifier (NMDevice *self, NMUtilsIPv6IfaceId *out_iid)
 static gboolean
 nm_device_get_ip_iface_identifier (NMDevice *self, NMUtilsIPv6IfaceId *iid)
 {
-	gboolean success;
-
-	success = NM_DEVICE_GET_CLASS (self)->get_ip_iface_identifier (self, iid);
-	if (!success)
-		_LOGW (LOGD_IP6, "failed to get interface identifier");
-	return success;
+	return NM_DEVICE_GET_CLASS (self)->get_ip_iface_identifier (self, iid);
 }
 
 const char *
@@ -3413,24 +3408,24 @@ check_and_add_ipv6ll_addr (NMDevice *self)
 		}
 	}
 
-	/* No IPv6 link-local address exists, but other addresses do.  We must
-	 * add the LL address to remain conformant with RFC 3513 chapter 2.1
-	 * ("Addressing Model"): "All interfaces are required to have at least
-	 * one link-local unicast address"
-	 */
-	if (!nm_device_get_ip_iface_identifier (self, &iid))
+	if (!nm_device_get_ip_iface_identifier (self, &iid)) {
+		_LOGW (LOGD_IP6, "failed to get interface identifier; IPv6 may be broken");
 		return;
+	}
 
 	memset (&lladdr, 0, sizeof (lladdr));
 	lladdr.s6_addr16[0] = htons (0xfe80);
 	nm_utils_ipv6_addr_set_interface_identfier (&lladdr, iid);
-	nm_platform_ip6_address_add (ip_ifindex,
-	                             lladdr,
-	                             in6addr_any,
-	                             64,
-	                             NM_PLATFORM_LIFETIME_PERMANENT,
-	                             NM_PLATFORM_LIFETIME_PERMANENT,
-	                             0);
+	if (!nm_platform_ip6_address_add (ip_ifindex,
+	                                  lladdr,
+	                                  in6addr_any,
+	                                  64,
+	                                  NM_PLATFORM_LIFETIME_PERMANENT,
+	                                  NM_PLATFORM_LIFETIME_PERMANENT,
+	                                  0)) {
+		_LOGW (LOGD_IP6, "failed to add IPv6 link-local address %s",
+		       nm_utils_inet6_ntop (&lladdr, NULL));
+	}
 }
 
 static NMActStageReturn
@@ -3697,8 +3692,10 @@ addrconf6_start_with_link_ready (NMDevice *self)
 
 	g_assert (priv->rdisc);
 
-	if (!nm_device_get_ip_iface_identifier (self, &iid))
+	if (!nm_device_get_ip_iface_identifier (self, &iid)) {
+		_LOGW (LOGD_IP6, "failed to get interface identifier; IPv6 cannot continue");
 		return FALSE;
+	}
 	nm_rdisc_set_iid (priv->rdisc, iid);
 
 	/* Apply any manual configuration before starting RA */
@@ -5989,6 +5986,11 @@ queued_ip_config_change (gpointer user_data)
 	priv->queued_ip_config_id = 0;
 	update_ip_config (self, FALSE);
 
+	/* If no IPv6 link-local address exists but other addresses do then we
+	 * must add the LL address to remain conformant with RFC 3513 chapter 2.1
+	 * ("Addressing Model"): "All interfaces are required to have at least
+	 * one link-local unicast address".
+	 */
 	if (priv->ip6_config)
 		check_and_add_ipv6ll_addr (self);
 
