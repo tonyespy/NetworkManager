@@ -216,17 +216,17 @@ nm_platform_check_support_kernel_extended_ifa_flags ()
 }
 
 gboolean
-nm_platform_check_support_kernel_ipv6ll_addr_disable (void)
+nm_platform_check_support_user_ipv6ll (void)
 {
 	static int supported = -1;
 
 	g_return_val_if_fail (NM_IS_PLATFORM (platform), FALSE);
 
-	if (!klass->check_support_kernel_ipv6ll_addr_disable)
+	if (!klass->check_support_user_ipv6ll)
 		return FALSE;
 
 	if (supported < 0)
-		supported = klass->check_support_kernel_ipv6ll_addr_disable (platform) ? 1 : 0;
+		supported = klass->check_support_user_ipv6ll (platform) ? 1 : 0;
 	return !!supported;
 }
 
@@ -745,39 +745,39 @@ nm_platform_link_uses_arp (int ifindex)
 }
 
 /**
- * nm_platform_link_get_kernel_ip6vll_addr_enabled:
+ * nm_platform_link_get_user_ip6vll_enabled:
  * @ifindex: Interface index
  *
- * Check whether the kernel handles IPv6LL address creation for the link.
+ * Check whether NM handles IPv6LL address creation for the link.
  */
 gboolean
-nm_platform_link_get_kernel_ipv6ll_addr_enabled (int ifindex)
+nm_platform_link_get_user_ipv6ll_enabled (int ifindex)
 {
 	reset_error ();
 
 	g_return_val_if_fail (ifindex >= 0, FALSE);
-	g_return_val_if_fail (klass->check_support_kernel_ipv6ll_addr_disable, FALSE);
-	g_return_val_if_fail (klass->link_get_kernel_ipv6ll_addr_enabled, FALSE);
+	g_return_val_if_fail (klass->check_support_user_ipv6ll, FALSE);
+	g_return_val_if_fail (klass->link_get_user_ipv6ll_enabled, FALSE);
 
-	return klass->link_get_kernel_ipv6ll_addr_enabled (platform, ifindex);
+	return klass->link_get_user_ipv6ll_enabled (platform, ifindex);
 }
 
 /**
- * nm_platform_link_set_kernel_ip6vll_addr_enabled:
+ * nm_platform_link_set_user_ip6vll_enabled:
  * @ifindex: Interface index
  *
- * Set whether the kernel handles IPv6LL address creation for the link.
+ * Set whether NM handles IPv6LL address creation for the link.
  */
 gboolean
-nm_platform_link_set_kernel_ipv6ll_addr_enabled (int ifindex, gboolean enabled)
+nm_platform_link_set_user_ipv6ll_enabled (int ifindex, gboolean enabled)
 {
 	reset_error ();
 
 	g_return_val_if_fail (ifindex >= 0, FALSE);
-	g_return_val_if_fail (klass->check_support_kernel_ipv6ll_addr_disable, FALSE);
-	g_return_val_if_fail (klass->link_set_kernel_ipv6ll_addr_enabled, FALSE);
+	g_return_val_if_fail (klass->check_support_user_ipv6ll, FALSE);
+	g_return_val_if_fail (klass->link_set_user_ipv6ll_enabled, FALSE);
 
-	return klass->link_set_kernel_ipv6ll_addr_enabled (platform, ifindex, enabled);
+	return klass->link_set_user_ipv6ll_enabled (platform, ifindex, enabled);
 }
 
 /**

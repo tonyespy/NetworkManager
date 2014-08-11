@@ -86,7 +86,7 @@ typedef struct {
 	GHashTable *wifi_data;
 
 	int support_kernel_extended_ifa_flags;
-	gboolean support_kernel_ipv6ll_addr_mode;
+	gboolean support_user_ipv6ll;
 } NMLinuxPlatformPrivate;
 
 #define NM_LINUX_PLATFORM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_LINUX_PLATFORM, NMLinuxPlatformPrivate))
@@ -674,11 +674,11 @@ check_support_kernel_extended_ifa_flags (NMPlatform *platform)
 }
 
 static gboolean
-check_support_kernel_ipv6ll_addr_disable (NMPlatform *platform)
+check_support_user_ipv6ll (NMPlatform *platform)
 {
 	g_return_val_if_fail (NM_IS_LINUX_PLATFORM (platform), FALSE);
 
-	return NM_LINUX_PLATFORM_GET_PRIVATE (platform)->support_kernel_ipv6ll_addr_mode;
+	return NM_LINUX_PLATFORM_GET_PRIVATE (platform)->support_user_ipv6ll;
 }
 
 
@@ -1548,11 +1548,11 @@ announce_object (NMPlatform *platform, const struct nl_object *object, NMPlatfor
 			/* If we ever see a link with valid IPv6 link-local address
 			 * generation modes, the kernel supports it.
 			 */
-			if (priv->support_kernel_ipv6ll_addr_mode == FALSE) {
+			if (priv->support_user_ipv6ll == FALSE) {
 				uint8_t mode;
 
-				if (rtnl_link_inet6_get_addr_gen_mode (rtnl_link,&mode) == 0)
-					priv->support_kernel_ipv6ll_addr_mode = TRUE;
+				if (rtnl_link_inet6_get_addr_gen_mode (rtnl_link, &mode) == 0)
+					priv->support_user_ipv6ll = TRUE;
 			}
 #endif
 
@@ -2430,36 +2430,36 @@ link_set_noarp (NMPlatform *platform, int ifindex)
 }
 
 static gboolean
-link_get_kernel_ipv6ll_addr_enabled (NMPlatform *platform, int ifindex)
+link_get_user_ipv6ll_enabled (NMPlatform *platform, int ifindex)
 {
 #if HAVE_LIBNL_INET6_ADDR_GEN_MODE
 	NMLinuxPlatformPrivate *priv = NM_LINUX_PLATFORM_GET_PRIVATE (platform);
 
-	if (priv->support_kernel_ipv6ll_addr_mode) {
+	if (priv->support_user_ipv6ll) {
 		auto_nl_object struct rtnl_link *rtnllink = link_get (platform, ifindex);
 		uint8_t mode = 0;
 
 		if (rtnllink) {
 			if (rtnl_link_inet6_get_addr_gen_mode (rtnllink, &mode) != 0) {
-				/* Default to "enabled" on error */
-				return TRUE;
+				/* Default to "disabled" on error */
+				return FALSE;
 			}
-			return mode == IN6_ADDR_GEN_MODE_EUI64;
+			return mode == IN6_ADDR_GEN_MODE_NONE;
 		}
 	}
 #endif
-	g_return_val_if_reached (TRUE);
+	g_return_val_if_reached (FALSE);
 }
 
 static gboolean
-link_set_kernel_ipv6ll_addr_enabled (NMPlatform *platform, int ifindex, gboolean enabled)
+link_set_user_ipv6ll_enabled (NMPlatform *platform, int ifindex, gboolean enabled)
 {
 #if HAVE_LIBNL_INET6_ADDR_GEN_MODE
 	NMLinuxPlatformPrivate *priv = NM_LINUX_PLATFORM_GET_PRIVATE (platform);
 
-	if (priv->support_kernel_ipv6ll_addr_mode) {
+	if (priv->support_user_ipv6ll) {
 		auto_nl_object struct rtnl_link *change = _nm_rtnl_link_alloc (ifindex, NULL);
-		guint8 mode = enabled ? IN6_ADDR_GEN_MODE_EUI64 : IN6_ADDR_GEN_MODE_NONE;
+		guint8 mode = enabled ? IN6_ADDR_GEN_MODE_NONE : IN6_ADDR_GEN_MODE_EUI64;
 		char buf[32];
 
 		rtnl_link_inet6_set_addr_gen_mode (change, mode);
@@ -4213,8 +4213,8 @@ nm_linux_platform_class_init (NMLinuxPlatformClass *klass)
 	platform_class->link_is_connected = link_is_connected;
 	platform_class->link_uses_arp = link_uses_arp;
 
-	platform_class->link_get_kernel_ipv6ll_addr_enabled = link_get_kernel_ipv6ll_addr_enabled;
-	platform_class->link_set_kernel_ipv6ll_addr_enabled = link_set_kernel_ipv6ll_addr_enabled;
+	platform_class->link_get_user_ipv6ll_enabled = link_get_user_ipv6ll_enabled;
+	platform_class->link_set_user_ipv6ll_enabled = link_set_user_ipv6ll_enabled;
 
 	platform_class->link_get_address = link_get_address;
 	platform_class->link_set_address = link_set_address;
@@ -4282,5 +4282,5 @@ nm_linux_platform_class_init (NMLinuxPlatformClass *klass)
 	platform_class->ip6_route_exists = ip6_route_exists;
 
 	platform_class->check_support_kernel_extended_ifa_flags = check_support_kernel_extended_ifa_flags;
-	platform_class->check_support_kernel_ipv6ll_addr_disable = check_support_kernel_ipv6ll_addr_disable;
+	platform_class->check_support_user_ipv6ll = check_support_user_ipv6ll;
 }
