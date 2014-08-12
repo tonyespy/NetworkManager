@@ -3821,22 +3821,38 @@ restore_ip6_properties (NMDevice *self)
 	gpointer key, value;
 
 	g_hash_table_iter_init (&iter, priv->ip6_saved_properties);
-	while (g_hash_table_iter_next (&iter, &key, &value))
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		/* Don't touch "disable_ipv6" if we're doing userland IPv6LL */
+		if (priv->nm_ipv6ll && strcmp (key, "disable_ipv6") == 0)
+			continue;
 		nm_device_ipv6_sysctl_set (self, key, value);
+	}
 }
 
 static inline void
-set_disable_ipv6 (NMDevice *self, const char *value, gboolean disable_ipv6ll)
+set_disable_ipv6 (NMDevice *self, const char *value)
+{
+	/* We only touch disable_ipv6 when NM is not managing the IPv6LL address */
+	if (NM_DEVICE_GET_PRIVATE (self)->nm_ipv6ll == FALSE)
+		nm_device_ipv6_sysctl_set (self, "disable_ipv6", value);
+}
+
+static inline void
+set_nm_ipv6ll (NMDevice *self, gboolean enable)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+	int ifindex = nm_device_get_ip_ifindex (self);
 
-	if (nm_platform_check_support_user_ipv6ll () == FALSE)
-		nm_device_ipv6_sysctl_set (self, "disable_ipv6", value);
-	else if (disable_ipv6ll && G_UNLIKELY (priv->nm_ipv6ll == FALSE)) {
-		int ifindex = nm_device_get_ip_ifindex (self);
+	if (!nm_platform_check_support_user_ipv6ll ())
+		return;
 
-		if (ifindex > 0)
-			priv->nm_ipv6ll = nm_platform_link_set_user_ipv6ll_enabled (ifindex, TRUE);
+	priv->nm_ipv6ll = enable;
+	if (ifindex > 0) {
+		const char *detail = enable ? "enable" : "disable";
+
+		_LOGD (LOGD_IP6, "will %s userland IPv6LL", detail);
+		if (!nm_platform_link_set_user_ipv6ll_enabled (ifindex, enable))
+			_LOGW (LOGD_IP6, "failed to %s userspace IPv6LL address handling", detail);
 	}
 }
 
@@ -3966,7 +3982,7 @@ act_stage3_ip6_config_start (NMDevice *self,
 	}
 
 	/* Re-enable IPv6 on the interface */
-	set_disable_ipv6 (self, "0", FALSE);
+	set_disable_ipv6 (self, "0");
 
 	/* Enable/disable IPv6 Privacy Extensions.
 	 * If a global value is configured by sysadmin (e.g. /etc/sysctl.conf),
@@ -6633,7 +6649,7 @@ nm_device_cleanup (NMDevice *self, NMDeviceStateReason reason)
 	_cleanup_generic_pre (self, TRUE);
 
 	/* Turn off kernel IPv6 */
-	set_disable_ipv6 (self, "1", FALSE);
+	set_disable_ipv6 (self, "1");
 	nm_device_ipv6_sysctl_set (self, "accept_ra", "0");
 	nm_device_ipv6_sysctl_set (self, "use_tempaddr", "0");
 
@@ -6748,6 +6764,7 @@ _set_state_full (NMDevice *self,
 			if (nm_device_get_act_request (self))
 				nm_device_cleanup (self, reason);
 			nm_device_take_down (self, TRUE);
+			set_nm_ipv6ll (self, FALSE);
 			restore_ip6_properties (self);
 		}
 		break;
@@ -6755,7 +6772,8 @@ _set_state_full (NMDevice *self,
 		if (old_state == NM_DEVICE_STATE_UNMANAGED) {
 			save_ip6_properties (self);
 			if (reason != NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED) {
-				set_disable_ipv6 (self, "1", TRUE);
+				set_nm_ipv6ll (self, TRUE);
+				set_disable_ipv6 (self, "1");
 				nm_device_ipv6_sysctl_set (self, "accept_ra_defrtr", "0");
 				nm_device_ipv6_sysctl_set (self, "accept_ra_pinfo", "0");
 				nm_device_ipv6_sysctl_set (self, "accept_ra_rtr_pref", "0");
@@ -6780,6 +6798,12 @@ _set_state_full (NMDevice *self,
 			nm_device_cleanup (self, reason);
 		break;
 	case NM_DEVICE_STATE_DISCONNECTED:
+		/* Ensure devices that previously assumed a connection now have
+		 * userspace IPv6LL enabled.
+		 */
+		if (reason != NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED)
+			set_nm_ipv6ll (self, TRUE);
+
 		if (old_state > NM_DEVICE_STATE_UNAVAILABLE)
 			nm_device_cleanup (self, reason);
 		break;
@@ -7350,6 +7374,9 @@ dispose (GObject *object)
 
 	g_warn_if_fail (priv->slaves == NULL);
 	g_assert (priv->master_ready_id == 0);
+
+	/* Let the kernel manage IPv6LL again */
+	set_nm_ipv6ll (self, FALSE);
 
 	_cleanup_generic_post (self, FALSE);
 
