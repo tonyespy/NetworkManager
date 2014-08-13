@@ -3416,6 +3416,7 @@ check_and_add_ipv6ll_addr (NMDevice *self)
 	memset (&lladdr, 0, sizeof (lladdr));
 	lladdr.s6_addr16[0] = htons (0xfe80);
 	nm_utils_ipv6_addr_set_interface_identfier (&lladdr, iid);
+	_LOGD (LOGD_IP6, "adding IPv6LL address %s", nm_utils_inet6_ntop (&lladdr, NULL));
 	if (!nm_platform_ip6_address_add (ip_ifindex,
 	                                  lladdr,
 	                                  in6addr_any,
@@ -6007,7 +6008,7 @@ queued_ip_config_change (gpointer user_data)
 	 * ("Addressing Model"): "All interfaces are required to have at least
 	 * one link-local unicast address".
 	 */
-	if (priv->ip6_config)
+	if (priv->ip6_config && nm_ip6_config_get_num_addresses (priv->ip6_config))
 		check_and_add_ipv6ll_addr (self);
 
 	return FALSE;
