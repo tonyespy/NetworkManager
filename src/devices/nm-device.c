@@ -7298,6 +7298,13 @@ constructor (GType type,
 	g_signal_connect (platform, NM_PLATFORM_SIGNAL_IP6_ROUTE_CHANGED, G_CALLBACK (device_ip_changed), self);
 	g_signal_connect (platform, NM_PLATFORM_SIGNAL_LINK_CHANGED, G_CALLBACK (link_changed_cb), self);
 
+	if (nm_platform_check_support_user_ipv6ll ()) {
+		int ip_ifindex = nm_device_get_ip_ifindex (self);
+
+		if (ip_ifindex > 0)
+			priv->nm_ipv6ll = nm_platform_link_get_user_ipv6ll_enabled (ip_ifindex);
+	}
+
 	return object;
 
 error:
