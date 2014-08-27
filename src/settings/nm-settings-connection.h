@@ -156,8 +156,6 @@ void nm_settings_connection_cancel_secrets (NMSettingsConnection *connection,
 
 gboolean nm_settings_connection_is_visible (NMSettingsConnection *self);
 
-void nm_settings_connection_recheck_visibility (NMSettingsConnection *self);
-
 void nm_settings_connection_signal_remove (NMSettingsConnection *self);
 
 gboolean nm_settings_connection_get_unsaved (NMSettingsConnection *self);

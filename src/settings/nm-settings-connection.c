@@ -243,8 +243,8 @@ nm_settings_connection_is_visible (NMSettingsConnection *self)
 	return NM_SETTINGS_CONNECTION_GET_PRIVATE (self)->visible;
 }
 
-void
-nm_settings_connection_recheck_visibility (NMSettingsConnection *self)
+static void
+_connection_recheck_visibility (NMSettingsConnection *self)
 {
 	NMSettingsConnectionPrivate *priv;
 	NMSettingConnection *s_con;
@@ -286,7 +286,7 @@ nm_settings_connection_recheck_visibility (NMSettingsConnection *self)
 static void
 session_changed_cb (NMSessionMonitor *self, gpointer user_data)
 {
-	nm_settings_connection_recheck_visibility (NM_SETTINGS_CONNECTION (user_data));
+	_connection_recheck_visibility (NM_SETTINGS_CONNECTION (user_data));
 }
 
 /**************************************************************/
@@ -461,7 +461,7 @@ nm_settings_connection_replace_settings (NMSettingsConnection *self,
 		}
 	}
 
-	nm_settings_connection_recheck_visibility (self);
+	_connection_recheck_visibility (self);
 
 	/* Manually emit changed signal since we disconnected the handler, but
 	 * only update Unsaved if the caller wanted us to.
