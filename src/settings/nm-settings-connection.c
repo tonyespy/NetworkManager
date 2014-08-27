@@ -291,57 +291,6 @@ session_changed_cb (NMSessionMonitor *self, gpointer user_data)
 
 /**************************************************************/
 
-/* Return TRUE if any active user in the connection's ACL has the given
- * permission without having to authorize for it via PolicyKit.  Connections
- * visible to everyone automatically pass the check.
- */
-gboolean
-nm_settings_connection_check_permission (NMSettingsConnection *self,
-                                         const char *permission)
-{
-	NMSettingsConnectionPrivate *priv;
-	NMSettingConnection *s_con;
-	guint32 num, i;
-	const char *puser;
-
-	g_return_val_if_fail (NM_IS_SETTINGS_CONNECTION (self), FALSE);
-
-	priv = NM_SETTINGS_CONNECTION_GET_PRIVATE (self);
-
-	if (priv->visible == FALSE)
-		return FALSE;
-
-	s_con = nm_connection_get_setting_connection (NM_CONNECTION (self));
-	g_assert (s_con);
-
-	/* Check every user in the ACL for a session */
-	num = nm_setting_connection_get_num_permissions (s_con);
-	if (num == 0) {
-		/* Visible to all so it's OK to auto-activate */
-		return TRUE;
-	}
-
-	for (i = 0; i < num; i++) {
-		/* For each user get their secret agent and check if that agent has the
-		 * required permission.
-		 *
-		 * FIXME: what if the user isn't running an agent?  PolKit needs a bus
-		 * name or a PID but if the user isn't running an agent they won't have
-		 * either.
-		 */
-		if (nm_setting_connection_get_permission (s_con, i, NULL, &puser, NULL)) {
-			NMSecretAgent *agent = nm_agent_manager_get_agent_by_user (priv->agent_mgr, puser);
-
-			if (agent && nm_secret_agent_has_permission (agent, permission))
-				return TRUE;
-		}
-	}
-
-	return FALSE;
-}
-
-/**************************************************************/
-
 static gboolean
 secrets_filter_cb (NMSetting *setting,
                    const char *secret,
@@ -2134,6 +2083,43 @@ nm_settings_connection_set_autoconnect_blocked_reason (NMSettingsConnection *con
 	NM_SETTINGS_CONNECTION_GET_PRIVATE (connection)->autoconnect_blocked_reason = reason;
 }
 
+/**************************************************************/
+
+/* Return TRUE if any active user in the connection's ACL has the given
+ * permission without having to authorize for it via PolicyKit.  Connections
+ * visible to everyone automatically pass the check.
+ */
+static gboolean
+_connection_check_permission (NMSettingsConnection *self, const char *permission)
+{
+	NMSettingsConnectionPrivate *priv = NM_SETTINGS_CONNECTION_GET_PRIVATE (self);
+	NMSettingConnection *s_con;
+	guint32 num, i;
+	const char *puser;
+
+	s_con = nm_connection_get_setting_connection (NM_CONNECTION (self));
+	g_assert (s_con);
+
+	/* Check every user in the ACL for a session */
+	num = nm_setting_connection_get_num_permissions (s_con);
+	if (num == 0) {
+		/* Visible to all = allowed */
+		return TRUE;
+	}
+
+	for (i = 0; i < num; i++) {
+		/* Ensure at least one secret agent has the permission */
+		if (nm_setting_connection_get_permission (s_con, i, NULL, &puser, NULL)) {
+			NMSecretAgent *agent = nm_agent_manager_get_agent_by_user (priv->agent_mgr, puser);
+
+			if (agent && nm_secret_agent_has_permission (agent, permission))
+				return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 gboolean
 nm_settings_connection_can_autoconnect (NMSettingsConnection *connection)
 {
@@ -2152,7 +2138,7 @@ nm_settings_connection_can_autoconnect (NMSettingsConnection *connection)
 
 	permission = nm_utils_get_shared_wifi_permission (NM_CONNECTION (connection));
 	if (permission) {
-		if (nm_settings_connection_check_permission (connection, permission) == FALSE)
+		if (_connection_check_permission (connection, permission) == FALSE)
 			return FALSE;
 	}
 
