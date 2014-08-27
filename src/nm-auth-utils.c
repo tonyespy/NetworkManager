@@ -439,13 +439,6 @@ nm_auth_is_subject_in_acl (NMConnection *connection,
 	if (0 == uid)
 		return TRUE;
 
-	/* Reject the request if the request comes from no session at all */
-	if (!nm_session_monitor_session_exists (uid, FALSE)) {
-		if (out_error_desc)
-			*out_error_desc = g_strdup_printf ("No session found for uid %lu", uid);
-		return FALSE;
-	}
-
 	if (!nm_session_monitor_uid_to_user (uid, &user)) {
 		if (out_error_desc)
 			*out_error_desc = g_strdup_printf ("Could not determine username for uid %lu", uid);
@@ -460,7 +453,11 @@ nm_auth_is_subject_in_acl (NMConnection *connection,
 		return TRUE;
 	}
 
-	/* Match the username returned by the session check to a user in the ACL */
+	/* Visible/usable by all users */
+	if (nm_setting_connection_get_num_permissions (s_con) == 0)
+		return TRUE;
+
+	/* Match the username to a user in the ACL */
 	if (!nm_setting_connection_permissions_user_allowed (s_con, user)) {
 		if (out_error_desc)
 			*out_error_desc = g_strdup_printf ("uid %lu has no permission to perform this operation", uid);
@@ -469,5 +466,4 @@ nm_auth_is_subject_in_acl (NMConnection *connection,
 
 	return TRUE;
 }
-
 
