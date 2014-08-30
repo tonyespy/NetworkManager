@@ -40,12 +40,19 @@
 #include <netlink/cache.h>
 #include <netlink/route/link.h>
 #include <netlink/route/link/vlan.h>
-#if HAVE_LIBNL_INET6_ADDR_GEN_MODE
-#include <netlink/route/link/inet6.h>
-#endif
 #include <netlink/route/addr.h>
 #include <netlink/route/route.h>
 #include <gudev/gudev.h>
+
+#if HAVE_LIBNL_INET6_ADDR_GEN_MODE
+#include <netlink/route/link/inet6.h>
+#if HAVE_KERNEL_INET6_ADDR_GEN_MODE
+#include <linux/if_link.h>
+#else
+#define IN6_ADDR_GEN_MODE_EUI64 0
+#define IN6_ADDR_GEN_MODE_NONE  1
+#endif
+#endif
 
 #include "NetworkManagerUtils.h"
 #include "nm-linux-platform.h"
