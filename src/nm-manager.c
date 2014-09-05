@@ -1014,20 +1014,18 @@ system_create_virtual_device (NMManager *self, NMConnection *connection, GError 
 
 	nm_owned = !nm_platform_link_exists (NM_PLATFORM_GET, iface);
 
-	device = nm_device_factory_create_virtual_device_for_connection (factory,
-	                                                                 connection,
-	                                                                 parent,
-	                                                                 error);
+	device = nm_device_factory_create_device (factory, iface, NULL, connection, NULL, error);
 	if (device) {
-		if (nm_owned)
-			nm_device_set_nm_owned (device);
+		if (nm_device_create_and_realize (device, connection, parent, error)) {
+			if (nm_owned)
+				nm_device_set_nm_owned (device);
 
-		/* If it was created by NM there's no connection to assume, but if it
-		 * previously existed there might be one.
-		 */
-		add_device (self, device, !nm_owned);
-
-		g_object_unref (device);
+			/* If it was created by NM there's no connection to assume, but if it
+			 * previously existed there might be one.
+			 */
+			add_device (self, device, !nm_owned);
+		}
+		g_clear_object (&device);
 	}
 
 	priv->ignore_link_added_cb--;
@@ -1821,7 +1819,14 @@ factory_device_added_cb (NMDeviceFactory *factory,
                          NMDevice *device,
                          gpointer user_data)
 {
-	add_device (NM_MANAGER (user_data), device, TRUE);
+	GError *error = NULL;
+
+	if (nm_device_realize (device, NULL, &error))
+		add_device (NM_MANAGER (user_data), device, TRUE);
+	else {
+		nm_log_warn (LOGD_DEVICE, "(%s): %s", nm_device_get_iface (device), error->message);
+		g_error_free (error);
+	}
 }
 
 static gboolean
@@ -1874,13 +1879,18 @@ platform_link_added (NMManager *self,
 	if (factory) {
 		gboolean ignore = FALSE;
 
-		device = nm_device_factory_new_link (factory, plink, &ignore, &error);
+		device = nm_device_factory_create_device (factory, plink->name, plink, NULL, &ignore, &error);
 		if (!device) {
 			if (!ignore) {
 				nm_log_warn (LOGD_HW, "%s: factory failed to create device: %s",
 				             plink->name, error->message);
 				g_clear_error (&error);
 			}
+			return;
+		} else if (!nm_device_realize (device, plink, &error)) {
+			nm_log_warn (LOGD_HW, "%s: factory failed to create device: %s",
+			             plink->name, error->message);
+			g_clear_error (&error);
 			return;
 		}
 	}

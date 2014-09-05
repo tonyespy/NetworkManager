@@ -96,7 +96,11 @@ NM_DEVICE_FACTORY_DECLARE_TYPES (
 )
 
 static NMDevice *
-new_link (NMDeviceFactory *factory, NMPlatformLink *plink, gboolean *out_ignore, GError **error)
+create_device (NMDeviceFactory *factory,
+               const char *iface,
+               NMPlatformLink *plink,
+               NMConnection *connection,
+               gboolean *out_ignore)
 {
 	g_warn_if_fail (plink->type == NM_LINK_TYPE_WWAN_ETHERNET);
 	*out_ignore = TRUE;
@@ -126,7 +130,7 @@ static void
 device_factory_interface_init (NMDeviceFactory *factory_iface)
 {
 	factory_iface->get_supported_types = get_supported_types;
-	factory_iface->new_link = new_link;
+	factory_iface->create_device = create_device;
 	factory_iface->start = start;
 }
 
