@@ -102,7 +102,7 @@ check_connection_compatible (NMDevice *device, NMConnection *connection)
 		return FALSE;
 
 	mac_address = nm_setting_bridge_get_mac_address (s_bridge);
-	if (mac_address) {
+	if (mac_address && nm_device_is_real (device)) {
 		const char *hw_addr;
 
 		hw_addr = nm_device_get_hw_address (device);
@@ -453,7 +453,7 @@ get_property (GObject *object, guint prop_id,
 		break;
 	case PROP_SLAVES:
 		list = nm_device_master_get_slaves (NM_DEVICE (object));
-		nm_utils_g_value_set_object_path_array (value, list);
+		nm_utils_g_value_set_object_path_array (value, list, NULL, NULL);
 		g_slist_free (list);
 		break;
 	default:
