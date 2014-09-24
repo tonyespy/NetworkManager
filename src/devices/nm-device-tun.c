@@ -115,6 +115,31 @@ setup (NMDevice *device, NMPlatformLink *plink)
 	reload_tun_properties (NM_DEVICE_TUN (device));
 }
 
+static gboolean
+unrealize (NMDevice *device, gboolean remove_resources, GError **error)
+{
+	NMDeviceTun *self = NM_DEVICE_TUN (device);
+	NMDeviceTunPrivate *priv = NM_DEVICE_TUN_GET_PRIVATE (self);
+	GParamSpec **properties;
+	guint n_properties, i;
+	gboolean success;
+
+	success = NM_DEVICE_CLASS (nm_device_tun_parent_class)->unrealize (device, remove_resources, error);
+
+	g_object_freeze_notify (G_OBJECT (device));
+
+	memset (&priv->props, 0, sizeof (NMPlatformTunProperties));
+
+	properties = g_object_class_list_properties (G_OBJECT_GET_CLASS (self), &n_properties);
+	for (i = 0; i < n_properties; i++)
+		g_object_notify (G_OBJECT (device), properties[i]->name);
+	g_free (properties);
+
+	g_object_thaw_notify (G_OBJECT (device));
+
+	return success;
+}
+
 /**************************************************************/
 
 static void
@@ -194,6 +219,7 @@ nm_device_tun_class_init (NMDeviceTunClass *klass)
 
 	device_class->link_changed = link_changed;
 	device_class->setup = setup;
+	device_class->unrealize = unrealize;
 
 	/* properties */
 	g_object_class_install_property
