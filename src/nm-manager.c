@@ -143,7 +143,9 @@ G_DEFINE_TYPE (NMManager, nm_manager, NM_TYPE_EXPORTED_OBJECT)
 
 enum {
 	DEVICE_ADDED,
+	INTERNAL_DEVICE_ADDED,
 	DEVICE_REMOVED,
+	INTERNAL_DEVICE_REMOVED,
 	STATE_CHANGED,
 	CHECK_PERMISSIONS,
 	USER_PERMISSIONS_CHANGED,
@@ -175,6 +177,7 @@ enum {
 	PROP_ACTIVATING_CONNECTION,
 	PROP_DEVICES,
 	PROP_METERED,
+	PROP_ALL_DEVICES,
 
 	/* Not exported */
 	PROP_HOSTNAME,
@@ -776,9 +779,13 @@ remove_device (NMManager *manager,
 	nm_settings_device_removed (priv->settings, device, quitting);
 	priv->devices = g_slist_remove (priv->devices, device);
 
-	g_signal_emit (manager, signals[DEVICE_REMOVED], 0, device);
-	g_object_notify (G_OBJECT (manager), NM_MANAGER_DEVICES);
-	nm_device_removed (device);
+	if (nm_device_is_real (device)) {
+		g_signal_emit (manager, signals[DEVICE_REMOVED], 0, device);
+		g_object_notify (G_OBJECT (manager), NM_MANAGER_DEVICES);
+		nm_device_removed (device);
+	}
+	g_signal_emit (manager, signals[INTERNAL_DEVICE_REMOVED], 0, device);
+	g_object_notify (G_OBJECT (manager), NM_MANAGER_ALL_DEVICES);
 
 	nm_exported_object_unexport (NM_EXPORTED_OBJECT (device));
 	g_object_unref (device);
@@ -1660,6 +1667,10 @@ device_realized (NMDevice *device,
 	int ifindex;
 	gboolean assumed = FALSE;
 
+	/* Emit D-Bus signals */
+	g_signal_emit (self, signals[DEVICE_ADDED], 0, device);
+	g_object_notify (G_OBJECT (self), NM_MANAGER_DEVICES);
+
 	/* Loopback device never gets managed */
 	ifindex = nm_device_get_ifindex (device);
 	if (ifindex > 0 && nm_platform_link_get_type (NM_PLATFORM_GET, ifindex) == NM_LINK_TYPE_LOOPBACK)
@@ -1781,8 +1792,8 @@ add_device (NMManager *self, NMDevice *device)
 	nm_device_finish_init (device);
 
 	nm_settings_device_added (priv->settings, device);
-	g_signal_emit (self, signals[DEVICE_ADDED], 0, device);
-	g_object_notify (G_OBJECT (self), NM_MANAGER_DEVICES);
+	g_signal_emit (self, signals[INTERNAL_DEVICE_ADDED], 0, device);
+	g_object_notify (G_OBJECT (self), NM_MANAGER_ALL_DEVICES);
 
 	notify_component_added (self, G_OBJECT (device));
 }
@@ -2058,8 +2069,9 @@ nm_manager_get_best_device_for_connection (NMManager *self,
 }
 
 static void
-impl_manager_get_devices (NMManager *self,
-                          GDBusMethodInvocation *context)
+_get_devices (NMManager *self,
+              GDBusMethodInvocation *context,
+              gboolean all_devices)
 {
 	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (self);
 	gs_free const char **paths = NULL;
@@ -2073,13 +2085,27 @@ impl_manager_get_devices (NMManager *self,
 
 		path = nm_exported_object_get_path (NM_EXPORTED_OBJECT (iter->data));
 		if (   path
-		    && nm_device_is_real (iter->data))
+		    && (all_devices || nm_device_is_real (iter->data)))
 			paths[i++] = path;
 	}
 	paths[i++] = NULL;
 
 	g_dbus_method_invocation_return_value (context,
 	                                       g_variant_new ("(^ao)", (char **) paths));
+}
+
+static void
+impl_manager_get_devices (NMManager *self,
+                          GDBusMethodInvocation *context)
+{
+	_get_devices (self, context, FALSE);
+}
+
+static void
+impl_manager_get_all_devices (NMManager *self,
+                              GDBusMethodInvocation *context)
+{
+	_get_devices (self, context, TRUE);
 }
 
 static void
@@ -5014,6 +5040,9 @@ get_property (GObject *object, guint prop_id,
 	case PROP_METERED:
 		g_value_set_uint (value, priv->metered);
 		break;
+	case PROP_ALL_DEVICES:
+		nm_utils_g_value_set_object_path_array (value, priv->devices, NULL, NULL);
+		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 		break;
@@ -5304,7 +5333,16 @@ nm_manager_class_init (NMManagerClass *manager_class)
 		                    G_PARAM_READABLE |
 		                    G_PARAM_STATIC_STRINGS));
 
+	g_object_class_install_property
+		(object_class, PROP_ALL_DEVICES,
+		 g_param_spec_boxed (NM_MANAGER_ALL_DEVICES, "", "",
+		                     G_TYPE_STRV,
+		                     G_PARAM_READABLE |
+		                     G_PARAM_STATIC_STRINGS));
+
 	/* signals */
+
+	/* D-Bus exported; emitted only for realized devices */
 	signals[DEVICE_ADDED] =
 		g_signal_new ("device-added",
 		              G_OBJECT_CLASS_TYPE (object_class),
@@ -5313,6 +5351,15 @@ nm_manager_class_init (NMManagerClass *manager_class)
 		              NULL, NULL, NULL,
 		              G_TYPE_NONE, 1, NM_TYPE_DEVICE);
 
+	/* Emitted for both realized devices and placeholder devices */
+	signals[INTERNAL_DEVICE_ADDED] =
+		g_signal_new ("internal-device-added",
+		              G_OBJECT_CLASS_TYPE (object_class),
+		              G_SIGNAL_RUN_FIRST, 0,
+		              NULL, NULL, NULL,
+		              G_TYPE_NONE, 1, G_TYPE_OBJECT);
+
+	/* D-Bus exported; emitted only for realized devices */
 	signals[DEVICE_REMOVED] =
 		g_signal_new ("device-removed",
 		              G_OBJECT_CLASS_TYPE (object_class),
@@ -5320,6 +5367,14 @@ nm_manager_class_init (NMManagerClass *manager_class)
 		              G_STRUCT_OFFSET (NMManagerClass, device_removed),
 		              NULL, NULL, NULL,
 		              G_TYPE_NONE, 1, NM_TYPE_DEVICE);
+
+	/* Emitted for both realized devices and placeholder devices */
+	signals[INTERNAL_DEVICE_REMOVED] =
+		g_signal_new ("internal-device-removed",
+		              G_OBJECT_CLASS_TYPE (object_class),
+		              G_SIGNAL_RUN_FIRST, 0,
+		              NULL, NULL, NULL,
+		              G_TYPE_NONE, 1, G_TYPE_OBJECT);
 
 	signals[STATE_CHANGED] =
 		g_signal_new ("state-changed",
@@ -5367,6 +5422,7 @@ nm_manager_class_init (NMManagerClass *manager_class)
 	nm_exported_object_class_add_interface (NM_EXPORTED_OBJECT_CLASS (manager_class),
 	                                        NMDBUS_TYPE_MANAGER_SKELETON,
 	                                        "GetDevices", impl_manager_get_devices,
+	                                        "GetAllDevices", impl_manager_get_all_devices,
 	                                        "GetDeviceByIpIface", impl_manager_get_device_by_ip_iface,
 	                                        "ActivateConnection", impl_manager_activate_connection,
 	                                        "AddAndActivateConnection", impl_manager_add_and_activate_connection,
