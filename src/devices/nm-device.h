@@ -121,6 +121,7 @@ typedef struct {
 	NMExportedObjectClass parent;
 
 	const char *connection_type;
+	const NMLinkType *link_types;
 
 	void (*state_changed) (NMDevice *device,
 	                       NMDeviceState new_state,
@@ -471,6 +472,7 @@ gboolean nm_device_has_capability (NMDevice *self, NMDeviceCapabilities caps);
 
 gboolean nm_device_realize            (NMDevice *device,
                                        NMPlatformLink *plink,
+                                       gboolean *out_compatible,
                                        GError **error);
 gboolean nm_device_create_and_realize (NMDevice *self,
                                        NMConnection *connection,
