@@ -860,6 +860,7 @@ global:
 	nm_access_point_get_last_seen;
 	nm_connection_verify_secrets;
 	nm_device_ethernet_get_s390_subchannels;
+	nm_client_get_all_devices;
 	nm_device_get_lldp_neighbors;
 	nm_device_get_metered;
 	nm_device_get_nm_plugin_missing;
