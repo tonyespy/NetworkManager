@@ -1796,10 +1796,6 @@ device_has_config (NMDevice *self)
 	if (have_ip6_address (priv->ip6_config, FALSE))
 		return TRUE;
 
-	/* The existence of a software device is good enough. */
-	if (nm_device_is_software (self))
-		return TRUE;
-
 	/* Slaves are also configured by definition */
 	if (nm_platform_link_get_master (priv->ifindex) > 0)
 		return TRUE;

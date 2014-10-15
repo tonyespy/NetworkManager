@@ -1625,6 +1625,7 @@ nm_settings_device_added (NMSettings *self, NMDevice *device)
 	 * ignore it.
 	 */
 	if (   !nm_device_get_managed (device)
+	    || nm_device_is_software (device)
 	    || g_object_get_data (G_OBJECT (device), DEFAULT_WIRED_CONNECTION_TAG)
 	    || have_connection_for_device (self, device))
 		return;
