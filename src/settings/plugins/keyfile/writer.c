@@ -863,7 +863,11 @@ write_setting_value (NMSetting *setting,
 			nm_log_warn (LOGD_SETTINGS, "Unhandled setting property type (write) '%s/%s' : '%s'", 
 			             setting_name, key, g_type_name (type));
 		}
-	} else {
+	} else if (G_VALUE_HOLDS_FLAGS (value))
+		nm_keyfile_plugin_kf_set_uint64 (info->keyfile, setting_name, key, (guint64) g_value_get_flags (value));
+	else if (G_VALUE_HOLDS_ENUM (value))
+		nm_keyfile_plugin_kf_set_integer (info->keyfile, setting_name, key, g_value_get_enum (value));
+	else {
 		nm_log_warn (LOGD_SETTINGS, "Unhandled setting property type (write) '%s/%s' : '%s'", 
 		             setting_name, key, g_type_name (type));
 	}

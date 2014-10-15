@@ -1214,6 +1214,27 @@ read_one_setting_value (NMSetting *setting,
 			nm_log_warn (LOGD_SETTINGS, "Unhandled setting property type (read): '%s/%s' : '%s'",
 			             setting_name, key, G_VALUE_TYPE_NAME (value));
 		}
+	} else if (G_VALUE_HOLDS_FLAGS (value)) {
+		guint64 uint_val;
+
+		uint_val = nm_keyfile_plugin_kf_get_uint64 (info->keyfile, setting_name, key, &err);
+		if (!err) {
+			/* Flags are 32-bit but GKeyFile only has uint64 functions */
+			if (uint_val <= G_MAXUINT32)
+				g_object_set (setting, key, uint_val, NULL);
+			else {
+				nm_log_warn (LOGD_SETTINGS, "Too large FLAGS property (read): '%s/%s' : '%s'",
+				             setting_name, key, G_VALUE_TYPE_NAME (value));
+			}
+		}
+		g_clear_error (&err);
+	} else if (G_VALUE_HOLDS_ENUM (value)) {
+		int int_val;
+
+		int_val = nm_keyfile_plugin_kf_get_integer (info->keyfile, setting_name, key, &err);
+		if (!err)
+			g_object_set (setting, key, int_val, NULL);
+		g_clear_error (&err);
 	} else {
 		nm_log_warn (LOGD_SETTINGS, "Unhandled setting property type (read): '%s/%s' : '%s'",
 		             setting_name, key, G_VALUE_TYPE_NAME (value));
