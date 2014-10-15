@@ -339,6 +339,8 @@ static void _set_state_full (NMDevice *self,
 
 static void nm_device_update_hw_address (NMDevice *self);
 
+static gboolean have_ip6_address (const NMIP6Config *ip6_config, gboolean linklocal);
+
 /***********************************************************/
 
 #define QUEUED_PREFIX "queued state change to "
@@ -1791,7 +1793,7 @@ device_has_config (NMDevice *self)
 	/* Check for IP configuration. */
 	if (priv->ip4_config && nm_ip4_config_get_num_addresses (priv->ip4_config))
 		return TRUE;
-	if (priv->ip6_config && nm_ip6_config_get_num_addresses (priv->ip6_config))
+	if (have_ip6_address (priv->ip6_config, FALSE))
 		return TRUE;
 
 	/* The existence of a software device is good enough. */
