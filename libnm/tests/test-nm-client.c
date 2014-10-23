@@ -186,7 +186,7 @@ test_device_added_signal_after_init (void)
 
 	/* Ensure the 'device-added' signal doesn't show up before
 	 * the 'Devices' property change notification */
-	while (!(result & 0x0F) && !(result & 0xF0))
+	while (!(result & SIGNAL_MASK) && !(result & NOTIFY_MASK))
 		g_main_context_iteration (NULL, TRUE);
 
 	g_signal_handlers_disconnect_by_func (client, device_sai_added_cb, &result);
@@ -202,10 +202,6 @@ test_device_added_signal_after_init (void)
 	device = g_ptr_array_index (devices, 0);
 	g_assert (device);
 	g_assert_cmpstr (nm_device_get_iface (device), ==, "eth0");
-
-	/* Try deleting the device via the ordinary NM interface, which should fail */
-	nm_device_delete (device, NULL, &error);
-	g_assert_error (error, NM_DEVICE_ERROR, NM_DEVICE_ERROR_NOT_SOFTWARE);
 
 	g_object_unref (client);
 	g_clear_pointer (&sinfo, nm_test_service_cleanup);

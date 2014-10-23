@@ -69,7 +69,7 @@ typedef struct {
 	const char *signal_prefix;
 } PropertyInfo;
 
-static void reload_complete (NMObject *object);
+static void reload_complete (NMObject *object, gboolean emit_now);
 static gboolean demarshal_generic (NMObject *object, GParamSpec *pspec, GVariant *value, gpointer field);
 
 typedef struct {
@@ -184,10 +184,11 @@ deferred_notify_cb (gpointer data)
 	NMObjectPrivate *priv = NM_OBJECT_GET_PRIVATE (object);
 	GSList *props, *iter;
 
-	if (priv->reload_remaining)
-		return G_SOURCE_CONTINUE;
-
 	priv->notify_id = 0;
+
+	/* Wait until all reloads are done before notifying */
+	if (priv->reload_remaining)
+		return G_SOURCE_REMOVE;
 
 	/* Clear priv->notify_items early so that an NMObject subclass that
 	 * listens to property changes can queue up other property changes
@@ -221,6 +222,15 @@ deferred_notify_cb (gpointer data)
 }
 
 static void
+_nm_object_defer_notify (NMObject *object)
+{
+	NMObjectPrivate *priv = NM_OBJECT_GET_PRIVATE (object);
+
+	if (!priv->notify_id)
+		priv->notify_id = g_idle_add_full (G_PRIORITY_LOW, deferred_notify_cb, object, NULL);
+}
+
+static void
 _nm_object_queue_notify_full (NMObject *object,
                               const char *property,
                               const char *signal,
@@ -235,8 +245,7 @@ _nm_object_queue_notify_full (NMObject *object,
 	g_return_if_fail (property || (signal && changed));
 
 	priv = NM_OBJECT_GET_PRIVATE (object);
-	if (!priv->notify_id)
-		priv->notify_id = g_idle_add_full (G_PRIORITY_LOW, deferred_notify_cb, object, NULL);
+	_nm_object_defer_notify (object);
 
 	property = g_intern_string (property);
 	signal = g_intern_string (signal);
@@ -662,7 +671,7 @@ object_property_complete (ObjectCreatedData *odata)
 		_nm_object_queue_notify (self, odata->property_name);
 
 	if (--priv->reload_remaining == 0)
-		reload_complete (self);
+		reload_complete (self, FALSE);
 
 	g_object_unref (self);
 	g_free (odata->objects);
@@ -1071,6 +1080,8 @@ _nm_object_reload_properties (NMObject *object, GError **error)
 	if (!g_hash_table_size (priv->proxies) || !priv->nm_running)
 		return TRUE;
 
+	priv->reload_remaining++;
+
 	g_hash_table_iter_init (&iter, priv->proxies);
 	while (g_hash_table_iter_next (&iter, (gpointer *) &interface, (gpointer *) &proxy)) {
 		ret = g_dbus_proxy_call_sync (priv->properties_proxy,
@@ -1089,6 +1100,9 @@ _nm_object_reload_properties (NMObject *object, GError **error)
 		g_variant_unref (props);
 		g_variant_unref (ret);
 	}
+
+	if (--priv->reload_remaining == 0)
+		reload_complete (object, TRUE);
 
 	return TRUE;
 }
@@ -1173,15 +1187,21 @@ _nm_object_set_property (NMObject *object,
 }
 
 static void
-reload_complete (NMObject *object)
+reload_complete (NMObject *object, gboolean emit_now)
 {
 	NMObjectPrivate *priv = NM_OBJECT_GET_PRIVATE (object);
 	GSimpleAsyncResult *simple;
 	GSList *results, *iter;
 	GError *error;
 
-	if (!priv->reload_results)
-		return;
+	if (emit_now) {
+		if (priv->notify_id) {
+			g_source_remove (priv->notify_id);
+			priv->notify_id = 0;
+		}
+		deferred_notify_cb (object);
+	} else
+		_nm_object_defer_notify (object);
 
 	results = priv->reload_results;
 	priv->reload_results = NULL;
@@ -1228,7 +1248,7 @@ reload_got_properties (GObject *proxy,
 	}
 
 	if (--priv->reload_remaining == 0)
-		reload_complete (object);
+		reload_complete (object, FALSE);
 }
 
 void
