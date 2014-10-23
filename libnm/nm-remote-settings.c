@@ -611,10 +611,6 @@ updated_properties (GObject *object, GAsyncResult *result, gpointer user_data)
 	}
 }
 
-#define CLEAR_CANCELLABLE(c) \
-	if (c) g_cancellable_cancel (c); \
-	g_clear_object (&c);
-
 static void
 nm_running_changed (GObject *object,
                     GParamSpec *pspec,
@@ -629,7 +625,7 @@ nm_running_changed (GObject *object,
 		GPtrArray *connections;
 		int i;
 
-		CLEAR_CANCELLABLE (priv->props_cancellable);
+		NM_UTILS_CLEAR_CANCELLABLE (priv->props_cancellable);
 
 		/* Clear connections */
 		connections = priv->all_connections;
@@ -653,7 +649,8 @@ nm_running_changed (GObject *object,
 		_nm_object_suppress_property_updates (NM_OBJECT (self), TRUE);
 	} else {
 		_nm_object_suppress_property_updates (NM_OBJECT (self), FALSE);
-		CLEAR_CANCELLABLE (priv->props_cancellable);
+
+		NM_UTILS_CLEAR_CANCELLABLE (priv->props_cancellable);
 		priv->props_cancellable = g_cancellable_new ();
 		_nm_object_reload_properties_async (NM_OBJECT (self), priv->props_cancellable, updated_properties, self);
 	}
@@ -741,7 +738,6 @@ dispose (GObject *object)
 
 	g_clear_pointer (&priv->visible_connections, g_ptr_array_unref);
 	g_clear_pointer (&priv->hostname, g_free);
-	g_clear_object (&priv->props_cancellable);
 
 	G_OBJECT_CLASS (nm_remote_settings_parent_class)->dispose (object);
 }

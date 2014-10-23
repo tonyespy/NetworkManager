@@ -1216,10 +1216,6 @@ updated_properties (GObject *object, GAsyncResult *result, gpointer user_data)
 	_nm_object_queue_notify (NM_OBJECT (manager), NM_MANAGER_NM_RUNNING);
 }
 
-#define CLEAR_CANCELLABLE(c) \
-	if (c) g_cancellable_cancel (c); \
-	g_clear_object (&c);
-
 static void
 nm_running_changed_cb (GObject *object,
                        GParamSpec *pspec,
@@ -1229,7 +1225,7 @@ nm_running_changed_cb (GObject *object,
 	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (manager);
 
 	if (!nm_manager_get_nm_running (manager)) {
-		CLEAR_CANCELLABLE (priv->props_cancellable);
+		NM_UTILS_CLEAR_CANCELLABLE (priv->props_cancellable);
 
 		priv->state = NM_STATE_UNKNOWN;
 		priv->startup = FALSE;
@@ -1254,9 +1250,11 @@ nm_running_changed_cb (GObject *object,
 		_nm_object_cache_clear ();
 	} else {
 		_nm_object_suppress_property_updates (NM_OBJECT (manager), FALSE);
-		CLEAR_CANCELLABLE (priv->props_cancellable);
+
+		NM_UTILS_CLEAR_CANCELLABLE (priv->props_cancellable);
 		priv->props_cancellable = g_cancellable_new ();
 		_nm_object_reload_properties_async (NM_OBJECT (manager), priv->props_cancellable, updated_properties, manager);
+
 		manager_recheck_permissions (priv->manager_proxy, manager);
 	}
 }
@@ -1407,8 +1405,6 @@ dispose (GObject *object)
 
 	g_hash_table_destroy (priv->permissions);
 	priv->permissions = NULL;
-
-	g_clear_object (&priv->props_cancellable);
 
 	G_OBJECT_CLASS (nm_manager_parent_class)->dispose (object);
 }
