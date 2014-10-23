@@ -1704,6 +1704,16 @@ nm_platform_wifi_get_ssid (NMPlatform *self, int ifindex)
 	return klass->wifi_get_ssid (self, ifindex);
 }
 
+void
+nm_platform_wifi_set_powersave (NMPlatform *self, int ifindex, guint32 powersave)
+{
+	_CHECK_SELF_VOID (self, klass);
+
+	g_return_if_fail (ifindex > 0);
+
+	klass->wifi_set_powersave (self, ifindex, powersave);
+}
+
 guint32
 nm_platform_wifi_get_frequency (NMPlatform *self, int ifindex)
 {
