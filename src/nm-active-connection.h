@@ -71,6 +71,10 @@ typedef struct {
 	                              NMDeviceState new_state,
 	                              NMDeviceState old_state);
 	void (*master_failed)  (NMActiveConnection *connection);
+
+	void (*device_changed) (NMActiveConnection *connection,
+	                        NMDevice *new_device,
+	                        NMDevice *old_device);
 } NMActiveConnectionClass;
 
 GType         nm_active_connection_get_type (void);
