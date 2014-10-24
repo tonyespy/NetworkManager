@@ -258,7 +258,7 @@ static void
 _nm_object_queue_notify_full (NMObject *object,
                               const char *property,
                               const char *signal_prefix,
-                              NotifySignalPending pending,
+                              gboolean added,
                               NMObject *changed)
 {
 	NMObjectPrivate *priv;
@@ -268,7 +268,6 @@ _nm_object_queue_notify_full (NMObject *object,
 	g_return_if_fail (NM_IS_OBJECT (object));
 	g_return_if_fail (!signal_prefix != !property);
 	g_return_if_fail (!signal_prefix == !changed);
-	g_return_if_fail (!signal_prefix == !(pending == NOTIFY_SIGNAL_PENDING_ADDED || pending == NOTIFY_SIGNAL_PENDING_REMOVED));
 
 	priv = NM_OBJECT_GET_PRIVATE (object);
 	_nm_object_defer_notify (object);
@@ -290,7 +289,7 @@ _nm_object_queue_notify_full (NMObject *object,
 		 * Without the ADDED_REMOVED state:
 		 *     NONE          + added   -> ADDED
 		 *     ADDED         + removed -> NONE
-		 *     NONE          + removed -> REMOVED (emits 'removed' signal)
+		 *     NONE          + removed -> REMOVED (would emit 'removed' signal)
 		 *
 		 * With the ADDED_REMOVED state:
 		 *     NONE | ADDED_REMOVED  + added   -> ADDED
@@ -300,19 +299,19 @@ _nm_object_queue_notify_full (NMObject *object,
 		if (signal_prefix && (changed == item->changed) && (item->signal_prefix == signal_prefix)) {
 			switch (item->pending) {
 			case NOTIFY_SIGNAL_PENDING_ADDED:
-				if (pending == NOTIFY_SIGNAL_PENDING_REMOVED)
+				if (!added)
 					item->pending = NOTIFY_SIGNAL_PENDING_ADDED_REMOVED;
 				break;
 			case NOTIFY_SIGNAL_PENDING_REMOVED:
-				if (pending == NOTIFY_SIGNAL_PENDING_ADDED)
+				if (added)
 					item->pending = NOTIFY_SIGNAL_PENDING_NONE;
 				break;
 			case NOTIFY_SIGNAL_PENDING_ADDED_REMOVED:
-				if (pending == NOTIFY_SIGNAL_PENDING_ADDED)
+				if (added)
 					item->pending = NOTIFY_SIGNAL_PENDING_ADDED;
 				break;
 			case NOTIFY_SIGNAL_PENDING_NONE:
-				item->pending = pending;
+				item->pending = added ? NOTIFY_SIGNAL_PENDING_ADDED : NOTIFY_SIGNAL_PENDING_REMOVED;
 				break;
 			default:
 				g_assert_not_reached ();
@@ -324,7 +323,7 @@ _nm_object_queue_notify_full (NMObject *object,
 	item = g_slice_new0 (NotifyItem);
 	item->property = property;
 	item->signal_prefix = signal_prefix;
-	item->pending = pending;
+	item->pending = added ? NOTIFY_SIGNAL_PENDING_ADDED : NOTIFY_SIGNAL_PENDING_REMOVED;
 	item->changed = changed ? g_object_ref (changed) : NULL;
 	priv->notify_items = g_slist_prepend (priv->notify_items, item);
 }
@@ -332,7 +331,7 @@ _nm_object_queue_notify_full (NMObject *object,
 void
 _nm_object_queue_notify (NMObject *object, const char *property)
 {
-	_nm_object_queue_notify_full (object, property, NULL, NOTIFY_SIGNAL_PENDING_NONE, NULL);
+	_nm_object_queue_notify_full (object, property, NULL, FALSE, NULL);
 }
 
 void
@@ -649,7 +648,7 @@ queue_added_removed_signal (NMObject *self,
                             NMObject *changed,
                             gboolean added)
 {
-	_nm_object_queue_notify_full (self, NULL, signal_prefix, added ? NOTIFY_SIGNAL_PENDING_ADDED : NOTIFY_SIGNAL_PENDING_REMOVED, changed);
+	_nm_object_queue_notify_full (self, NULL, signal_prefix, added, changed);
 }
 
 static void
