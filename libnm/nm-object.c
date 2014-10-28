@@ -190,6 +190,7 @@ deferred_notify_cb (gpointer data)
 {
 	NMObject *object = NM_OBJECT (data);
 	NMObjectPrivate *priv = NM_OBJECT_GET_PRIVATE (object);
+	NMObjectClass *object_class = NM_OBJECT_GET_CLASS (object);
 	GSList *props, *iter;
 
 	priv->notify_id = 0;
@@ -229,8 +230,11 @@ deferred_notify_cb (gpointer data)
 		case NOTIFY_SIGNAL_PENDING_REMOVED:
 			ret = g_snprintf (buf, sizeof (buf), "%s-removed", item->signal_prefix);
 			break;
-		case NOTIFY_SIGNAL_PENDING_NONE:
 		case NOTIFY_SIGNAL_PENDING_ADDED_REMOVED:
+			if (object_class->object_creation_failed)
+				object_class->object_creation_failed (object, nm_object_get_path (item->changed));
+			break;
+		case NOTIFY_SIGNAL_PENDING_NONE:
 		default:
 			break;
 		}
@@ -322,9 +326,11 @@ _nm_object_queue_notify_full (NMObject *object,
 
 	item = g_slice_new0 (NotifyItem);
 	item->property = property;
-	item->signal_prefix = signal_prefix;
-	item->pending = added ? NOTIFY_SIGNAL_PENDING_ADDED : NOTIFY_SIGNAL_PENDING_REMOVED;
-	item->changed = changed ? g_object_ref (changed) : NULL;
+	if (signal_prefix) {
+		item->signal_prefix = signal_prefix;
+		item->pending = added ? NOTIFY_SIGNAL_PENDING_ADDED : NOTIFY_SIGNAL_PENDING_REMOVED;
+		item->changed = changed ? g_object_ref (changed) : NULL;
+	}
 	priv->notify_items = g_slist_prepend (priv->notify_items, item);
 }
 
