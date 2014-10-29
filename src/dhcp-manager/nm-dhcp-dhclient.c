@@ -45,7 +45,16 @@
 #include "NetworkManagerUtils.h"
 #include "nm-dhcp-listener.h"
 
-G_DEFINE_TYPE (NMDhcpDhclient, nm_dhcp_dhclient, NM_TYPE_DHCP_CLIENT)
+static const char *nm_dhcp_dhclient_get_path (void);
+static GSList *nm_dhcp_dhclient_get_lease_ip_configs (const char *iface,
+                                                      const char *uuid,
+                                                      gboolean ipv6);
+
+G_DEFINE_TYPE_EXTENDED (NMDhcpDhclient, nm_dhcp_dhclient, NM_TYPE_DHCP_CLIENT, 0,
+                        _nm_dhcp_client_register (g_define_type_id,
+                                                  "dhclient",
+                                                  nm_dhcp_dhclient_get_path,
+                                                  nm_dhcp_dhclient_get_lease_ip_configs);)
 
 #define NM_DHCP_DHCLIENT_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_DHCP_DHCLIENT, NMDhcpDhclientPrivate))
 
@@ -56,7 +65,14 @@ typedef struct {
 	char *pid_file;
 } NMDhcpDhclientPrivate;
 
-const char *
+static void __attribute__((constructor))
+register_dhcp_dhclient (void)
+{
+	g_type_init ();
+	g_type_ensure (NM_TYPE_DHCP_DHCLIENT);
+}
+
+static const char *
 nm_dhcp_dhclient_get_path (void)
 {
 	const char *path = NULL;
@@ -123,7 +139,7 @@ get_dhclient_leasefile (const char *iface,
 	return NULL;
 }
 
-GSList *
+static GSList *
 nm_dhcp_dhclient_get_lease_ip_configs (const char *iface,
                                        const char *uuid,
                                        gboolean ipv6)

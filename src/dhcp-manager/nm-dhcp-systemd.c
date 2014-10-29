@@ -48,7 +48,15 @@
 #include "dhcp6-protocol.h"
 #include "dhcp6-lease-internal.h"
 
-G_DEFINE_TYPE (NMDhcpSystemd, nm_dhcp_systemd, NM_TYPE_DHCP_CLIENT)
+static GSList *nm_dhcp_systemd_get_lease_ip_configs (const char *iface,
+                                                     const char *uuid,
+                                                     gboolean ipv6);
+
+G_DEFINE_TYPE_EXTENDED (NMDhcpSystemd, nm_dhcp_systemd, NM_TYPE_DHCP_CLIENT, 0,
+                        _nm_dhcp_client_register (g_define_type_id,
+                                                  "internal",
+                                                  NULL,
+                                                  nm_dhcp_systemd_get_lease_ip_configs);)
 
 #define NM_DHCP_SYSTEMD_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_DHCP_SYSTEMD, NMDhcpSystemdPrivate))
 
@@ -62,6 +70,13 @@ typedef struct {
 
 	gboolean privacy;
 } NMDhcpSystemdPrivate;
+
+static void __attribute__((constructor))
+register_dhcp_dhclient (void)
+{
+	g_type_init ();
+	g_type_ensure (NM_TYPE_DHCP_SYSTEMD);
+}
 
 /************************************************************/
 
@@ -374,7 +389,7 @@ get_leasefile_path (const char *iface, const char *uuid, gboolean ipv6)
 	                        iface);
 }
 
-GSList *
+static GSList *
 nm_dhcp_systemd_get_lease_ip_configs (const char *iface,
                                       const char *uuid,
                                       gboolean ipv6)

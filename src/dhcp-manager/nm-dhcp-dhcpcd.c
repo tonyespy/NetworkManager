@@ -40,7 +40,13 @@
 #include "NetworkManagerUtils.h"
 #include "nm-dhcp-listener.h"
 
-G_DEFINE_TYPE (NMDhcpDhcpcd, nm_dhcp_dhcpcd, NM_TYPE_DHCP_CLIENT)
+static const char *nm_dhcp_dhcpcd_get_path (void);
+
+G_DEFINE_TYPE_EXTENDED (NMDhcpDhcpcd, nm_dhcp_dhcpcd, NM_TYPE_DHCP_CLIENT, 0,
+                        _nm_dhcp_client_register (g_define_type_id,
+                                                  "dhcpcd",
+                                                  nm_dhcp_dhcpcd_get_path,
+                                                  NULL);)
 
 #define NM_DHCP_DHCPCD_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_DHCP_DHCPCD, NMDhcpDhcpcdPrivate))
 
@@ -48,7 +54,14 @@ typedef struct {
 	char *pid_file;
 } NMDhcpDhcpcdPrivate;
 
-const char *
+static void __attribute__((constructor))
+register_dhcp_dhclient (void)
+{
+	g_type_init ();
+	g_type_ensure (NM_TYPE_DHCP_DHCPCD);
+}
+
+static const char *
 nm_dhcp_dhcpcd_get_path (void)
 {
 	const char *path = NULL;
