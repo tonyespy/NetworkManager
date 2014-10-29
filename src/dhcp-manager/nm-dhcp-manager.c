@@ -390,7 +390,11 @@ nm_dhcp_manager_init (NMDhcpManager *self)
 	GError *error = NULL;
 
 	/* Client-specific setup */
+#ifdef NM_IFACE_HELPER
+	client = "internal";
+#else
 	client = nm_config_get_dhcp_client (nm_config_get ());
+#endif
 	priv->client_type = get_client_type (client, &error);
 	if (priv->client_type == G_TYPE_INVALID) {
 		nm_log_warn (LOGD_DHCP, "No usable DHCP client found (%s)! DHCP configurations will fail.",

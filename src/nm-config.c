@@ -74,41 +74,33 @@ G_DEFINE_TYPE (NMConfig, nm_config, G_TYPE_OBJECT)
 /************************************************************************/
 
 static gboolean
-_parse_bool_str (const char *str, gboolean *out_value)
+_get_bool_value (GKeyFile *keyfile,
+                 const char *section,
+                 const char *key)
 {
-	gboolean value;
-	gsize len;
-	char *s = NULL;
+	gboolean value = FALSE;
+	char *str;
 
-	g_return_val_if_fail (str, FALSE);
+	g_return_val_if_fail (keyfile != NULL, FALSE);
+	g_return_val_if_fail (section != NULL, FALSE);
+	g_return_val_if_fail (key != NULL, FALSE);
 
-	while (g_ascii_isspace (*str))
-		str++;
-
-	if (!*str)
+	str = g_key_file_get_value (keyfile, section, key, NULL);
+	if (!str)
 		return FALSE;
 
-	len = strlen (str);
-
-	if (g_ascii_isspace (str[len-1])) {
-		str = s = g_strdup (str);
-		g_strchomp (s);
+	g_strstrip (str);
+	if (str[0]) {
+		if (!g_ascii_strcasecmp (str, "true") || !g_ascii_strcasecmp (str, "yes") || !g_ascii_strcasecmp (str, "on") || !g_ascii_strcasecmp (str, "1"))
+			value = TRUE;
+		else if (!g_ascii_strcasecmp (str, "false") || !g_ascii_strcasecmp (str, "no") || !g_ascii_strcasecmp (str, "off") || !g_ascii_strcasecmp (str, "0"))
+			value = FALSE;
+		else
+			nm_log_warn (LOGD_CORE, "Unrecognized value for %s.%s: '%s'. Assuming 'false'", section, key, str);
 	}
 
-	if (!g_ascii_strcasecmp (str, "true") || !g_ascii_strcasecmp (str, "yes") || !g_ascii_strcasecmp (str, "on") || !g_ascii_strcasecmp (str, "1"))
-		value = TRUE;
-	else if (!g_ascii_strcasecmp (str, "false") || !g_ascii_strcasecmp (str, "no") || !g_ascii_strcasecmp (str, "off") || !g_ascii_strcasecmp (str, "0"))
-		value = FALSE;
-	else {
-		g_free (s);
-		return FALSE;
-	}
-
-	if (out_value)
-		*out_value = value;
-
-	g_free (s);
-	return TRUE;
+	g_free (str);
+	return value;
 }
 
 /************************************************************************/
@@ -521,7 +513,6 @@ nm_config_new (GError **error)
 	GFileInfo *info;
 	GPtrArray *confs;
 	const char *name;
-	char *value;
 	int i;
 	GString *config_description;
 
@@ -591,23 +582,9 @@ nm_config_new (GError **error)
 	if (!priv->plugins && STRLEN (CONFIG_PLUGINS_DEFAULT) > 0)
 		priv->plugins = g_strsplit (CONFIG_PLUGINS_DEFAULT, ",", -1);
 
-	value = g_key_file_get_value (priv->keyfile, "main", "monitor-connection-files", NULL);
-	priv->monitor_connection_files = FALSE;
-	if (value) {
-		if (!_parse_bool_str (value, &priv->monitor_connection_files))
-			nm_log_warn (LOGD_CORE, "Unrecognized value for main.monitor-connection-files: %s. Assuming 'false'", value);
-		g_free (value);
-	}
+	priv->monitor_connection_files = _get_bool_value (priv->keyfile, "main", "monitor-connection-files");
 
-	value = g_key_file_get_value (priv->keyfile, "main", "auth-polkit", NULL);
-	priv->auth_polkit = NM_CONFIG_DEFAULT_AUTH_POLKIT;
-	if (value) {
-		if (!_parse_bool_str (value, &priv->auth_polkit)) {
-			nm_log_warn (LOGD_CORE, "Unrecognized value for main.auth-polkit: %s. Assuming '%s'", value,
-			             NM_CONFIG_DEFAULT_AUTH_POLKIT ? "true" : "false");
-		}
-		g_free (value);
-	}
+	priv->auth_polkit = _get_bool_value (priv->keyfile, "main", "auth-polkit");
 
 	priv->dhcp_client = g_key_file_get_value (priv->keyfile, "main", "dhcp", NULL);
 	priv->dns_mode = g_key_file_get_value (priv->keyfile, "main", "dns", NULL);
@@ -631,7 +608,7 @@ nm_config_new (GError **error)
 
 	priv->ignore_carrier = g_key_file_get_string_list (priv->keyfile, "main", "ignore-carrier", NULL, NULL);
 
-	priv->configure_and_quit = g_key_file_get_boolean (priv->keyfile, "main", "configure-and-quit", NULL);
+	priv->configure_and_quit = _get_bool_value (priv->keyfile, "main", "configure-quit");
 
 	return singleton;
 }
