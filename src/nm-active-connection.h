@@ -56,6 +56,9 @@
 #define NM_ACTIVE_CONNECTION_INT_MASTER         "int-master"
 #define NM_ACTIVE_CONNECTION_INT_MASTER_READY   "int-master-ready"
 
+/* Internal signals*/
+#define NM_ACTIVE_CONNECTION_DEVICE_CHANGED     "device-changed"
+
 struct _NMActiveConnection {
 	GObject parent;
 };

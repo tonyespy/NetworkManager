@@ -1032,7 +1032,7 @@ nm_active_connection_class_init (NMActiveConnectionClass *ac_class)
 		                       G_PARAM_STATIC_STRINGS));
 
 	signals[DEVICE_CHANGED] =
-		g_signal_new ("device-changed",
+		g_signal_new (NM_ACTIVE_CONNECTION_DEVICE_CHANGED,
 		              G_OBJECT_CLASS_TYPE (object_class),
 		              G_SIGNAL_RUN_FIRST,
 		              G_STRUCT_OFFSET (NMActiveConnectionClass, device_changed),
