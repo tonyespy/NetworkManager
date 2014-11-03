@@ -19,6 +19,7 @@
  */
 
 #include <glib.h>
+
 #include "nm-types.h"
 #include "nm-active-connection.h"
 #include "nm-dbus-interface.h"
@@ -30,7 +31,7 @@
 #include "nm-auth-utils.h"
 #include "nm-auth-subject.h"
 #include "NetworkManagerUtils.h"
-
+#include "gsystem-local-alloc.h"
 #include "nm-active-connection-glue.h"
 
 /* Base class for anything implementing the Connection.Active D-Bus interface */
@@ -401,7 +402,7 @@ gboolean
 nm_active_connection_set_device (NMActiveConnection *self, NMDevice *device)
 {
 	NMActiveConnectionPrivate *priv;
-	NMDevice *old_device;
+	gs_unref_object NMDevice *old_device = NULL;
 
 	g_return_val_if_fail (NM_IS_ACTIVE_CONNECTION (self), FALSE);
 	g_return_val_if_fail (!device || NM_IS_DEVICE (device), FALSE);
@@ -418,7 +419,6 @@ nm_active_connection_set_device (NMActiveConnection *self, NMDevice *device)
 		g_return_val_if_fail (!priv->master || device != nm_active_connection_get_device (priv->master), FALSE);
 
 		priv->device = g_object_ref (device);
-		g_object_notify (G_OBJECT (self), NM_ACTIVE_CONNECTION_INT_DEVICE);
 
 		g_signal_connect (device, "state-changed",
 		                  G_CALLBACK (device_state_changed), self);
@@ -429,10 +429,11 @@ nm_active_connection_set_device (NMActiveConnection *self, NMDevice *device)
 			priv->pending_activation_id = g_strdup_printf ("activation::%p", (void *)self);
 			nm_device_add_pending_action (device, priv->pending_activation_id, TRUE);
 		}
-	}
+	} else
+		priv->device = NULL;
+	g_object_notify (G_OBJECT (self), NM_ACTIVE_CONNECTION_INT_DEVICE);
 
 	g_signal_emit (self, signals[DEVICE_CHANGED], 0, priv->device, old_device);
-	g_clear_object (&old_device);
 
 	g_object_notify (G_OBJECT (self), NM_ACTIVE_CONNECTION_DEVICES);
 
