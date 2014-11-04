@@ -1025,7 +1025,7 @@ nm_vpn_connection_config_get (DBusGProxy *proxy,
 	nm_log_info (LOGD_VPN, "VPN connection '%s' (IP Config Get) reply received.",
 	             nm_connection_get_id (priv->connection));
 
-	if (priv->vpn_state == STATE_NEED_AUTH || priv->vpn_state == STATE_CONNECT)
+	if (priv->vpn_state == STATE_CONNECT)
 		_set_vpn_state (connection, STATE_IP_CONFIG_GET, NM_VPN_CONNECTION_STATE_REASON_NONE, FALSE);
 
 	if (!process_generic_config (connection, config_hash))
@@ -1079,7 +1079,7 @@ nm_vpn_connection_ip4_config_get (DBusGProxy *proxy,
 	GValue *val;
 	int i;
 
-	if (priv->vpn_state == STATE_NEED_AUTH || priv->vpn_state == STATE_CONNECT)
+	if (priv->vpn_state == STATE_CONNECT)
 		_set_vpn_state (connection, STATE_IP_CONFIG_GET, NM_VPN_CONNECTION_STATE_REASON_NONE, FALSE);
 
 	if (priv->has_ip4) {
@@ -1238,7 +1238,7 @@ nm_vpn_connection_ip6_config_get (DBusGProxy *proxy,
 	nm_log_info (LOGD_VPN, "VPN connection '%s' (IP6 Config Get) reply received.",
 	             nm_connection_get_id (priv->connection));
 
-	if (priv->vpn_state == STATE_NEED_AUTH || priv->vpn_state == STATE_CONNECT)
+	if (priv->vpn_state == STATE_CONNECT)
 		_set_vpn_state (connection, STATE_IP_CONFIG_GET, NM_VPN_CONNECTION_STATE_REASON_NONE, FALSE);
 
 	if (g_hash_table_size (config_hash) == 0) {
@@ -1759,7 +1759,9 @@ plugin_new_secrets_cb  (DBusGProxy *proxy, DBusGProxyCall *call, void *user_data
 	NMVpnConnectionPrivate *priv = NM_VPN_CONNECTION_GET_PRIVATE (self);
 	GError *error = NULL;
 
-	if (!dbus_g_proxy_end_call (proxy, call, &error, G_TYPE_INVALID)) {
+	if (dbus_g_proxy_end_call (proxy, call, &error, G_TYPE_INVALID)) {
+		_set_vpn_state (self, STATE_CONNECT, NM_VPN_CONNECTION_STATE_REASON_NONE, FALSE);
+	} else {
 		nm_log_err (LOGD_VPN, "(%s/%s) sending new secrets to the plugin failed: %s %s",
 		            nm_connection_get_uuid (priv->connection),
 		            nm_connection_get_id (priv->connection),
