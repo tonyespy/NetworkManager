@@ -111,7 +111,7 @@ typedef struct {
 enum {
 	VPN_STATE_CHANGED,
 	INTERNAL_STATE_CHANGED,
-	INTERNAL_RETRY_FAILED,
+	INTERNAL_RETRY_AFTER_FAILURE,
 
 	LAST_SIGNAL
 };
@@ -759,7 +759,7 @@ plugin_state_changed (DBusGProxy *proxy,
 			if (   old_state == STATE_ACTIVATED
 			    && priv->vpn_state == STATE_FAILED
 			    && _connection_only_can_persist (connection))
-				g_signal_emit (connection, signals[INTERNAL_RETRY_FAILED], 0);
+				g_signal_emit (connection, signals[INTERNAL_RETRY_AFTER_FAILURE], 0);
 		}
 	} else if (new_service_state == NM_VPN_SERVICE_STATE_STARTING &&
 	           old_service_state == NM_VPN_SERVICE_STATE_STARTED) {
@@ -2166,8 +2166,8 @@ nm_vpn_connection_class_init (NMVpnConnectionClass *connection_class)
 		              0, NULL, NULL, NULL,
 		              G_TYPE_NONE, 3, G_TYPE_UINT, G_TYPE_UINT, G_TYPE_UINT);
 
-	signals[INTERNAL_RETRY_FAILED] =
-		g_signal_new (NM_VPN_CONNECTION_INTERNAL_RETRY_FAILED,
+	signals[INTERNAL_RETRY_AFTER_FAILURE] =
+		g_signal_new (NM_VPN_CONNECTION_INTERNAL_RETRY_AFTER_FAILURE,
 		              G_OBJECT_CLASS_TYPE (object_class),
 		              G_SIGNAL_RUN_FIRST,
 		              0, NULL, NULL, NULL,

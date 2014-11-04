@@ -1836,7 +1836,7 @@ vpn_connection_state_changed (NMVpnConnection *vpn,
 }
 
 static void
-vpn_connection_retry_failed (NMVpnConnection *vpn, NMPolicy *policy)
+vpn_connection_retry_after_failure (NMVpnConnection *vpn, NMPolicy *policy)
 {
 	NMPolicyPrivate *priv = NM_POLICY_GET_PRIVATE (policy);
 	NMActiveConnection *ac = NM_ACTIVE_CONNECTION (vpn);
@@ -1881,8 +1881,8 @@ active_connection_added (NMManager *manager,
 		g_signal_connect (active, NM_VPN_CONNECTION_INTERNAL_STATE_CHANGED,
 		                  G_CALLBACK (vpn_connection_state_changed),
 		                  policy);
-		g_signal_connect (active, NM_VPN_CONNECTION_INTERNAL_RETRY_FAILED,
-		                  G_CALLBACK (vpn_connection_retry_failed),
+		g_signal_connect (active, NM_VPN_CONNECTION_INTERNAL_RETRY_AFTER_FAILURE,
+		                  G_CALLBACK (vpn_connection_retry_after_failure),
 		                  policy);
 	}
 
@@ -1902,7 +1902,7 @@ active_connection_removed (NMManager *manager,
 	                                      vpn_connection_state_changed,
 	                                      policy);
 	g_signal_handlers_disconnect_by_func (active,
-	                                      vpn_connection_retry_failed,
+	                                      vpn_connection_retry_after_failure,
 	                                      policy);
 	g_signal_handlers_disconnect_by_func (active,
 	                                      active_connection_state_changed,
