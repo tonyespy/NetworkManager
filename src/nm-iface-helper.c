@@ -340,12 +340,6 @@ main (int argc, char *argv[])
 		g_clear_pointer (&bad_domains, g_free);
 	}
 
-	/* Setup runtime directory */
-	if (g_mkdir_with_parents (NMRUNDIR, 0755) != 0) {
-		nm_log_err (LOGD_CORE, "Cannot create '%s': %s", NMRUNDIR, strerror (errno));
-		exit (1);
-	}
-
 	pidfile = g_strdup_printf (NMIH_PID_FILE_FMT, ifindex);
 	g_assert (pidfile);
 
