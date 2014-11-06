@@ -28,7 +28,6 @@ struct sd_event_source {
 	guint refcount;
 	guint id;
 	gpointer user_data;
-	char *name;
 
 	GIOChannel *channel;
 	sd_event_io_handler_t io_cb;
@@ -56,9 +55,12 @@ sd_event_source_unref (sd_event_source *s)
 	if (s->refcount == 0) {
 		if (s->id)
 			g_source_remove (s->id);
-		if (s->channel)
+		if (s->channel) {
+			/* Don't shut down the channel since systemd will soon close
+			 * the file descriptor itself, which would cause -EBADF.
+			 */
 			g_io_channel_unref (s->channel);
-		g_free (s->name);
+		}
 		g_free (s);
 	}
 	return NULL;
@@ -70,8 +72,7 @@ sd_event_source_set_name(sd_event_source *s, const char *name)
 	if (!s)
 		return -EINVAL;
 
-	g_free (s->name);
-	s->name = g_strdup (name);
+	g_source_set_name_by_id (s->id, name);
 	return 0;
 }
 
