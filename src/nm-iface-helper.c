@@ -20,6 +20,7 @@
 
 #include <config.h>
 #include <glib.h>
+#include <glib-unix.h>
 #include <getopt.h>
 #include <locale.h>
 #include <errno.h>
@@ -241,6 +242,24 @@ rdisc_ra_timeout (NMRDisc *rdisc, gpointer user_data)
 		nm_log_warn (LOGD_IP6, "(%s): IPv6 timed out or failed", iface);
 }
 
+static gboolean
+quit_handler (gpointer user_data)
+{
+	gboolean *quit_early_ptr = user_data;
+
+	*quit_early_ptr = TRUE;
+	g_main_loop_quit (main_loop);
+	return G_SOURCE_CONTINUE;
+}
+
+static void
+setup_signals (gboolean *quit_early_ptr)
+{
+	signal (SIGPIPE, SIG_IGN);
+	g_unix_signal_add (SIGINT, quit_handler, quit_early_ptr);
+	g_unix_signal_add (SIGTERM, quit_handler, quit_early_ptr);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -350,8 +369,7 @@ main (int argc, char *argv[])
 
 	/* Set up unix signal handling - before creating threads, but after daemonizing! */
 	main_loop = g_main_loop_new (NULL, FALSE);
-	if (!nm_main_utils_setup_signals (main_loop, &quit_early))
-		exit (1);
+	setup_signals (&quit_early);
 
 	if (g_fatal_warnings) {
 		GLogLevelFlags fatal_mask;
