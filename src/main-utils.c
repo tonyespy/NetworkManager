@@ -232,17 +232,12 @@ nm_main_utils_early_setup (const char *progname,
 	 */
 	umask (022);
 
-	/* Set locale to be able to use environment variables */
+	/* Ensure gettext() gets the right environment (bgo #666516) */
 	setlocale (LC_ALL, "");
 
 	bindtextdomain (GETTEXT_PACKAGE, NMLOCALEDIR);
 	bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 	textdomain (GETTEXT_PACKAGE);
-
-	if (!g_module_supported ()) {
-		fprintf (stderr, _("GModules are not supported on your platform!\n"));
-		exit (1);
-	}
 
 	if (getuid () != 0) {
 		fprintf (stderr, _("You must be root to run %s!\n"), progname);
