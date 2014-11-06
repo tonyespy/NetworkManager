@@ -76,18 +76,19 @@ G_DEFINE_TYPE (NMConfig, nm_config, G_TYPE_OBJECT)
 static gboolean
 _get_bool_value (GKeyFile *keyfile,
                  const char *section,
-                 const char *key)
+                 const char *key,
+                 gboolean default_value)
 {
-	gboolean value = FALSE;
+	gboolean value = default_value;
 	char *str;
 
-	g_return_val_if_fail (keyfile != NULL, FALSE);
-	g_return_val_if_fail (section != NULL, FALSE);
-	g_return_val_if_fail (key != NULL, FALSE);
+	g_return_val_if_fail (keyfile != NULL, default_value);
+	g_return_val_if_fail (section != NULL, default_value);
+	g_return_val_if_fail (key != NULL, default_value);
 
 	str = g_key_file_get_value (keyfile, section, key, NULL);
 	if (!str)
-		return FALSE;
+		return default_value;
 
 	g_strstrip (str);
 	if (str[0]) {
@@ -95,8 +96,10 @@ _get_bool_value (GKeyFile *keyfile,
 			value = TRUE;
 		else if (!g_ascii_strcasecmp (str, "false") || !g_ascii_strcasecmp (str, "no") || !g_ascii_strcasecmp (str, "off") || !g_ascii_strcasecmp (str, "0"))
 			value = FALSE;
-		else
-			nm_log_warn (LOGD_CORE, "Unrecognized value for %s.%s: '%s'. Assuming 'false'", section, key, str);
+		else {
+			nm_log_warn (LOGD_CORE, "Unrecognized value for %s.%s: '%s'. Assuming '%s'",
+			             section, key, str, default_value ? "true" : "false");
+		}
 	}
 
 	g_free (str);
@@ -582,9 +585,9 @@ nm_config_new (GError **error)
 	if (!priv->plugins && STRLEN (CONFIG_PLUGINS_DEFAULT) > 0)
 		priv->plugins = g_strsplit (CONFIG_PLUGINS_DEFAULT, ",", -1);
 
-	priv->monitor_connection_files = _get_bool_value (priv->keyfile, "main", "monitor-connection-files");
+	priv->monitor_connection_files = _get_bool_value (priv->keyfile, "main", "monitor-connection-files", FALSE);
 
-	priv->auth_polkit = _get_bool_value (priv->keyfile, "main", "auth-polkit");
+	priv->auth_polkit = _get_bool_value (priv->keyfile, "main", "auth-polkit", NM_CONFIG_DEFAULT_AUTH_POLKIT);
 
 	priv->dhcp_client = g_key_file_get_value (priv->keyfile, "main", "dhcp", NULL);
 	priv->dns_mode = g_key_file_get_value (priv->keyfile, "main", "dns", NULL);
@@ -608,7 +611,7 @@ nm_config_new (GError **error)
 
 	priv->ignore_carrier = g_key_file_get_string_list (priv->keyfile, "main", "ignore-carrier", NULL, NULL);
 
-	priv->configure_and_quit = _get_bool_value (priv->keyfile, "main", "configure-quit");
+	priv->configure_and_quit = _get_bool_value (priv->keyfile, "main", "configure-quit", FALSE);
 
 	return singleton;
 }
