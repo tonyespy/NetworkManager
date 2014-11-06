@@ -85,7 +85,7 @@ typedef struct {
 
 typedef struct {
 	guint num;
-	const char *desc;
+	const char *name;
 	gboolean include;
 } ReqOption;
 
@@ -152,16 +152,16 @@ take_option (GHashTable *options,
 
 	g_return_if_fail (value != NULL);
 
-	for (i = 0; requests[i].desc; i++) {
+	for (i = 0; requests[i].name; i++) {
 		if (requests[i].num == option) {
 			g_hash_table_insert (options,
-			                     (gpointer) (requests[i].desc + STRLEN (REQPREFIX)),
+			                     (gpointer) (requests[i].name + STRLEN (REQPREFIX)),
 			                     value);
 			break;
 		}
 	}
 	/* Option should always be found */
-	g_assert (requests[i].desc);
+	g_assert (requests[i].name);
 }
 
 static void
@@ -183,18 +183,18 @@ add_requests_to_options (GHashTable *options, const ReqOption *requests)
 {
 	guint i;
 
-	for (i = 0; options && requests[i].desc; i++) {
+	for (i = 0; options && requests[i].name; i++) {
 		if (requests[i].include)
-			g_hash_table_insert (options, (gpointer) requests[i].desc, g_strdup ("1"));
+			g_hash_table_insert (options, (gpointer) requests[i].name, g_strdup ("1"));
 	}
 }
 
 #define LOG_LEASE(domain, ...) \
-    G_STMT_START { \
-		if (log_lease) { \
-            nm_log (LOGL_INFO, (domain), __VA_ARGS__); \
-        } \
-    } G_STMT_END
+G_STMT_START { \
+	if (log_lease) { \
+		nm_log (LOGL_INFO, (domain), __VA_ARGS__); \
+	} \
+} G_STMT_END
 
 static NMIP4Config *
 lease_to_ip4_config (sd_dhcp_lease *lease,
@@ -213,7 +213,8 @@ lease_to_ip4_config (sd_dhcp_lease *lease,
 	GString *l;
 	struct sd_dhcp_route *routes;
 	guint16 mtu;
-	int r;
+	int r, num;
+	gint64 end_time;
 
 	r = sd_dhcp_lease_get_address (lease, &tmp_addr);
 	if (r < 0) {
@@ -254,10 +255,11 @@ lease_to_ip4_config (sd_dhcp_lease *lease,
 		lifetime = 3600; /* one hour */
 	address.timestamp = nm_utils_get_monotonic_timestamp_s ();
 	address.lifetime = address.preferred = lifetime;
+	end_time = (g_get_real_time () / G_USEC_PER_SEC) + lifetime;
 	add_option_u32 (options,
 	                dhcp4_requests,
 	                DHCP_OPTION_IP_ADDRESS_LEASE_TIME,
-	                (guint) MIN (time (NULL) + lifetime, G_MAXUINT32));
+	                (guint) CLAMP (end_time, 0, G_MAXUINT32 - 1));
 
 	address.source = NM_IP_CONFIG_SOURCE_DHCP;
 	nm_ip4_config_add_address (ip4_config, &address);
@@ -272,10 +274,10 @@ lease_to_ip4_config (sd_dhcp_lease *lease,
 	}
 
 	/* DNS Servers */
-	r = sd_dhcp_lease_get_dns (lease, &addr_list);
-	if (r > 0) {
+	num = sd_dhcp_lease_get_dns (lease, &addr_list);
+	if (num > 0) {
 		l = g_string_sized_new (30);
-		for (i = 0; i < r; i++) {
+		for (i = 0; i < num; i++) {
 			if (addr_list[i].s_addr) {
 				nm_ip4_config_add_nameserver (ip4_config, addr_list[i].s_addr);
 				str = nm_utils_inet4_ntop (addr_list[i].s_addr, NULL);
@@ -310,10 +312,11 @@ lease_to_ip4_config (sd_dhcp_lease *lease,
 		add_option (options, dhcp4_requests, DHCP_OPTION_HOST_NAME, str);
 	}
 
-	r = sd_dhcp_lease_get_routes (lease, &routes);
-	if (r > 0) {
+	/* Routes */
+	num = sd_dhcp_lease_get_routes (lease, &routes);
+	if (num > 0) {
 		l = g_string_sized_new (30);
-		for (i = 0; i < r; i++) {
+		for (i = 0; i < num; i++) {
 			NMPlatformIP4Route route;
 			const char *gw_str;
 
@@ -335,6 +338,7 @@ lease_to_ip4_config (sd_dhcp_lease *lease,
 		g_string_free (l, TRUE);
 	}
 
+	/* MTU */
 	r = sd_dhcp_lease_get_mtu (lease, &mtu);
 	if (r == 0 && mtu) {
 		nm_ip4_config_set_mtu (ip4_config, mtu, NM_IP_CONFIG_SOURCE_DHCP);
@@ -342,10 +346,11 @@ lease_to_ip4_config (sd_dhcp_lease *lease,
 		LOG_LEASE (LOGD_DHCP4, "  mtu %u", mtu);
 	}
 
-	r = sd_dhcp_lease_get_ntp(lease, &addr_list);
-	if (r > 0) {
+	/* NTP servers */
+	num = sd_dhcp_lease_get_ntp(lease, &addr_list);
+	if (num > 0) {
 		l = g_string_sized_new (30);
-		for (i = 0; i < r; i++) {
+		for (i = 0; i < num; i++) {
 			str = nm_utils_inet4_ntop (addr_list[i].s_addr, buf);
 			g_string_append_printf (l, "%s%s", l->len ? " " : "", str);
 		}
@@ -378,7 +383,10 @@ nm_dhcp_systemd_get_lease_ip_configs (const char *iface,
 	NMIP4Config *ip4_config;
 	int r;
 
-	path = get_leasefile_path (iface, uuid, ipv6);
+	if (ipv6)
+		return NULL;
+
+	path = get_leasefile_path (iface, uuid, FALSE);
 	r = sd_dhcp_lease_load (path, &lease);
 	if (r == 0) {
 		ip4_config = lease_to_ip4_config (lease, NULL, 0, FALSE, NULL);
@@ -576,7 +584,7 @@ ip4_start (NMDhcpClient *client,
 		sd_dhcp_lease_unref (lease);
 
 	/* Add requested options */
-	for (i = 0; dhcp4_requests[i].desc; i++) {
+	for (i = 0; dhcp4_requests[i].name; i++) {
 		if (dhcp4_requests[i].include)
 			sd_dhcp_client_set_request_option (priv->client4, dhcp4_requests[i].num);
 	}
@@ -713,7 +721,7 @@ ip6_start (NMDhcpClient *client,
 	}
 
 	/* Add requested options */
-	for (i = 0; dhcp6_requests[i].desc; i++) {
+	for (i = 0; dhcp6_requests[i].name; i++) {
 		if (dhcp6_requests[i].include)
 			sd_dhcp6_client_set_request_option (priv->client6, dhcp6_requests[i].num);
 	}
