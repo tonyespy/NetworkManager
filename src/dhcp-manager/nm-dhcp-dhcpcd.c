@@ -40,26 +40,13 @@
 #include "NetworkManagerUtils.h"
 #include "nm-dhcp-listener.h"
 
-static const char *nm_dhcp_dhcpcd_get_path (void);
-
-G_DEFINE_TYPE_EXTENDED (NMDhcpDhcpcd, nm_dhcp_dhcpcd, NM_TYPE_DHCP_CLIENT, 0,
-                        _nm_dhcp_client_register (g_define_type_id,
-                                                  "dhcpcd",
-                                                  nm_dhcp_dhcpcd_get_path,
-                                                  NULL);)
+G_DEFINE_TYPE (NMDhcpDhcpcd, nm_dhcp_dhcpcd, NM_TYPE_DHCP_CLIENT)
 
 #define NM_DHCP_DHCPCD_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_DHCP_DHCPCD, NMDhcpDhcpcdPrivate))
 
 typedef struct {
 	char *pid_file;
 } NMDhcpDhcpcdPrivate;
-
-static void __attribute__((constructor))
-register_dhcp_dhclient (void)
-{
-	g_type_init ();
-	g_type_ensure (NM_TYPE_DHCP_DHCPCD);
-}
 
 static const char *
 nm_dhcp_dhcpcd_get_path (void)
@@ -238,5 +225,15 @@ nm_dhcp_dhcpcd_class_init (NMDhcpDhcpcdClass *dhcpcd_class)
 	client_class->ip4_start = ip4_start;
 	client_class->ip6_start = ip6_start;
 	client_class->stop = stop;
+}
+
+static void __attribute__((constructor))
+register_dhcp_dhclient (void)
+{
+	g_type_init ();
+	_nm_dhcp_client_register (NM_TYPE_DHCP_DHCPCD,
+	                          "dhcpcd",
+	                          nm_dhcp_dhcpcd_get_path,
+	                          NULL);
 }
 

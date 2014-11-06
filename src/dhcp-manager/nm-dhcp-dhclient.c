@@ -45,16 +45,7 @@
 #include "NetworkManagerUtils.h"
 #include "nm-dhcp-listener.h"
 
-static const char *nm_dhcp_dhclient_get_path (void);
-static GSList *nm_dhcp_dhclient_get_lease_ip_configs (const char *iface,
-                                                      const char *uuid,
-                                                      gboolean ipv6);
-
-G_DEFINE_TYPE_EXTENDED (NMDhcpDhclient, nm_dhcp_dhclient, NM_TYPE_DHCP_CLIENT, 0,
-                        _nm_dhcp_client_register (g_define_type_id,
-                                                  "dhclient",
-                                                  nm_dhcp_dhclient_get_path,
-                                                  nm_dhcp_dhclient_get_lease_ip_configs);)
+G_DEFINE_TYPE (NMDhcpDhclient, nm_dhcp_dhclient, NM_TYPE_DHCP_CLIENT)
 
 #define NM_DHCP_DHCLIENT_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_DHCP_DHCLIENT, NMDhcpDhclientPrivate))
 
@@ -64,13 +55,6 @@ typedef struct {
 	char *lease_file;
 	char *pid_file;
 } NMDhcpDhclientPrivate;
-
-static void __attribute__((constructor))
-register_dhcp_dhclient (void)
-{
-	g_type_init ();
-	g_type_ensure (NM_TYPE_DHCP_DHCLIENT);
-}
 
 static const char *
 nm_dhcp_dhclient_get_path (void)
@@ -667,5 +651,15 @@ nm_dhcp_dhclient_class_init (NMDhcpDhclientClass *dhclient_class)
 	client_class->ip6_start = ip6_start;
 	client_class->stop = stop;
 	client_class->get_duid = get_duid;
+}
+
+static void __attribute__((constructor))
+register_dhcp_dhclient (void)
+{
+	g_type_init ();
+	_nm_dhcp_client_register (NM_TYPE_DHCP_DHCLIENT,
+	                          "dhclient",
+	                          nm_dhcp_dhclient_get_path,
+	                          nm_dhcp_dhclient_get_lease_ip_configs);
 }
 

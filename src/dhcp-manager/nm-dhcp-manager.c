@@ -171,6 +171,8 @@ get_client_type (const char *client, GError **error)
 		client_gtype = is_client_enabled ("dhclient", NULL);
 		if (client_gtype == G_TYPE_INVALID)
 			client_gtype = is_client_enabled ("dhcpcd", NULL);
+		if (client_gtype == G_TYPE_INVALID)
+			client_gtype = is_client_enabled ("internal", NULL);
 		if (client_gtype == G_TYPE_INVALID) {
 			g_set_error_literal (error, NM_MANAGER_ERROR, NM_MANAGER_ERROR_FAILED,
 				                 _("no usable DHCP client could be found."));
