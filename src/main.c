@@ -277,12 +277,6 @@ main (int argc, char *argv[])
 		g_free (path);
 	}
 
-	/* Setup runtime directory */
-	if (g_mkdir_with_parents (NMRUNDIR, 0755) != 0) {
-		nm_log_err (LOGD_CORE, "Cannot create '%s': %s", NMRUNDIR, strerror (errno));
-		exit (1);
-	}
-
 	/* Ensure state directory exists */
 	if (g_mkdir_with_parents (NMSTATEDIR, 0755) != 0) {
 		nm_log_err (LOGD_CORE, "Cannot create '%s': %s", NMSTATEDIR, strerror (errno));

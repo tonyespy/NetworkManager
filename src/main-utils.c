@@ -171,6 +171,12 @@ nm_main_utils_check_pidfile (const char *pidfile, const char *name)
 	gboolean nm_running = FALSE;
 	const char *process_name;
 
+	/* Setup runtime directory */
+	if (g_mkdir_with_parents (NMRUNDIR, 0755) != 0) {
+		nm_log_err (LOGD_CORE, "Cannot create '%s': %s", NMRUNDIR, strerror (errno));
+		exit (1);
+	}
+
 	if (!g_file_get_contents (pidfile, &contents, &len, NULL))
 		return FALSE;
 
