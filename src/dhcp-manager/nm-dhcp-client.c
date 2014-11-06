@@ -161,7 +161,7 @@ nm_dhcp_client_set_client_id (NMDhcpClient *self, GBytes *client_id)
 
 	priv = NM_DHCP_CLIENT_GET_PRIVATE (self);
 
-	if (priv->client_id && g_bytes_equal (priv->client_id, client_id))
+	if (priv->client_id && client_id && g_bytes_equal (priv->client_id, client_id))
 		return;
 	g_clear_pointer (&priv->client_id, g_bytes_unref);
 	priv->client_id = client_id ? g_bytes_ref (client_id) : NULL;
