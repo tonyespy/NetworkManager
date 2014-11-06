@@ -524,7 +524,7 @@ ip4_start (NMDhcpClient *client, const char *dhcp_anycast_addr, const char *last
 	GBytes *override_client_id;
 	const uint8_t *client_id = NULL;
 	size_t client_id_len = 0;
-	struct in_addr last_addr;
+	struct in_addr last_addr = { 0 };
 	const char *hostname;
 	int r, i;
 
@@ -578,11 +578,9 @@ ip4_start (NMDhcpClient *client, const char *dhcp_anycast_addr, const char *last
 
 	sd_dhcp_lease_load (priv->lease_file, &lease);
 
-	if (last_ip4_address) {
-		r = inet_pton (AF_INET, last_ip4_address, &last_addr);
-		if (r == 1)
-			sd_dhcp_client_set_request_address (priv->client4, &last_addr);
-	} else if (lease)
+	if (last_ip4_address)
+		inet_pton (AF_INET, last_ip4_address, &last_addr);
+	else if (lease)
 		sd_dhcp_lease_get_address (lease, &last_addr);
 
 	if (last_addr.s_addr) {
