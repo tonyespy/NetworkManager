@@ -62,7 +62,7 @@ typedef struct {
 	char **no_auto_default;
 	char **ignore_carrier;
 
-	gboolean config_quit;
+	gboolean configure_and_quit;
 } NMConfigPrivate;
 
 static NMConfig *singleton = NULL;
@@ -221,9 +221,9 @@ nm_config_get_connectivity_response (NMConfig *config)
 }
 
 gboolean
-nm_config_get_configure_quit (NMConfig *config)
+nm_config_get_configure_and_quit (NMConfig *config)
 {
-	return NM_CONFIG_GET_PRIVATE (config)->config_quit;
+	return NM_CONFIG_GET_PRIVATE (config)->configure_and_quit;
 }
 
 char *
@@ -631,7 +631,7 @@ nm_config_new (GError **error)
 
 	priv->ignore_carrier = g_key_file_get_string_list (priv->keyfile, "main", "ignore-carrier", NULL, NULL);
 
-	priv->config_quit = g_key_file_get_boolean (priv->keyfile, "main", "configure-quit", NULL);
+	priv->configure_and_quit = g_key_file_get_boolean (priv->keyfile, "main", "configure-and-quit", NULL);
 
 	return singleton;
 }

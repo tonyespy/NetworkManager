@@ -185,7 +185,7 @@ manager_startup_complete (NMManager *manager, GParamSpec *pspec, gpointer user_d
 
 	g_object_get (G_OBJECT (manager), NM_MANAGER_STARTUP, &startup, NULL);
 
-	if (!startup && nm_config_get_configure_quit (config)) {
+	if (!startup && nm_config_get_configure_and_quit (config)) {
 		nm_log_info (LOGD_CORE, "quitting now that startup is complete");
 		g_main_loop_quit (main_loop);
 	}
