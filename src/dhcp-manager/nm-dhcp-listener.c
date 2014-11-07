@@ -112,19 +112,6 @@ get_option (GHashTable *hash, const char *key)
 	return garray_to_string ((GArray *) g_value_get_boxed (value), key);
 }
 
-static gboolean
-event_return_accumulator (GSignalInvocationHint *ihint,
-                          GValue *return_accu,
-                          const GValue *handler_return,
-                          gpointer data)
-{
-	if (g_value_get_boolean (handler_return)) {
-		g_value_set_boolean (return_accu, TRUE);
-		return FALSE;  /* stop emission */
-	}
-	return TRUE;  /* continue emission */
-}
-
 static void
 handle_event (DBusGProxy *proxy,
               GHashTable *options,
@@ -291,7 +278,7 @@ nm_dhcp_listener_class_init (NMDhcpListenerClass *listener_class)
 		g_signal_new (NM_DHCP_LISTENER_EVENT,
 		              G_OBJECT_CLASS_TYPE (object_class),
 		              G_SIGNAL_RUN_LAST, 0,
-		              event_return_accumulator,
+		              g_signal_accumulator_true_handled,
 		              NULL, NULL,
 		              G_TYPE_BOOLEAN,     /* listeners return TRUE if handled */
 		              4,
