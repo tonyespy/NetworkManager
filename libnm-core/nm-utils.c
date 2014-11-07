@@ -2936,11 +2936,13 @@ nm_utils_hexstr2bin (const char *hex)
 	guint i = 0, x = 0;
 	gs_free guint8 *c = NULL;
 	int a;
+	gboolean found_colon = FALSE;
 
 	g_return_val_if_fail (hex != NULL, NULL);
 
 	if (strncasecmp (hex, "0x", 2) == 0)
 		hex += 2;
+	found_colon = !!strchr (hex, ':');
 
 	c = g_malloc0 (strlen (hex) / 2 + 1);
 	while (hex[i]) {
@@ -2962,6 +2964,9 @@ nm_utils_hexstr2bin (const char *hex)
 				return NULL;
 			}
 			i++;
+		} else if (hex[i] && found_colon) {
+			/* If colons exist, they must delimit 1 or 2 hex chars */
+			return NULL;
 		}
 	}
 

@@ -3568,6 +3568,8 @@ test_hexstr2bin (void)
 		{ "aabb1199:" },
 		{ ":aabb1199" },
 		{ "aabb$$dd" },
+		{ "aab:ccc:ddd" },
+		{ "aab::ccc:ddd" },
 	};
 	GBytes *b;
 	guint i;
