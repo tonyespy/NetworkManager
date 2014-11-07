@@ -393,10 +393,9 @@ nm_dhcp_manager_init (NMDhcpManager *self)
 	/* Client-specific setup */
 	client = nm_config_get_dhcp_client (config);
 	if (nm_config_get_configure_and_quit (config)) {
-		if (client && strcmp (client, "internal") != 0) {
+		if (g_strcmp0 (client, "internal") != 0)
 			nm_log_warn (LOGD_DHCP, "Using internal DHCP client since configure-and-quit is set.");
-			client = "internal";
-		}
+		client = "internal";
 	}
 
 	priv->client_type = get_client_type (client, &error);
