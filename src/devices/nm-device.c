@@ -7032,8 +7032,6 @@ nm_device_spawn_iface_helper (NMDevice *self)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 	gboolean priority_set = FALSE, configured = FALSE;
-	NMSettingIP4Config *s_ip4;
-	NMSettingIP6Config *s_ip6;
 	NMConnection *connection;
 	GError *error = NULL;
 	const char *method;
@@ -7065,6 +7063,7 @@ nm_device_spawn_iface_helper (NMDevice *self)
 	    && g_strcmp0 (method, NM_SETTING_IP4_CONFIG_METHOD_AUTO) == 0
 	    && priv->dhcp4_client
 	    && dhcp4_address) {
+		NMSettingIPConfig *s_ip4;
 		GBytes *client_id;
 		char *hex_client_id;
 		const char *hostname;
@@ -7078,7 +7077,7 @@ nm_device_spawn_iface_helper (NMDevice *self)
 
 		g_ptr_array_add (argv, g_strdup ("--dhcp4"));
 		g_ptr_array_add (argv, g_strdup (dhcp4_address));
-		if (nm_setting_ip4_config_get_may_fail (s_ip4) == FALSE)
+		if (nm_setting_ip_config_get_may_fail (s_ip4) == FALSE)
 			g_ptr_array_add (argv, g_strdup ("--dhcp4-required"));
 
 		client_id = nm_dhcp_client_get_client_id (priv->dhcp4_client);
@@ -7104,6 +7103,7 @@ nm_device_spawn_iface_helper (NMDevice *self)
 	    && g_strcmp0 (method, NM_SETTING_IP6_CONFIG_METHOD_AUTO) == 0
 	    && priv->rdisc
 	    && priv->ac_ip6_config) {
+		NMSettingIPConfig *s_ip6;
 		char *hex_iid;
 		NMUtilsIPv6IfaceId iid = NM_UTILS_IPV6_IFACE_ID_INIT;
 
@@ -7112,7 +7112,7 @@ nm_device_spawn_iface_helper (NMDevice *self)
 
 		g_ptr_array_add (argv, g_strdup ("--slaac"));
 
-		if (nm_setting_ip6_config_get_may_fail (s_ip6) == FALSE)
+		if (nm_setting_ip_config_get_may_fail (s_ip6) == FALSE)
 			g_ptr_array_add (argv, g_strdup ("--slaac-required"));
 
 		g_ptr_array_add (argv, g_strdup ("--slaac-tempaddr"));
