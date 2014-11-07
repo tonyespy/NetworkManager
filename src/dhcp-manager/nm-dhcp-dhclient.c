@@ -44,6 +44,7 @@
 #include "nm-posix-signals.h"
 #include "NetworkManagerUtils.h"
 #include "nm-dhcp-listener.h"
+#include "gsystem-local-alloc.h"
 
 G_DEFINE_TYPE (NMDhcpDhclient, nm_dhcp_dhclient, NM_TYPE_DHCP_CLIENT)
 

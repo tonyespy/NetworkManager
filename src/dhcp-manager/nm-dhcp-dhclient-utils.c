@@ -31,6 +31,7 @@
 #include "nm-utils.h"
 #include "nm-platform.h"
 #include "NetworkManagerUtils.h"
+#include "gsystem-local-alloc.h"
 
 #define CLIENTID_TAG            "send dhcp-client-identifier"
 
