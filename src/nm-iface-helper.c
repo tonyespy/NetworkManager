@@ -49,7 +49,7 @@
 #define NMIH_PID_FILE_FMT NMRUNDIR "/nm-iface-helper-%d.pid"
 
 static GMainLoop *main_loop = NULL;
-static char *iface = NULL;
+static char *ifname = NULL;
 static int ifindex = -1;
 static gboolean slaac_required = FALSE;
 static gboolean dhcp4_required = FALSE;
@@ -68,7 +68,7 @@ dhcp4_state_changed (NMDhcpClient *client,
 
 	g_return_if_fail (!ip4_config || NM_IS_IP4_CONFIG (ip4_config));
 
-	nm_log_dbg (LOGD_DHCP4, "(%s): new DHCPv4 client state %d", iface, state);
+	nm_log_dbg (LOGD_DHCP4, "(%s): new DHCPv4 client state %d", ifname, state);
 
 	switch (state) {
 	case NM_DHCP_STATE_BOUND:
@@ -79,7 +79,7 @@ dhcp4_state_changed (NMDhcpClient *client,
 
 		nm_ip4_config_merge (existing, ip4_config);
 		if (!nm_ip4_config_commit (existing, ifindex))
-			nm_log_warn (LOGD_DHCP4, "(%s): failed to apply DHCPv4 config", iface);
+			nm_log_warn (LOGD_DHCP4, "(%s): failed to apply DHCPv4 config", ifname);
 
 		if (last_config) {
 			g_object_unref (last_config);
@@ -91,10 +91,10 @@ dhcp4_state_changed (NMDhcpClient *client,
 	case NM_DHCP_STATE_DONE:
 	case NM_DHCP_STATE_FAIL:
 		if (dhcp4_required) {
-			nm_log_warn (LOGD_DHCP4, "(%s): DHCPv4 timed out or failed, quitting...", iface);
+			nm_log_warn (LOGD_DHCP4, "(%s): DHCPv4 timed out or failed, quitting...", ifname);
 			g_main_loop_quit (main_loop);
 		} else
-			nm_log_warn (LOGD_DHCP4, "(%s): DHCPv4 timed out or failed", iface);
+			nm_log_warn (LOGD_DHCP4, "(%s): DHCPv4 timed out or failed", ifname);
 		break;
 	default:
 		break;
@@ -207,14 +207,14 @@ rdisc_config_changed (NMRDisc *rdisc, NMRDiscConfigMap changed, gpointer user_da
 		char val[16];
 
 		g_snprintf (val, sizeof (val), "%d", rdisc->hop_limit);
-		nm_platform_sysctl_set (nm_utils_ip6_property_path (iface, "hop_limit"), val);
+		nm_platform_sysctl_set (nm_utils_ip6_property_path (ifname, "hop_limit"), val);
 	}
 
 	if (changed & NM_RDISC_CONFIG_MTU) {
 		char val[16];
 
 		g_snprintf (val, sizeof (val), "%d", rdisc->mtu);
-		nm_platform_sysctl_set (nm_utils_ip6_property_path (iface, "mtu"), val);
+		nm_platform_sysctl_set (nm_utils_ip6_property_path (ifname, "mtu"), val);
 	}
 
 	existing = nm_ip6_config_capture (ifindex, FALSE, tempaddr);
@@ -223,7 +223,7 @@ rdisc_config_changed (NMRDisc *rdisc, NMRDiscConfigMap changed, gpointer user_da
 
 	nm_ip6_config_merge (existing, ip6_config);
 	if (!nm_ip6_config_commit (existing, ifindex))
-		nm_log_warn (LOGD_IP6, "(%s): failed to apply IPv6 config", iface);
+		nm_log_warn (LOGD_IP6, "(%s): failed to apply IPv6 config", ifname);
 
 	if (last_config) {
 		g_object_unref (last_config);
@@ -236,10 +236,10 @@ static void
 rdisc_ra_timeout (NMRDisc *rdisc, gpointer user_data)
 {
 	if (slaac_required) {
-		nm_log_warn (LOGD_IP6, "(%s): IPv6 timed out or failed, quitting...", iface);
+		nm_log_warn (LOGD_IP6, "(%s): IPv6 timed out or failed, quitting...", ifname);
 		g_main_loop_quit (main_loop);
 	} else
-		nm_log_warn (LOGD_IP6, "(%s): IPv6 timed out or failed", iface);
+		nm_log_warn (LOGD_IP6, "(%s): IPv6 timed out or failed", ifname);
 }
 
 static gboolean
@@ -283,7 +283,7 @@ main (int argc, char *argv[])
 
 	GOptionEntry options[] = {
 		/* Interface/IP config */
-		{ "iface", 'i', 0, G_OPTION_ARG_STRING, &iface, N_("The interface to manage"), N_("eth0") },
+		{ "ifname", 'i', 0, G_OPTION_ARG_STRING, &ifname, N_("The interface to manage"), N_("eth0") },
 		{ "uuid", 'u', 0, G_OPTION_ARG_STRING, &uuid, N_("Connection UUID"), N_("661e8cd0-b618-46b8-9dc9-31a52baaa16b") },
 		{ "slaac", 's', 0, G_OPTION_ARG_NONE, &slaac, N_("Whether to manage IPv6 SLAAC"), NULL },
 		{ "slaac-required", '6', 0, G_OPTION_ARG_NONE, &slaac_required, N_("Whether SLAAC must be successful"), NULL },
@@ -320,7 +320,7 @@ main (int argc, char *argv[])
 		exit (0);
 	}
 
-	if (!iface || !uuid) {
+	if (!ifname || !uuid) {
 		fprintf (stderr, _("An interface name and UUID are required\n"));
 		exit (1);
 	}
@@ -384,9 +384,9 @@ main (int argc, char *argv[])
 	/* Set up platform interaction layer */
 	nm_linux_platform_setup ();
 
-	ifindex = nm_platform_link_get_ifindex (iface);
+	ifindex = nm_platform_link_get_ifindex (ifname);
 	if (ifindex <= 0) {
-		fprintf (stderr, _("Failed to find interface index for %s\n"), iface);
+		fprintf (stderr, _("Failed to find interface index for %s\n"), ifname);
 		exit (1);
 	}
 
@@ -402,7 +402,7 @@ main (int argc, char *argv[])
 
 		bytes = nm_utils_hexstr2bin (iid_str);
 		if (!bytes || g_bytes_get_size (bytes) != sizeof (*iid)) {
-			fprintf (stderr, _("(%s): Invalid IID %s\n"), iface, iid_str);
+			fprintf (stderr, _("(%s): Invalid IID %s\n"), ifname, iid_str);
 			exit (1);
 		}
 		iid = g_bytes_unref_to_data (bytes, &ignored);
@@ -411,14 +411,14 @@ main (int argc, char *argv[])
 	priority = MAX (0, priority);
 
 	if (dhcp4_address) {
-		nm_platform_sysctl_set (nm_utils_ip4_property_path (iface, "promote_secondaries"), "1");
+		nm_platform_sysctl_set (nm_utils_ip4_property_path (ifname, "promote_secondaries"), "1");
 
 		/* Initialize DHCP manager */
 		dhcp_mgr = nm_dhcp_manager_get ();
 		g_assert (dhcp_mgr != NULL);
 
 		dhcp4_client = nm_dhcp_manager_start_ip4 (dhcp_mgr,
-		                                          iface,
+		                                          ifname,
 		                                          ifindex,
 		                                          hwaddr,
 		                                          uuid,
@@ -439,16 +439,16 @@ main (int argc, char *argv[])
 	if (slaac) {
 		nm_platform_link_set_user_ipv6ll_enabled (ifindex, TRUE);
 
-		rdisc = nm_lndp_rdisc_new (ifindex, iface);
+		rdisc = nm_lndp_rdisc_new (ifindex, ifname);
 		g_assert (rdisc);
 
 		if (iid)
 			nm_rdisc_set_iid (rdisc, *iid);
 
-		nm_platform_sysctl_set (nm_utils_ip6_property_path (iface, "accept_ra"), "1");
-		nm_platform_sysctl_set (nm_utils_ip6_property_path (iface, "accept_ra_defrtr"), "0");
-		nm_platform_sysctl_set (nm_utils_ip6_property_path (iface, "accept_ra_pinfo"), "0");
-		nm_platform_sysctl_set (nm_utils_ip6_property_path (iface, "accept_ra_rtr_pref"), "0");
+		nm_platform_sysctl_set (nm_utils_ip6_property_path (ifname, "accept_ra"), "1");
+		nm_platform_sysctl_set (nm_utils_ip6_property_path (ifname, "accept_ra_defrtr"), "0");
+		nm_platform_sysctl_set (nm_utils_ip6_property_path (ifname, "accept_ra_pinfo"), "0");
+		nm_platform_sysctl_set (nm_utils_ip6_property_path (ifname, "accept_ra_rtr_pref"), "0");
 
 		g_signal_connect (rdisc,
 		                  NM_RDISC_CONFIG_CHANGED,

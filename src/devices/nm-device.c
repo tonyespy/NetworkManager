@@ -7066,7 +7066,7 @@ nm_device_spawn_iface_helper (NMDevice *self)
 	g_ptr_array_set_free_func (argv, g_free);
 
 	g_ptr_array_add (argv, g_strdup (LIBEXECDIR "/nm-iface-helper"));
-	g_ptr_array_add (argv, g_strdup ("--iface"));
+	g_ptr_array_add (argv, g_strdup ("--ifname"));
 	g_ptr_array_add (argv, g_strdup (nm_device_get_ip_iface (self)));
 	g_ptr_array_add (argv, g_strdup ("--uuid"));
 	g_ptr_array_add (argv, g_strdup (nm_connection_get_uuid (connection)));
