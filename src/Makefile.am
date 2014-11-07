@@ -506,10 +506,6 @@ libnm_iface_helper_la_SOURCES += \
 	platform/wifi/wifi-utils-wext.h
 endif
 
-libnm_iface_helper_la_CPPFLAGS = \
-	$(AM_CPPFLAGS) \
-	-DNM_IFACE_HELPER
-
 libnm_iface_helper_la_LIBADD = \
 	$(top_builddir)/libnm-core/libnm-core.la \
 	libsystemd-dhcp.la \
@@ -529,10 +525,6 @@ nm_iface_helper_SOURCES = \
 	nm-iface-helper.c \
 	main-utils.c \
 	main-utils.h
-
-nm_iface_helper_CPPFLAGS = \
-	$(AM_CPPFLAGS) \
-	-DNM_IFACE_HELPER
 
 nm_iface_helper_LDADD = \
 	$(top_builddir)/libnm-core/libnm-core.la \

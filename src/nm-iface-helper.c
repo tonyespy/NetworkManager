@@ -482,3 +482,48 @@ main (int argc, char *argv[])
 	nm_log_info (LOGD_CORE, "exiting");
 	exit (0);
 }
+
+/*******************************************************/
+/* Stub functions */
+
+gconstpointer nm_config_get (void);
+const char *nm_config_get_dhcp_client (gpointer unused);
+gboolean nm_config_get_configure_and_quit (gpointer unused);
+gconstpointer nm_dbus_manager_get (void);
+void nm_dbus_manager_register_exported_type (gpointer unused, GType gtype, gconstpointer unused2);
+void nm_dbus_manager_register_object (gpointer unused, const char *path, gpointer object);
+
+gconstpointer
+nm_config_get (void)
+{
+	return GUINT_TO_POINTER (1);
+}
+
+const char *
+nm_config_get_dhcp_client (gpointer unused)
+{
+	return "internal";
+}
+
+gboolean
+nm_config_get_configure_and_quit (gpointer unused)
+{
+	return TRUE;
+}
+
+gconstpointer
+nm_dbus_manager_get (void)
+{
+	return GUINT_TO_POINTER (1);
+}
+
+void
+nm_dbus_manager_register_exported_type (gpointer unused, GType gtype, gconstpointer unused2)
+{
+}
+
+void
+nm_dbus_manager_register_object (gpointer unused, const char *path, gpointer object)
+{
+}
+
