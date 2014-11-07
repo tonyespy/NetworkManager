@@ -121,7 +121,7 @@ handle_event (DBusGProxy *proxy,
 	char *iface = NULL;
 	char *pid_str = NULL;
 	char *reason = NULL;
-	gint64 pid;
+	gint32 pid;
 	gboolean handled = FALSE;
 
 	iface = get_option (options, "interface");
@@ -131,7 +131,7 @@ handle_event (DBusGProxy *proxy,
 	}
 
 	pid_str = get_option (options, "pid");
-	pid = nm_utils_ascii_str_to_int64 (pid_str, 10, 0, LONG_MAX, -1);
+	pid = (gint32) nm_utils_ascii_str_to_int64 (pid_str, 10, 0, G_MAXINT32, -1);
 	if (pid == -1 || pid != (GPid) pid) {
 		nm_log_warn (LOGD_DHCP, "DHCP event: couldn't convert PID '%s' to an integer", pid_str ? pid_str : "(null)");
 		goto out;
@@ -139,7 +139,7 @@ handle_event (DBusGProxy *proxy,
 
 	reason = get_option (options, "reason");
 	if (reason == NULL) {
-		nm_log_warn (LOGD_DHCP, "(pid %ld) DHCP event didn't have a reason", pid);
+		nm_log_warn (LOGD_DHCP, "(pid %d) DHCP event didn't have a reason", pid);
 		goto out;
 	}
 
@@ -147,9 +147,9 @@ handle_event (DBusGProxy *proxy,
 	if (!handled) {
 		if (g_ascii_strcasecmp (reason, "RELEASE") == 0) {
 			/* Ignore event when the dhcp client gets killed and we receive its last message */
-			nm_log_dbg (LOGD_DHCP, "(pid %ld) unhandled RELEASE DHCP event for interface %s", pid, iface);
+			nm_log_dbg (LOGD_DHCP, "(pid %d) unhandled RELEASE DHCP event for interface %s", pid, iface);
 		} else
-			nm_log_warn (LOGD_DHCP, "(pid %ld) unhandled DHCP event for interface %s", pid, iface);
+			nm_log_warn (LOGD_DHCP, "(pid %d) unhandled DHCP event for interface %s", pid, iface);
 	}
 
 out:
