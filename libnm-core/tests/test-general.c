@@ -3564,6 +3564,7 @@ test_hexstr2bin (void)
 		{ "aa:bb:cc:dd:10:49:6a", { 0xaa, 0xbb, 0xcc, 0xdd, 0x10, 0x49, 0x6a },       7 },
 		{ "0xccddeeff",           { 0xcc, 0xdd, 0xee, 0xff },                         4 },
 		{ "1:2:66:77:80",         { 0x01, 0x02, 0x66, 0x77, 0x80 },                   5 },
+		{ "e",                    { 0x0e },                                           1 },
 		{ "aabb1199:" },
 		{ ":aabb1199" },
 		{ "aabb$$dd" },
