@@ -7027,20 +7027,6 @@ find_dhcp4_address (NMDevice *self)
 	return NULL;
 }
 
-static void
-iface_helper_child_setup (gpointer user_data G_GNUC_UNUSED)
-{
-        /* We are in the child process at this point */
-        pid_t pid = getpid ();
-        setpgid (pid, pid);
-
-        /*
-         * We blocked signals in main(). We need to restore original signal
-         * mask for the helper here so that it can receive signals.
-         */
-        nm_unblock_posix_signals (NULL);
-}
-
 void
 nm_device_spawn_iface_helper (NMDevice *self)
 {
@@ -7159,8 +7145,8 @@ nm_device_spawn_iface_helper (NMDevice *self)
 			g_free (tmp);
 		}
 
-		if (g_spawn_async (NULL, (char **) argv->pdata, NULL, G_SPAWN_DO_NOT_REAP_CHILD,
-			               iface_helper_child_setup, NULL, &pid, &error)) {
+		if (g_spawn_async (NULL, (char **) argv->pdata, NULL,
+		                   G_SPAWN_DO_NOT_REAP_CHILD, NULL, NULL, &pid, &error)) {
 			_LOGI (LOGD_DEVICE, "spawned helper PID %u", (guint) pid);
 		} else {
 			_LOGW (LOGD_DEVICE, "failed to spawn helper: %s", error->message);

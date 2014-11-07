@@ -31,6 +31,7 @@
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <signal.h>
 
 #include "gsystem-local-alloc.h"
 #include "NetworkManagerUtils.h"
@@ -255,6 +256,11 @@ quit_handler (gpointer user_data)
 static void
 setup_signals (gboolean *quit_early_ptr)
 {
+	sigset_t sigmask;
+
+	sigemptyset (&sigmask);
+	pthread_sigmask (SIG_SETMASK, &sigmask, NULL);
+
 	signal (SIGPIPE, SIG_IGN);
 	g_unix_signal_add (SIGINT, quit_handler, quit_early_ptr);
 	g_unix_signal_add (SIGTERM, quit_handler, quit_early_ptr);
@@ -306,6 +312,8 @@ main (int argc, char *argv[])
 		{ "g-fatal-warnings", 0, 0, G_OPTION_ARG_NONE, &g_fatal_warnings, N_("Make all warnings fatal"), NULL },
 		{NULL}
 	};
+
+	setpgid (getpid (), getpid ());
 
 	if (!nm_main_utils_early_setup ("nm-iface-helper",
 	                                &argv,
