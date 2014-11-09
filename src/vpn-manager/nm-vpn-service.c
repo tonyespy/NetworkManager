@@ -53,7 +53,7 @@ typedef struct {
 
 #define VPN_CONNECTION_GROUP "VPN Connection"
 
-static gboolean start_pending_vpn (NMVpnService *self);
+static gboolean start_pending_vpn (NMVpnService *self, GError **error);
 
 NMVpnService *
 nm_vpn_service_new (const char *namefile, GError **error)
@@ -129,7 +129,7 @@ connection_vpn_state_changed (NMVpnConnection *connection,
 		g_signal_handlers_disconnect_by_func (connection, G_CALLBACK (connection_vpn_state_changed), self);
 		if (connection == priv->active) {
 			priv->active = NULL;
-			start_pending_vpn (self);
+			start_pending_vpn (self, NULL);
 		} else
 			priv->pending = g_slist_remove (priv->pending, connection);
 		g_object_unref (connection);
@@ -252,7 +252,7 @@ start_active_vpn (NMVpnService *self, GError **error)
 }
 
 static gboolean
-start_pending_vpn (NMVpnService *self)
+start_pending_vpn (NMVpnService *self, GError **error)
 {
 	NMVpnServicePrivate *priv = NM_VPN_SERVICE_GET_PRIVATE (self);
 
@@ -265,7 +265,7 @@ start_pending_vpn (NMVpnService *self)
 	priv->active = g_slist_nth_data (priv->pending, 0);
 	priv->pending = g_slist_remove (priv->pending, priv->active);
 
-	return start_active_vpn (self, NULL);
+	return start_active_vpn (self, error);
 }
 
 gboolean
@@ -299,7 +299,7 @@ nm_vpn_service_activate (NMVpnService *service,
 	}
 
 	/* Otherwise start the next VPN */
-	return start_pending_vpn (service);
+	return start_pending_vpn (service, error);
 }
 
 static void
