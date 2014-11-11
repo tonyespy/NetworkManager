@@ -43,6 +43,7 @@
 #define NM_AP_MODE "mode"
 #define NM_AP_MAX_BITRATE "max-bitrate"
 #define NM_AP_STRENGTH "strength"
+#define NM_AP_LAST_SEEN "last-seen"
 
 typedef struct {
 	GObject parent;
@@ -101,8 +102,9 @@ void     nm_ap_set_fake (NMAccessPoint *ap, gboolean fake);
 gboolean nm_ap_get_broadcast (NMAccessPoint *ap);
 void     nm_ap_set_broadcast (NMAccessPoint *ap, gboolean broadcast);
 
-gint32   nm_ap_get_last_seen (const NMAccessPoint *ap);
-void     nm_ap_set_last_seen (NMAccessPoint *ap, gint32 last_seen);
+guint32	nm_ap_get_last_seen	(const NMAccessPoint *ap);
+void	nm_ap_set_last_seen	(NMAccessPoint *ap, guint32 last_seen);
+void	nm_ap_update_last_seen	(NMAccessPoint *ap);
 
 gboolean nm_ap_check_compatible (NMAccessPoint *self,
                                  NMConnection *connection);
