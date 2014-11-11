@@ -70,6 +70,7 @@ struct _NMDeviceWifiClass
 	void (*access_point_added)   (NMDeviceWifi *device, NMAccessPoint *ap);
 	void (*access_point_removed) (NMDeviceWifi *device, NMAccessPoint *ap);
 	gboolean (*scanning_allowed) (NMDeviceWifi *device);
+	void (*scan_done) (NMDeviceWifi *device);
 };
 
 
