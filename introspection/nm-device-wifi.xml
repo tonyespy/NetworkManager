@@ -121,6 +121,12 @@
         </tp:docstring>
     </signal>
 
+    <signal name="ScanDone">
+        <tp:docstring>
+            Emitted when the device has finished scanning for new APs.
+        </tp:docstring>
+    </signal>
+
     <tp:flags name="NM_802_11_DEVICE_CAP" type="u">
       <tp:docstring>
         Flags describing the capabilities of a wireless device.

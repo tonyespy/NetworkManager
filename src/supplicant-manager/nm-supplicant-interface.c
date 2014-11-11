@@ -1118,6 +1118,7 @@ nm_supplicant_interface_set_config (NMSupplicantInterface *self,
 static void
 scan_request_cb (GDBusProxy *proxy, GAsyncResult *result, gpointer user_data)
 {
+	NMSupplicantInterface *self = NM_SUPPLICANT_INTERFACE (user_data);
 	gs_unref_variant GVariant *reply = NULL;
 	gs_free_error GError *error = NULL;
 
@@ -1133,7 +1134,7 @@ scan_request_cb (GDBusProxy *proxy, GAsyncResult *result, gpointer user_data)
 			nm_log_warn (LOGD_SUPPLICANT, "Could not get scan request result: %s", error->message);
 		}
 	}
-	g_signal_emit (NM_SUPPLICANT_INTERFACE (user_data), signals[SCAN_DONE], 0, error ? FALSE : TRUE);
+	g_signal_emit (self, signals[SCAN_DONE], 0, FALSE);
 }
 
 gboolean

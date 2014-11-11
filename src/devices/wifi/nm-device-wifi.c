@@ -104,6 +104,7 @@ enum {
 	ACCESS_POINT_ADDED,
 	ACCESS_POINT_REMOVED,
 	SCANNING_ALLOWED,
+	SCAN_DONE,
 
 	LAST_SIGNAL
 };
@@ -1619,6 +1620,8 @@ supplicant_iface_scan_done_cb (NMSupplicantInterface *iface,
 	NMDeviceWifiPrivate *priv = NM_DEVICE_WIFI_GET_PRIVATE (self);
 
 	_LOGD (LOGD_WIFI_SCAN, "scan %s", success ? "successful" : "failed");
+
+	g_signal_emit (self, signals[SCAN_DONE], 0, NULL);
 
 	schedule_scan (self, success);
 
@@ -3379,6 +3382,14 @@ nm_device_wifi_class_init (NMDeviceWifiClass *klass)
 		              G_STRUCT_OFFSET (NMDeviceWifiClass, scanning_allowed),
 		              scanning_allowed_accumulator, NULL, NULL,
 		              G_TYPE_BOOLEAN, 0);
+
+	signals[SCAN_DONE] =
+		g_signal_new ("scan-done",
+		              G_OBJECT_CLASS_TYPE (object_class),
+		              G_SIGNAL_RUN_FIRST,
+		              G_STRUCT_OFFSET (NMDeviceWifiClass, scan_done),
+		              NULL, NULL, NULL,
+		              G_TYPE_NONE, 0);
 
 	nm_dbus_manager_register_exported_type (nm_dbus_manager_get (),
 	                                        G_TYPE_FROM_CLASS (klass),
