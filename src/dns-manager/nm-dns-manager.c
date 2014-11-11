@@ -800,6 +800,27 @@ update_dns (NMDnsManager *self,
 }
 
 static void
+plugin_appeared (NMDnsPlugin *plugin, gpointer user_data)
+{
+	NMDnsManager *self = NM_DNS_MANAGER (user_data);
+	NMDnsManagerPrivate *priv = NM_DNS_MANAGER_GET_PRIVATE (self);
+	GError *error = NULL;
+
+	/* Not applicable to non-caching plugins */
+	if (!nm_dns_plugin_is_caching (plugin))
+		return;
+
+	/* Try to update DNS again; since it's now available on the bus this
+	 * might work. */
+	if (!update_dns (self, FALSE, &error)) {
+		nm_log_warn (LOGD_DNS, "could not commit DNS changes: (%d) %s",
+		             error ? error->code : -1,
+		             error && error->message ? error->message : "(unknown)");
+		g_clear_error (&error);
+	}
+}
+
+static void
 plugin_failed (NMDnsPlugin *plugin, gpointer user_data)
 {
 	NMDnsManager *self = NM_DNS_MANAGER (user_data);
@@ -1129,6 +1150,7 @@ init_resolv_conf_mode (NMDnsManager *self)
 		nm_log_info (LOGD_DNS, "DNS: loaded plugin %s", nm_dns_plugin_get_name (priv->plugin));
 		g_signal_connect (priv->plugin, NM_DNS_PLUGIN_FAILED, G_CALLBACK (plugin_failed), self);
 		g_signal_connect (priv->plugin, NM_DNS_PLUGIN_CHILD_QUIT, G_CALLBACK (plugin_child_quit), self);
+		g_signal_connect (priv->plugin, NM_DNS_PLUGIN_APPEARED, G_CALLBACK (plugin_appeared), self);
 	}
 }
 
