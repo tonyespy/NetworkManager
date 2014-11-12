@@ -280,6 +280,16 @@ modem_state_cb (NMModem *modem,
 		}
 	}
 
+	if (dev_state >= NM_DEVICE_STATE_DISCONNECTED &&
+	    new_state == NM_MODEM_STATE_REGISTERED && old_state < NM_MODEM_STATE_REGISTERED) {
+
+		nm_log_info (LOGD_MB, "(%s): modem re-registered; re-checking autoconnect",
+		             nm_device_get_iface (device));
+
+		g_object_set (G_OBJECT (device), NM_DEVICE_AUTOCONNECT, TRUE, NULL);
+		nm_device_emit_recheck_auto_activate (device);
+	}
+
 	if (new_state < NM_MODEM_STATE_CONNECTING &&
 	    old_state >= NM_MODEM_STATE_CONNECTING &&
 	    dev_state >= NM_DEVICE_STATE_NEED_AUTH &&
@@ -341,6 +351,14 @@ device_state_changed (NMDevice *device,
 		/* Log initial modem state */
 		_LOGI (LOGD_MB, "modem state '%s'",
 		       nm_modem_state_to_string (nm_modem_get_state (priv->modem)));
+	}
+
+	/* Block autoconnect until the modem is registered again */
+	if (new_state == NM_DEVICE_STATE_FAILED && nm_modem_get_state (priv->modem) == NM_MODEM_STATE_SEARCHING) {
+		nm_log_info (LOGD_MB, "(%s): modem searching; disabling autoconnect",
+		             nm_device_get_iface (device));
+
+		g_object_set (G_OBJECT (device), NM_DEVICE_AUTOCONNECT, FALSE, NULL);
 	}
 
 	nm_modem_device_state_changed (priv->modem, new_state, old_state, reason);
