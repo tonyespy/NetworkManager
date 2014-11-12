@@ -177,7 +177,11 @@ _platform_route_sync_add (const VTableIP *vtable, NMDefaultRouteManager *self, g
 			entry_unsynced = e;
 	}
 
-	/* For synced entries, we expect that the metric is chosen uniquely. */
+	/* We don't expect to have an unsynced *and* a synced entry for the same metric.
+	 * Unless, (a) their metric is G_MAXUINT32, in which case we could not find an unused effective metric,
+	 * or (b) if we have an unsynced and a synced entry for the same ifindex.
+	 * The latter case happens for example when activating an openvpn connection (synced) and
+	 * assuming the corresponding tun0 interface (unsynced). */
 	g_assert (!entry || !entry_unsynced || (entry->route.rx.ifindex == entry_unsynced->route.rx.ifindex) || metric == G_MAXUINT32);
 
 	/* we only add the route, if we have an (to be synced) entry for it. */
@@ -297,7 +301,7 @@ _sort_entries_cmp (gconstpointer a, gconstpointer b, gpointer user_data)
 }
 
 static GHashTable *
-_resync_all_construct_used_metric_index (const VTableIP *vtable, NMDefaultRouteManager *self, GArray *routes)
+_get_assumed_interface_metrics (const VTableIP *vtable, NMDefaultRouteManager *self, GArray *routes)
 {
 	NMDefaultRouteManagerPrivate *priv = NM_DEFAULT_ROUTE_MANAGER_GET_PRIVATE (self);
 	GPtrArray *entries;
@@ -305,8 +309,8 @@ _resync_all_construct_used_metric_index (const VTableIP *vtable, NMDefaultRouteM
 	GHashTable *result;
 
 	/* create a list of all metrics that are currently assigned on an interface
-	 * that is *not* already covered by one of our (synced) entries.
-	 * This effectivly returns the metrics that are in use by assumed interfaces
+	 * that is *not* already covered by one of our synced entries.
+	 * IOW, returns the metrics that are in use by assumed interfaces
 	 * that we want to preserve. */
 
 	entries = vtable->get_entries (priv);
@@ -356,9 +360,7 @@ _resync_all (const VTableIP *vtable, NMDefaultRouteManager *self, const Entry *c
 
 	routes = vtable->platform_route_get_all (0, NM_PLATFORM_GET_ROUTE_MODE_ONLY_DEFAULT);
 
-	/* construct a list of metrics that are reserved by assumed interfaces and
-	 * that we cannot reuse. */
-	assumed_metrics = _resync_all_construct_used_metric_index (vtable, self, routes);
+	assumed_metrics = _get_assumed_interface_metrics (vtable, self, routes);
 
 	if (old_entry && old_entry->synced) {
 		/* The old version obviously changed. */
@@ -401,7 +403,7 @@ _resync_all (const VTableIP *vtable, NMDefaultRouteManager *self, const Entry *c
 			expected_metric = last_metric == G_MAXUINT32 ? G_MAXUINT32 : last_metric + 1;
 
 		while (   expected_metric < G_MAXUINT32
-		       && g_hash_table_lookup_extended (assumed_metrics, GUINT_TO_POINTER (expected_metric), NULL, NULL)) {
+		       && g_hash_table_contains (assumed_metrics, GUINT_TO_POINTER (expected_metric))) {
 			gboolean has_metric_for_ifindex = FALSE;
 
 			/* Check if there are assumed devices that have default routes with this metric.
@@ -412,7 +414,7 @@ _resync_all (const VTableIP *vtable, NMDefaultRouteManager *self, const Entry *c
 				const NMPlatformIPRoute *r = _vt_route_index (vtable, routes, i);
 
 				if (   r->metric == expected_metric
-					&& r->ifindex == entry->route.rx.ifindex) {
+				    && r->ifindex == entry->route.rx.ifindex) {
 					has_metric_for_ifindex = TRUE;
 					break;
 				}
