@@ -47,6 +47,8 @@ typedef struct {
 	guint           name_owner_id;
 	DBusGProxy *    proxy;
 	gboolean        running;
+
+	GSList         *pending_calls;
 } NMFirewallManagerPrivate;
 
 enum {
@@ -59,17 +61,32 @@ static guint signals[LAST_SIGNAL] = { 0 };
 
 /********************************************************************/
 
+#define PENDING_CALL_DUMMY               ((NMFirewallPendingCall) GUINT_TO_POINTER(1))
+#define PENDING_CALL_FROM_INFO(info)     ((NMFirewallPendingCall) info)
+
+typedef enum {
+	IDLY_SCHEDULED_TYPE_NONE        = 0,
+	IDLY_SCHEDULED_TYPE_PENDING     = 1,
+	IDLY_SCHEDULED_TYPE_CANCELLED   = 2,
+} IdlyScheduledType;
+
 typedef struct {
+	NMFirewallManager *self;
 	char *iface;
 	FwAddToZoneFunc callback;
 	gpointer user_data;
 	guint id;
 	gboolean completed;
+
+	IdlyScheduledType idly_scheduled;
+	DBusGProxyCall *dbus_call;
 } CBInfo;
 
 static void
-cb_info_free (CBInfo *info)
+_cb_info_free (CBInfo *info)
 {
+	NMFirewallManagerPrivate *priv;
+
 	g_return_if_fail (info != NULL);
 
 	if (!info->completed) {
@@ -84,25 +101,52 @@ cb_info_free (CBInfo *info)
 		}
 	}
 	g_free (info->iface);
-	g_free (info);
+
+	priv = NM_FIREWALL_MANAGER_GET_PRIVATE (info->self);
+	priv->pending_calls = g_slist_remove (priv->pending_calls, info);
+	g_object_unref (info->self);
+
+	g_slice_free (CBInfo, info);
 }
 
 static CBInfo *
-_cb_info_create (const char *iface, FwAddToZoneFunc callback, gpointer user_data)
+_cb_info_create (NMFirewallManager *self, const char *iface, FwAddToZoneFunc callback, gpointer user_data)
 {
+	NMFirewallManagerPrivate *priv = NM_FIREWALL_MANAGER_GET_PRIVATE (self);
 	static guint id;
 	CBInfo *info;
 
-	info = g_malloc (sizeof (CBInfo));
+	info = g_slice_new0 (CBInfo);
 	if (++id == 0)
 		++id;
+	info->self = g_object_ref (self);
 	info->id = id;
 	info->iface = g_strdup (iface);
 	info->completed = FALSE;
 	info->callback = callback;
 	info->user_data = user_data;
 
+	priv->pending_calls = g_slist_prepend (priv->pending_calls, info);
 	return info;
+}
+
+static gboolean
+add_or_change_idle_cb (gpointer user_data)
+{
+	CBInfo *info = user_data;
+
+	if (info->idly_scheduled == IDLY_SCHEDULED_TYPE_CANCELLED) {
+		/* operation was cancelled. _cb_info_free will invoke callback. */
+	} else {
+		nm_log_dbg (LOGD_FIREWALL, "(%s) firewall zone call pretends success [%u]",
+		            info->iface, info->id);
+		if (info->callback)
+			info->callback (NULL, info->user_data);
+		info->completed = TRUE;
+	}
+
+	_cb_info_free (info);
+	return G_SOURCE_REMOVE;
 }
 
 static void
@@ -148,25 +192,33 @@ nm_firewall_manager_add_or_change_zone (NMFirewallManager *self,
 	CBInfo *info;
 
 	if (priv->running == FALSE) {
-		nm_log_dbg (LOGD_FIREWALL, "(%s) firewall zone add/change skipped (not running)", iface);
-		if (callback)
-			callback (NULL, user_data);
-		return NULL;
+		if (callback) {
+			info = _cb_info_create (self, iface, callback, user_data);
+			info->idly_scheduled = IDLY_SCHEDULED_TYPE_PENDING;
+			g_idle_add (add_or_change_idle_cb, info);
+			nm_log_dbg (LOGD_FIREWALL, "(%s) firewall zone %s -> %s%s%s [%u] (not running, simulate success)", iface, add ? "add" : "change",
+			            zone?"\"":"", zone ? zone : "default", zone?"\"":"", info->id);
+			return PENDING_CALL_FROM_INFO (info);
+		} else {
+			nm_log_dbg (LOGD_FIREWALL, "(%s) firewall zone add/change skipped (not running)", iface);
+			return PENDING_CALL_DUMMY;
+		}
 	}
 
-	info = _cb_info_create (iface, callback, user_data);
+	info = _cb_info_create (self, iface, callback, user_data);
 
 	nm_log_dbg (LOGD_FIREWALL, "(%s) firewall zone %s -> %s%s%s [%u]", iface, add ? "add" : "change",
 	                           zone?"\"":"", zone ? zone : "default", zone?"\"":"", info->id);
-	return (NMFirewallPendingCall) dbus_g_proxy_begin_call_with_timeout (priv->proxy,
-	                                                                     add ? "addInterface" : "changeZone",
-	                                                                     add_or_change_cb,
-	                                                                     info,
-	                                                                     (GDestroyNotify) cb_info_free,
-	                                                                     10000,      /* timeout */
-	                                                                     G_TYPE_STRING, zone ? zone : "",
-	                                                                     G_TYPE_STRING, iface,
-	                                                                     G_TYPE_INVALID);
+	info->dbus_call = dbus_g_proxy_begin_call_with_timeout (priv->proxy,
+	                                                        add ? "addInterface" : "changeZone",
+	                                                        add_or_change_cb,
+	                                                        info,
+	                                                        (GDestroyNotify) _cb_info_free,
+	                                                        10000,      /* timeout */
+	                                                        G_TYPE_STRING, zone ? zone : "",
+	                                                        G_TYPE_STRING, iface,
+	                                                        G_TYPE_INVALID);
+	return PENDING_CALL_FROM_INFO (info);
 }
 
 static void
@@ -208,29 +260,49 @@ nm_firewall_manager_remove_from_zone (NMFirewallManager *self,
 
 	if (priv->running == FALSE) {
 		nm_log_dbg (LOGD_FIREWALL, "(%s) firewall zone remove skipped (not running)", iface);
-		return NULL;
+		return PENDING_CALL_DUMMY;
 	}
 
-	info = _cb_info_create (iface, NULL, NULL);
+	info = _cb_info_create (self, iface, NULL, NULL);
 
 	nm_log_dbg (LOGD_FIREWALL, "(%s) firewall zone remove -> %s%s%s [%u]", iface,
 	                           zone?"\"":"", zone ? zone : "*", zone?"\"":"", info->id);
-	return (NMFirewallPendingCall) dbus_g_proxy_begin_call_with_timeout (priv->proxy,
-	                                                                     "removeInterface",
-	                                                                     remove_cb,
-	                                                                     info,
-	                                                                     (GDestroyNotify) cb_info_free,
-	                                                                     10000,      /* timeout */
-	                                                                     G_TYPE_STRING, zone ? zone : "",
-	                                                                     G_TYPE_STRING, iface,
-	                                                                     G_TYPE_INVALID);
+	info->dbus_call = dbus_g_proxy_begin_call_with_timeout (priv->proxy,
+	                                                        "removeInterface",
+	                                                        remove_cb,
+	                                                        info,
+	                                                        (GDestroyNotify) _cb_info_free,
+	                                                        10000,      /* timeout */
+	                                                        G_TYPE_STRING, zone ? zone : "",
+	                                                        G_TYPE_STRING, iface,
+	                                                        G_TYPE_INVALID);
+	return PENDING_CALL_FROM_INFO (info);
 }
 
 void nm_firewall_manager_cancel_call (NMFirewallManager *self, NMFirewallPendingCall call)
 {
+	NMFirewallManagerPrivate *priv = NM_FIREWALL_MANAGER_GET_PRIVATE (self);
+	GSList *pending;
+	CBInfo *info;
+
 	g_return_if_fail (NM_IS_FIREWALL_MANAGER (self));
-	dbus_g_proxy_cancel_call (NM_FIREWALL_MANAGER_GET_PRIVATE (self)->proxy,
-	                          (DBusGProxyCall *) call);
+
+	if (call == PENDING_CALL_DUMMY)
+		return;
+
+	pending = g_slist_find (priv->pending_calls, call);
+
+	if (!pending)
+		return;
+	priv->pending_calls = g_slist_remove_link (priv->pending_calls, pending);
+
+	info = (CBInfo *) call;
+	if (info->idly_scheduled != IDLY_SCHEDULED_TYPE_NONE)
+		info->idly_scheduled = IDLY_SCHEDULED_TYPE_CANCELLED;
+	else {
+		dbus_g_proxy_cancel_call (NM_FIREWALL_MANAGER_GET_PRIVATE (self)->proxy,
+		                          info->dbus_call);
+	}
 }
 
 static void
@@ -328,6 +400,8 @@ static void
 dispose (GObject *object)
 {
 	NMFirewallManagerPrivate *priv = NM_FIREWALL_MANAGER_GET_PRIVATE (object);
+
+	g_assert (priv->pending_calls == NULL);
 
 	if (priv->dbus_mgr) {
 		g_signal_handler_disconnect (priv->dbus_mgr, priv->name_owner_id);
