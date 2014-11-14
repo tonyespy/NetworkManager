@@ -64,12 +64,6 @@ static guint signals[LAST_SIGNAL] = { 0 };
 #define PENDING_CALL_DUMMY               ((NMFirewallPendingCall) GUINT_TO_POINTER(1))
 #define PENDING_CALL_FROM_INFO(info)     ((NMFirewallPendingCall) info)
 
-typedef enum {
-	IDLY_SCHEDULED_TYPE_NONE        = 0,
-	IDLY_SCHEDULED_TYPE_PENDING     = 1,
-	IDLY_SCHEDULED_TYPE_CANCELLED   = 2,
-} IdlyScheduledType;
-
 typedef struct {
 	NMFirewallManager *self;
 	char *iface;
@@ -78,7 +72,7 @@ typedef struct {
 	guint id;
 	gboolean completed;
 
-	IdlyScheduledType idly_scheduled;
+	guint idle_id;
 	DBusGProxyCall *dbus_call;
 } CBInfo;
 
@@ -135,7 +129,7 @@ add_or_change_idle_cb (gpointer user_data)
 {
 	CBInfo *info = user_data;
 
-	if (info->idly_scheduled == IDLY_SCHEDULED_TYPE_CANCELLED) {
+	if (info->idle_id == 0) {
 		/* operation was cancelled. _cb_info_free will invoke callback. */
 	} else {
 		nm_log_dbg (LOGD_FIREWALL, "(%s) firewall zone call pretends success [%u]",
@@ -143,6 +137,7 @@ add_or_change_idle_cb (gpointer user_data)
 		if (info->callback)
 			info->callback (NULL, info->user_data);
 		info->completed = TRUE;
+		info->idle_id = 0;
 	}
 
 	_cb_info_free (info);
@@ -194,8 +189,7 @@ nm_firewall_manager_add_or_change_zone (NMFirewallManager *self,
 	if (priv->running == FALSE) {
 		if (callback) {
 			info = _cb_info_create (self, iface, callback, user_data);
-			info->idly_scheduled = IDLY_SCHEDULED_TYPE_PENDING;
-			g_idle_add (add_or_change_idle_cb, info);
+			info->idle_id = g_idle_add (add_or_change_idle_cb, info);
 			nm_log_dbg (LOGD_FIREWALL, "(%s) firewall zone %s -> %s%s%s [%u] (not running, simulate success)", iface, add ? "add" : "change",
 			            zone?"\"":"", zone ? zone : "default", zone?"\"":"", info->id);
 			return PENDING_CALL_FROM_INFO (info);
@@ -297,8 +291,8 @@ void nm_firewall_manager_cancel_call (NMFirewallManager *self, NMFirewallPending
 	priv->pending_calls = g_slist_remove_link (priv->pending_calls, pending);
 
 	info = (CBInfo *) call;
-	if (info->idly_scheduled != IDLY_SCHEDULED_TYPE_NONE)
-		info->idly_scheduled = IDLY_SCHEDULED_TYPE_CANCELLED;
+	if (info->idle_id)
+		info->idle_id = 0;
 	else {
 		dbus_g_proxy_cancel_call (NM_FIREWALL_MANAGER_GET_PRIVATE (self)->proxy,
 		                          info->dbus_call);
