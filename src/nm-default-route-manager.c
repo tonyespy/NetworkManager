@@ -190,8 +190,10 @@ _platform_route_sync_add (const VTableIP *vtable, NMDefaultRouteManager *self, g
 		                                     entry->effective_metric,
 		                                     entry->route.rx.mss);
 	}
-	if (!success)
-		_LOGW (vtable->addr_family, "failed to add default route %s with effective metric %u", vtable->platform_route_to_string (&entry->route.rx), (guint) entry->effective_metric);
+	if (!success) {
+		_LOGW (vtable->addr_family, "failed to add default route %s with effective metric %u",
+		       vtable->platform_route_to_string (&entry->route.rx), (guint) entry->effective_metric);
+	}
 }
 
 static void
@@ -331,14 +333,20 @@ _resync_all (const VTableIP *vtable, NMDefaultRouteManager *self, const Entry *c
 			/* for the changed entry, the previous metric was either old_entry->effective_metric,
 			 * or none. Hence, we only have to remember what is going to change. */
 			g_hash_table_add (changed_metrics, GUINT_TO_POINTER (expected_metric));
-			if (old_entry)
-				_LOGD (vtable->addr_family, LOG_ENTRY_FMT": update %s (%u -> %u)", LOG_ENTRY_ARGS (i, entry), vtable->platform_route_to_string (&entry->route.rx), (guint) old_entry->effective_metric, (guint) expected_metric);
-			else
-				_LOGD (vtable->addr_family, LOG_ENTRY_FMT": add %s (%u)", LOG_ENTRY_ARGS (i, entry), vtable->platform_route_to_string (&entry->route.rx), (guint) expected_metric);
+			if (old_entry) {
+				_LOGD (vtable->addr_family, LOG_ENTRY_FMT": update %s (%u -> %u)", LOG_ENTRY_ARGS (i, entry),
+				       vtable->platform_route_to_string (&entry->route.rx), (guint) old_entry->effective_metric,
+				       (guint) expected_metric);
+			} else {
+				_LOGD (vtable->addr_family, LOG_ENTRY_FMT": add %s (%u)", LOG_ENTRY_ARGS (i, entry),
+				       vtable->platform_route_to_string (&entry->route.rx), (guint) expected_metric);
+			}
 		} else if (entry->effective_metric != expected_metric) {
 			g_hash_table_add (changed_metrics, GUINT_TO_POINTER (entry->effective_metric));
 			g_hash_table_add (changed_metrics, GUINT_TO_POINTER (expected_metric));
-			_LOGD (vtable->addr_family, LOG_ENTRY_FMT": resync metric %s (%u -> %u)", LOG_ENTRY_ARGS (i, entry), vtable->platform_route_to_string (&entry->route.rx), (guint) entry->effective_metric, (guint) expected_metric);
+			_LOGD (vtable->addr_family, LOG_ENTRY_FMT": resync metric %s (%u -> %u)", LOG_ENTRY_ARGS (i, entry),
+			       vtable->platform_route_to_string (&entry->route.rx), (guint) entry->effective_metric,
+			       (guint) expected_metric);
 		}
 
 		entry->effective_metric = expected_metric;
@@ -397,7 +405,9 @@ _entry_at_idx_remove (const VTableIP *vtable, NMDefaultRouteManager *self, guint
 
 	entry = g_ptr_array_index (entries, entry_idx);
 
-	_LOGD (vtable->addr_family, LOG_ENTRY_FMT": remove %s (%u%s)", LOG_ENTRY_ARGS (entry_idx, entry), vtable->platform_route_to_string (&entry->route.rx), (guint) entry->effective_metric, entry->synced ? "" : ", not synced");
+	_LOGD (vtable->addr_family, LOG_ENTRY_FMT": remove %s (%u%s)", LOG_ENTRY_ARGS (entry_idx, entry),
+	       vtable->platform_route_to_string (&entry->route.rx), (guint) entry->effective_metric,
+	       entry->synced ? "" : ", not synced");
 
 	/* Remove the entry from the list (but don't free it yet) */
 	g_ptr_array_index (entries, entry_idx) = NULL;
