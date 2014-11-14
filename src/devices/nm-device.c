@@ -2810,8 +2810,8 @@ ip4_config_merge_and_apply (NMDevice *self,
 
 			if (assumed)
 				priv->default_route.v4_has = _device_get_default_route_from_platform (self, AF_INET, (NMPlatformIPRoute *) route);
-			else if (   priv->ext_ip4_config_had_any_addresses
-			         || (commit && nm_ip4_config_get_num_addresses (composite))) {
+			else if (   (!commit && priv->ext_ip4_config_had_any_addresses)
+			         || ( commit && nm_ip4_config_get_num_addresses (composite))) {
 				/* For managed interfaces, we can only configure a gateway, if either the external config indicates
 				 * that we already have addresses, or if we are about to commit any addresses.
 				 * Otherwise adding a default route will fail, because NMDefaultRouteManager does not add any
@@ -3364,8 +3364,8 @@ ip6_config_merge_and_apply (NMDevice *self,
 
 			if (assumed)
 				priv->default_route.v6_has = _device_get_default_route_from_platform (self, AF_INET6, (NMPlatformIPRoute *) route);
-			else if (   priv->ext_ip6_config_had_any_addresses
-			         || (commit && nm_ip6_config_get_num_addresses (composite))) {
+			else if (   (!commit && priv->ext_ip6_config_had_any_addresses)
+			         || ( commit && nm_ip6_config_get_num_addresses (composite))) {
 				/* For managed interfaces, we can only configure a gateway, if either the external config indicates
 				 * that we already have addresses, or if we are about to commit any addresses.
 				 * Otherwise adding a default route will fail, because NMDefaultRouteManager does not add any
