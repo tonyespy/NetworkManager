@@ -479,13 +479,13 @@ _ipx_update_default_route (const VTableIP *vtable, NMDefaultRouteManager *self, 
 			if (   connection
 			    && nm_vpn_connection_get_vpn_state (vpn) == NM_VPN_CONNECTION_STATE_ACTIVATED) {
 
+				memset (&rt, 0, sizeof (rt));
 				if (VTABLE_IS_IP4) {
 					NMIP4Config *vpn_config;
 
 					vpn_config = nm_vpn_connection_get_ip4_config (vpn);
 					if (vpn_config) {
 						never_default = nm_ip4_config_get_never_default (vpn_config);
-						memset (&rt.r4, 0, sizeof (rt.r4));
 						rt.r4.ifindex = ip_ifindex;
 						rt.r4.source = NM_IP_CONFIG_SOURCE_VPN;
 						rt.r4.gateway = nm_vpn_connection_get_ip4_internal_gateway (vpn);
@@ -501,7 +501,6 @@ _ipx_update_default_route (const VTableIP *vtable, NMDefaultRouteManager *self, 
 						const struct in6_addr *int_gw = nm_vpn_connection_get_ip6_internal_gateway (vpn);
 
 						never_default = nm_ip6_config_get_never_default (vpn_config);
-						memset (&rt.r6, 0, sizeof (rt.r6));
 						rt.r6.ifindex = ip_ifindex;
 						rt.r6.source = NM_IP_CONFIG_SOURCE_VPN;
 						rt.r6.gateway = int_gw ? *int_gw : in6addr_any;
