@@ -263,7 +263,6 @@ typedef struct {
 	gulong            dnsmasq_state_id;
 
 	/* Firewall */
-	guint                 fw_call_idle;
 	NMFirewallPendingCall fw_call;
 
 	/* avahi-autoipd stuff */
@@ -4595,18 +4594,6 @@ fw_change_zone_cb (GError *error, gpointer user_data)
 	_LOGI (LOGD_DEVICE, "Activation: Stage 3 of 5 (IP Configure Start) scheduled.");
 }
 
-static gboolean
-fw_change_zone_idle_cb (gpointer user_data)
-{
-	NMDevice *self = NM_DEVICE (user_data);
-
-	NM_DEVICE_GET_PRIVATE (self)->fw_call_idle = 0;
-
-	activation_source_schedule (self, nm_device_activate_stage3_ip_config_start, 0);
-	_LOGI (LOGD_DEVICE, "Activation: Stage 3 of 5 (IP Configure Start) scheduled.");
-	return G_SOURCE_REMOVE;
-}
-
 /*
  * nm_device_activate_schedule_stage3_ip_config_start
  *
@@ -4626,7 +4613,6 @@ nm_device_activate_schedule_stage3_ip_config_start (NMDevice *self)
 	g_return_if_fail (priv->act_request);
 
 	g_return_if_fail (!priv->fw_call);
-	g_return_if_fail (!priv->fw_call_idle);
 
 	/* Add the interface to the specified firewall zone */
 	connection = nm_device_get_connection (self);
@@ -4637,7 +4623,8 @@ nm_device_activate_schedule_stage3_ip_config_start (NMDevice *self)
 
 	if (nm_device_uses_assumed_connection (self)) {
 		_LOGD (LOGD_DEVICE, "Activation: skip setting firewall zone '%s' for assumed device", zone ? zone : "default");
-		priv->fw_call_idle = g_idle_add (fw_change_zone_idle_cb, self);
+		activation_source_schedule (self, nm_device_activate_stage3_ip_config_start, 0);
+		_LOGI (LOGD_DEVICE, "Activation: Stage 3 of 5 (IP Configure Start) scheduled.");
 		return;
 	}
 
@@ -6938,10 +6925,6 @@ _cleanup_generic_pre (NMDevice *self, gboolean deconfigure)
 	if (priv->fw_call) {
 		nm_firewall_manager_cancel_call (nm_firewall_manager_get (), priv->fw_call);
 		priv->fw_call = NULL;
-	}
-	if (priv->fw_call_idle) {
-		g_source_remove (priv->fw_call_idle);
-		priv->fw_call_idle = 0;
 	}
 
 	connection = nm_device_get_connection (self);
