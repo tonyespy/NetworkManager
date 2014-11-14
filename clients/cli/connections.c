@@ -1168,7 +1168,8 @@ nmc_active_connection_details (NMActiveConnection *acon, NmCli *nmc)
 			NMSettingConnection *s_con;
 			NMSettingVpn *s_vpn;
 			NMVpnConnectionState vpn_state;
-			char *type_str, *banner_str, *vpn_state_str;
+			char *type_str, *banner_str = NULL, *vpn_state_str;
+			const char *banner;
 			const char *username = NULL;
 			char **vpn_data_array = NULL;
 			guint32 items_num;
@@ -1201,7 +1202,9 @@ nmc_active_connection_details (NMActiveConnection *acon, NmCli *nmc)
 			}
 
 			type_str = get_vpn_connection_type (con);
-			banner_str = g_strescape (nm_vpn_connection_get_banner (NM_VPN_CONNECTION (acon)), "");
+			banner = nm_vpn_connection_get_banner (NM_VPN_CONNECTION (acon));
+			if (banner)
+				banner_str = g_strescape (banner, "");
 			vpn_state = nm_vpn_connection_get_vpn_state (NM_VPN_CONNECTION (acon));
 			vpn_state_str = g_strdup_printf ("%d - %s", vpn_state, vpn_connection_state_to_string (vpn_state));
 
@@ -2154,7 +2157,8 @@ nmc_activate_connection (NmCli *nmc,
 	nmc->pwds_hash = pwds_hash;
 
 	/* Create secret agent */
-	nmc->secret_agent = nm_secret_agent_simple_new ("nmcli-connect", nm_object_get_path (NM_OBJECT (connection)));
+	nmc->secret_agent = nm_secret_agent_simple_new ("nmcli-connect",
+	                                                connection ? nm_object_get_path (NM_OBJECT (connection)) : NULL);
 	if (nmc->secret_agent)
 		g_signal_connect (nmc->secret_agent, "request-secrets", G_CALLBACK (secrets_requested), nmc);
 
@@ -2214,8 +2218,14 @@ do_connection_up (NmCli *nmc, int argc, char **argv)
 		next_arg (&argc, &argv);
 	}
 
-	if (name)
+	if (name) {
 		connection = nmc_find_connection (nmc->connections, selector, name, NULL);
+		if (!connection) {
+			g_string_printf (nmc->return_text, _("Error: Connection '%s' does not exist."), name);
+			nmc->return_value = NMC_RESULT_ERROR_NOT_FOUND;
+			goto error;
+		}
+	}
 
 	while (argc > 0) {
 		if (strcmp (*argv, "ifname") == 0) {
