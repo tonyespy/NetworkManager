@@ -157,6 +157,7 @@ typedef struct {
 	gboolean enslaved;
 	gboolean configure;
 	guint watch_id;
+	guint remove_watch_id;
 } SlaveInfo;
 
 typedef struct {
@@ -837,6 +838,7 @@ static void
 free_slave_info (SlaveInfo *info)
 {
 	g_signal_handler_disconnect (info->slave, info->watch_id);
+	g_signal_handler_disconnect (info->slave, info->remove_watch_id);
 	g_clear_object (&info->slave);
 	memset (info, 0, sizeof (*info));
 	g_free (info);
@@ -1589,6 +1591,23 @@ nm_device_get_enslaved (NMDevice *self)
 {
 	return NM_DEVICE_GET_PRIVATE (self)->enslaved;
 }
+
+/**
+ * nm_device_removed:
+ * @self: the #NMDevice
+ *
+ * Called by the manager when the device was removed. Releases the device from
+ * the master in case it's enslaved.
+ */
+void
+nm_device_removed (NMDevice *self)
+{
+	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+
+	if (priv->enslaved)
+		nm_device_release_one_slave (priv->master, self, TRUE, NM_DEVICE_STATE_REASON_REMOVED);
+}
+
 
 static gboolean
 is_available (NMDevice *self)
