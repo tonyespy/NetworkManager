@@ -1704,6 +1704,12 @@ nm_platform_wifi_get_ssid (NMPlatform *self, int ifindex)
 	return klass->wifi_get_ssid (self, ifindex);
 }
 
+static void
+wifi_set_powersave (NMPlatform *p, int ifindex, guint32 powersave)
+{
+	/* empty */
+}
+
 void
 nm_platform_wifi_set_powersave (NMPlatform *self, int ifindex, guint32 powersave)
 {
@@ -3098,6 +3104,8 @@ nm_platform_class_init (NMPlatformClass *platform_class)
 	                           G_PARAM_WRITABLE |
 	                           G_PARAM_CONSTRUCT_ONLY |
 	                           G_PARAM_STATIC_STRINGS));
+
+	platform_class->wifi_set_powersave = wifi_set_powersave;
 
 	/* Signals */
 	SIGNAL (SIGNAL_LINK_CHANGED, log_link)
