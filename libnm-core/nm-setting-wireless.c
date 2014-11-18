@@ -20,9 +20,11 @@
  * Copyright 2007 - 2008 Novell, Inc.
  */
 
+#include "config.h"
+
 #include <string.h>
 #include <net/ethernet.h>
-#include <glib/gi18n.h>
+#include <glib/gi18n-lib.h>
 
 #include "nm-setting-wireless.h"
 #include "nm-dbus-interface.h"
@@ -293,7 +295,7 @@ nm_setting_wireless_new (void)
  * nm_setting_wireless_get_ssid:
  * @setting: the #NMSettingWireless
  *
- * Returns: the #NMSettingWireless:ssid property of the setting
+ * Returns: (transfer none): the #NMSettingWireless:ssid property of the setting
  **/
 GBytes *
 nm_setting_wireless_get_ssid (NMSettingWireless *setting)

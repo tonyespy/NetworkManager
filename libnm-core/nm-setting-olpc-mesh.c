@@ -20,8 +20,10 @@
  * Copyright 2009 One Laptop per Child
  */
 
+#include "config.h"
+
 #include <string.h>
-#include <glib/gi18n.h>
+#include <glib/gi18n-lib.h>
 
 #include "nm-setting-olpc-mesh.h"
 #include "nm-dbus-interface.h"
@@ -69,6 +71,11 @@ nm_setting_olpc_mesh_init (NMSettingOlpcMesh *setting)
 {
 }
 
+/**
+ * nm_setting_olpc_mesh_get_ssid:
+ *
+ * Returns: (transfer none):
+ */
 GBytes *
 nm_setting_olpc_mesh_get_ssid (NMSettingOlpcMesh *setting)
 {

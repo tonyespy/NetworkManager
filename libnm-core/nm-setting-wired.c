@@ -20,9 +20,11 @@
  * Copyright 2007 - 2008 Novell, Inc.
  */
 
+#include "config.h"
+
 #include <string.h>
 #include <net/ethernet.h>
-#include <glib/gi18n.h>
+#include <glib/gi18n-lib.h>
 
 #include "nm-setting-wired.h"
 #include "nm-utils.h"
@@ -410,10 +412,11 @@ nm_setting_wired_get_num_s390_options (NMSettingWired *setting)
  * @setting: the #NMSettingWired
  * @idx: index of the desired option, from 0 to
  * nm_setting_wired_get_num_s390_options() - 1
- * @out_key: (out): on return, the key name of the s390 specific option; this
- * value is owned by the setting and should not be modified
- * @out_value: (out): on return, the value of the key of the s390 specific
- * option; this value is owned by the setting and should not be modified
+ * @out_key: (out) (transfer none): on return, the key name of the s390 specific
+ *   option; this value is owned by the setting and should not be modified
+ * @out_value: (out) (transfer none): on return, the value of the key of the
+ *   s390 specific option; this value is owned by the setting and should not be
+ *   modified
  *
  * Given an index, return the value of the s390 option at that index.  indexes
  * are *not* guaranteed to be static across modifications to options done by
