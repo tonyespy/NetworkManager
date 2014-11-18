@@ -68,7 +68,6 @@ struct sd_dhcp_client {
         uint32_t mtu;
         uint32_t xid;
         usec_t start_time;
-        uint16_t secs;
         unsigned int attempt;
         usec_t request_sent;
         sd_event_source *timeout_t1;
@@ -321,10 +320,12 @@ static int client_message_init(sd_dhcp_client *client, DHCPPacket **ret,
         _cleanup_free_ DHCPPacket *packet;
         size_t optlen, optoffset, size;
         be16_t max_size;
+        usec_t time_now;
+        uint16_t secs;
         int r;
 
         assert(client);
-        assert(client->secs);
+        assert(client->start_time);
         assert(ret);
         assert(_optlen);
         assert(_optoffset);
@@ -344,7 +345,15 @@ static int client_message_init(sd_dhcp_client *client, DHCPPacket **ret,
 
         /* Although 'secs' field is a SHOULD in RFC 2131, certain DHCP servers
            refuse to issue an DHCP lease if 'secs' is set to zero */
-        packet->dhcp.secs = htobe16(client->secs);
+        r = sd_event_now(client->event, clock_boottime_or_monotonic(), &time_now);
+        if (r < 0)
+                return r;
+        assert(time_now >= client->start_time);
+
+        /* seconds between sending first and last DISCOVER
+         * must always be strictly positive to deal with broken servers */
+        secs = ((time_now - client->start_time) / USEC_PER_SEC) ? : 1;
+        packet->dhcp.secs = htobe16(secs);
 
         /* RFC2132 section 4.1
            A client that cannot receive unicast IP datagrams until its protocol
@@ -441,23 +450,11 @@ static int dhcp_client_send_raw(sd_dhcp_client *client, DHCPPacket *packet,
 static int client_send_discover(sd_dhcp_client *client) {
         _cleanup_free_ DHCPPacket *discover = NULL;
         size_t optoffset, optlen;
-        usec_t time_now;
         int r;
 
         assert(client);
         assert(client->state == DHCP_STATE_INIT ||
                client->state == DHCP_STATE_SELECTING);
-
-        /* See RFC2131 section 4.4.1 */
-
-        r = sd_event_now(client->event, clock_boottime_or_monotonic(), &time_now);
-        if (r < 0)
-                return r;
-        assert(time_now >= client->start_time);
-
-        /* seconds between sending first and last DISCOVER
-         * must always be strictly positive to deal with broken servers */
-        client->secs = ((time_now - client->start_time) / USEC_PER_SEC) ? : 1;
 
         r = client_message_init(client, &discover, DHCP_DISCOVER,
                                 &optlen, &optoffset);
@@ -723,8 +720,7 @@ static int client_timeout_resend(sd_event_source *s, uint64_t usec,
         if (r < 0)
                 goto error;
 
-        r = sd_event_source_set_name(client->timeout_resend,
-                                     "dhcp4-resend-timer");
+        r = sd_event_source_set_description(client->timeout_resend, "dhcp4-resend-timer");
         if (r < 0)
                 goto error;
 
@@ -801,8 +797,7 @@ static int client_initialize_io_events(sd_dhcp_client *client,
         if (r < 0)
                 goto error;
 
-        r = sd_event_source_set_name(client->receive_message,
-                                     "dhcp4-receive-message");
+        r = sd_event_source_set_description(client->receive_message, "dhcp4-receive-message");
         if (r < 0)
                 goto error;
 
@@ -832,8 +827,7 @@ static int client_initialize_time_events(sd_dhcp_client *client) {
         r = sd_event_source_set_priority(client->timeout_resend,
                                          client->event_priority);
 
-        r = sd_event_source_set_name(client->timeout_resend,
-                                     "dhcp4-resend-timer");
+        r = sd_event_source_set_description(client->timeout_resend, "dhcp4-resend-timer");
         if (r < 0)
                 goto error;
 
@@ -875,10 +869,8 @@ static int client_start(sd_dhcp_client *client) {
         }
         client->fd = r;
 
-        if (client->state == DHCP_STATE_INIT) {
+        if (client->state == DHCP_STATE_INIT || client->state == DHCP_STATE_INIT_REBOOT)
                 client->start_time = now(clock_boottime_or_monotonic());
-                client->secs = 0;
-        }
 
         return client_initialize_events(client, client_receive_message_raw);
 }
@@ -1149,8 +1141,7 @@ static int client_set_lease_timeouts(sd_dhcp_client *client) {
         if (r < 0)
                 return r;
 
-        r = sd_event_source_set_name(client->timeout_expire,
-                                     "dhcp4-lifetime");
+        r = sd_event_source_set_description(client->timeout_expire, "dhcp4-lifetime");
         if (r < 0)
                 return r;
 
@@ -1177,8 +1168,7 @@ static int client_set_lease_timeouts(sd_dhcp_client *client) {
         if (r < 0)
                 return r;
 
-        r = sd_event_source_set_name(client->timeout_t2,
-                                     "dhcp4-t2-timeout");
+        r = sd_event_source_set_description(client->timeout_t2, "dhcp4-t2-timeout");
         if (r < 0)
                 return r;
 
@@ -1204,8 +1194,7 @@ static int client_set_lease_timeouts(sd_dhcp_client *client) {
         if (r < 0)
                 return r;
 
-        r = sd_event_source_set_name(client->timeout_t1,
-                                     "dhcp4-t1-timer");
+        r = sd_event_source_set_description(client->timeout_t1, "dhcp4-t1-timer");
         if (r < 0)
                 return r;
 
@@ -1250,8 +1239,7 @@ static int client_handle_message(sd_dhcp_client *client, DHCPMessage *message,
                         if (r < 0)
                                 goto error;
 
-                        r = sd_event_source_set_name(client->timeout_resend,
-                                                     "dhcp4-resend-timer");
+                        r = sd_event_source_set_description(client->timeout_resend, "dhcp4-resend-timer");
                         if (r < 0)
                                 goto error;
                 } else if (r == -ENOMSG)
@@ -1269,6 +1257,9 @@ static int client_handle_message(sd_dhcp_client *client, DHCPMessage *message,
                 if (r >= 0) {
                         client->timeout_resend =
                                 sd_event_source_unref(client->timeout_resend);
+                        client->receive_message =
+                                sd_event_source_unref(client->receive_message);
+                        client->fd = asynchronous_close(client->fd);
 
                         if (IN_SET(client->state, DHCP_STATE_REQUESTING,
                                    DHCP_STATE_REBOOTING))

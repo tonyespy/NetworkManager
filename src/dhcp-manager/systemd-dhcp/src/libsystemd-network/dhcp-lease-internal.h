@@ -35,7 +35,7 @@
 struct sd_dhcp_route {
         struct in_addr dst_addr;
         struct in_addr gw_addr;
-        uint8_t dst_prefixlen;
+        unsigned char dst_prefixlen;
 };
 
 struct sd_dhcp_lease {
@@ -75,9 +75,6 @@ struct sd_dhcp_lease {
 int dhcp_lease_new(sd_dhcp_lease **ret);
 int dhcp_lease_parse_options(uint8_t code, uint8_t len, const uint8_t *option,
                               void *user_data);
-
-int dhcp_lease_save(sd_dhcp_lease *lease, const char *lease_file);
-int dhcp_lease_load(const char *lease_file, sd_dhcp_lease **ret);
 
 int dhcp_lease_set_default_subnet_mask(sd_dhcp_lease *lease);
 
