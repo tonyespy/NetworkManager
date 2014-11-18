@@ -404,8 +404,14 @@ _resync_all (const VTableIP *vtable, NMDefaultRouteManager *self, const Entry *c
 	g_assert (priv->resync.is_resynching == 0);
 	priv->resync.is_resynching++;
 
-	if (!external_change)
-		_resync_idle_cancel (self);
+	if (!external_change) {
+		if (VTABLE_IS_IP4)
+			priv->resync.has_v4_changes = FALSE;
+		else
+			priv->resync.has_v6_changes = FALSE;
+		if (!priv->resync.has_v4_changes && !priv->resync.has_v6_changes)
+			_resync_idle_cancel (self);
+	}
 
 	entries = vtable->get_entries (priv);
 
