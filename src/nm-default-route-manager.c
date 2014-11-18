@@ -38,7 +38,7 @@ typedef struct {
 	GPtrArray *entries_ip4;
 	GPtrArray *entries_ip6;
 	struct {
-		guint reentrancy_guard;
+		guint guard;
 		guint backoff_wait_time_ms;
 		guint idle_handle;
 		gboolean has_v4_changes;
@@ -401,8 +401,8 @@ _resync_all (const VTableIP *vtable, NMDefaultRouteManager *self, const Entry *c
 	GArray *routes;
 	gboolean changed = FALSE;
 
-	g_assert (priv->resync.reentrancy_guard == 0);
-	priv->resync.reentrancy_guard++;
+	g_assert (priv->resync.guard == 0);
+	priv->resync.guard++;
 
 	if (!external_change) {
 		if (VTABLE_IS_IP4)
@@ -525,7 +525,7 @@ _resync_all (const VTableIP *vtable, NMDefaultRouteManager *self, const Entry *c
 	g_hash_table_unref (changed_metrics);
 	g_hash_table_unref (assumed_metrics);
 
-	priv->resync.reentrancy_guard--;
+	priv->resync.guard--;
 	return changed;
 }
 
@@ -1186,7 +1186,7 @@ _platform_ipx_route_changed_cb (const VTableIP *vtable,
 
 	priv = NM_DEFAULT_ROUTE_MANAGER_GET_PRIVATE (self);
 
-	if (priv->resync.reentrancy_guard) {
+	if (priv->resync.guard) {
 		/* callbacks while executing _resync_all() are ignored. */
 		return;
 	}
