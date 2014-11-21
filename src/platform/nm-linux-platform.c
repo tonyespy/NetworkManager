@@ -836,10 +836,6 @@ link_is_announceable (NMPlatform *platform, struct rtnl_link *rtnllink)
 {
 	NMLinuxPlatformPrivate *priv = NM_LINUX_PLATFORM_GET_PRIVATE (platform);
 
-	/* Software devices are always visible outside the platform */
-	if (link_is_software (rtnllink))
-		return TRUE;
-
 	/* Hardware devices must be found by udev so rules get run and tags set */
 	if (g_hash_table_lookup (priv->udev_devices,
 	                         GINT_TO_POINTER (rtnl_link_get_ifindex (rtnllink))))
@@ -4220,7 +4216,12 @@ setup (NMPlatform *platform)
 	/* And read initial device list */
 	enumerator = g_udev_enumerator_new (priv->udev_client);
 	g_udev_enumerator_add_match_subsystem (enumerator, "net");
-	g_udev_enumerator_add_match_is_initialized (enumerator);
+
+	/* Demand that the device is initialized (udev rules ran,
+	 * device has a stable name now) in case udev is running
+	 * (not in a container). */
+	if (access ("/sys", W_OK) == 0)
+		g_udev_enumerator_add_match_is_initialized (enumerator);
 
 	devices = g_udev_enumerator_execute (enumerator);
 	for (iter = devices; iter; iter = g_list_next (iter)) {
