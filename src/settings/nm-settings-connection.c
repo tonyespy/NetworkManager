@@ -1231,6 +1231,15 @@ has_some_secrets_cb (NMSetting *setting,
 
 	pspec = g_object_class_find_property (G_OBJECT_GET_CLASS (G_OBJECT (setting)), key);
 	if (pspec) {
+		/* Empty hash received, while the hashes default to NULL.
+		 * Don't match against the default, consider it unset. */
+		if (G_VALUE_HOLDS (value, G_TYPE_HASH_TABLE)) {
+			GHashTable *hash = (GHashTable *) g_value_get_boxed (value);
+
+			if (g_hash_table_size (hash) == 0)
+				return;
+		}
+
 		if (   (flags & NM_SETTING_PARAM_SECRET)
 		    && !g_param_value_defaults (pspec, (GValue *)value))
 			*((gboolean *) user_data) = TRUE;
