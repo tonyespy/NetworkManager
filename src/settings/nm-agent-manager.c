@@ -1107,7 +1107,13 @@ get_start (gpointer user_data)
 				            req, parent->detail, req->setting_name);
 
 				/* We don't, so ask some agents for additional secrets */
-				request_next_agent (parent);
+				if (   req->flags & NM_SECRET_AGENT_GET_SECRETS_FLAG_USER_REQUESTED
+				    && !parent->pending) {
+					/* No more agents, but user requested to show him what we have. */
+					req_complete_success (parent, req->existing_secrets, NULL, NULL);
+				} else {
+					request_next_agent (parent);
+				}
 			}
 		}
 		g_variant_unref (secrets_dict);
