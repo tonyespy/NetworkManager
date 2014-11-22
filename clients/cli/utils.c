@@ -751,6 +751,8 @@ parse_output_fields (const char *fields_str,
 
 		/* Field was not found - error case */
 		if (fields_array[i].name == NULL) {
+			g_assert (error);
+
 			/* Set GError */
 			if (!strcasecmp (*iter, "all") || !strcasecmp (*iter, "common"))
 				g_set_error (error, NMCLI_ERROR, 0, _("field '%s' has to be alone"), *iter);
