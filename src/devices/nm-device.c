@@ -451,8 +451,15 @@ reason_to_string (NMDeviceStateReason reason)
 /***********************************************************/
 
 gboolean
-nm_device_ipv6_sysctl_set (NMDevice *self, const char *property, const char *value)
+nm_device_ipv6_sysctl_set (NMDevice *self,
+                           const char *property,
+                           const char *value,
+                           gboolean skip_assumed)
 {
+	if (skip_assumed && nm_device_uses_assumed_connection (self)) {
+		_LOGD (LOGD_DEVICE, "not setting %s=%s for an assumed connection", property, value);
+		return FALSE;
+	}
 	return nm_platform_sysctl_set (nm_utils_ip6_property_path (nm_device_get_ip_iface (self), property), value);
 }
 
@@ -4069,14 +4076,14 @@ rdisc_config_changed (NMRDisc *rdisc, NMRDiscConfigMap changed, NMDevice *self)
 		char val[16];
 
 		g_snprintf (val, sizeof (val), "%d", rdisc->hop_limit);
-		nm_device_ipv6_sysctl_set (self, "hop_limit", val);
+		nm_device_ipv6_sysctl_set (self, "hop_limit", val, TRUE);
 	}
 
 	if (changed & NM_RDISC_CONFIG_MTU) {
 		char val[16];
 
 		g_snprintf (val, sizeof (val), "%d", rdisc->mtu);
-		nm_device_ipv6_sysctl_set (self, "mtu", val);
+		nm_device_ipv6_sysctl_set (self, "mtu", val, TRUE);
 	}
 
 	nm_device_activate_schedule_ip6_config_result (self);
@@ -4124,10 +4131,10 @@ addrconf6_start_with_link_ready (NMDevice *self)
 	if (!ip6_config_merge_and_apply (self, TRUE, NULL))
 		_LOGW (LOGD_IP6, "failed to apply manual IPv6 configuration");
 
-	nm_device_ipv6_sysctl_set (self, "accept_ra", "1");
-	nm_device_ipv6_sysctl_set (self, "accept_ra_defrtr", "0");
-	nm_device_ipv6_sysctl_set (self, "accept_ra_pinfo", "0");
-	nm_device_ipv6_sysctl_set (self, "accept_ra_rtr_pref", "0");
+	nm_device_ipv6_sysctl_set (self, "accept_ra", "1", TRUE);
+	nm_device_ipv6_sysctl_set (self, "accept_ra_defrtr", "0", TRUE);
+	nm_device_ipv6_sysctl_set (self, "accept_ra_pinfo", "0", TRUE);
+	nm_device_ipv6_sysctl_set (self, "accept_ra_rtr_pref", "0", TRUE);
 
 	priv->rdisc_changed_id = g_signal_connect (priv->rdisc,
 	                                           NM_RDISC_CONFIG_CHANGED,
@@ -4236,7 +4243,7 @@ save_ip6_properties (NMDevice *self)
 }
 
 static void
-restore_ip6_properties (NMDevice *self)
+restore_ip6_properties (NMDevice *self, gboolean skip_assumed)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 	GHashTableIter iter;
@@ -4247,7 +4254,7 @@ restore_ip6_properties (NMDevice *self)
 		/* Don't touch "disable_ipv6" if we're doing userland IPv6LL */
 		if (priv->nm_ipv6ll && strcmp (key, "disable_ipv6") == 0)
 			continue;
-		nm_device_ipv6_sysctl_set (self, key, value);
+		nm_device_ipv6_sysctl_set (self, key, value, skip_assumed);
 	}
 }
 
@@ -4256,7 +4263,7 @@ set_disable_ipv6 (NMDevice *self, const char *value)
 {
 	/* We only touch disable_ipv6 when NM is not managing the IPv6LL address */
 	if (NM_DEVICE_GET_PRIVATE (self)->nm_ipv6ll == FALSE)
-		nm_device_ipv6_sysctl_set (self, "disable_ipv6", value);
+		nm_device_ipv6_sysctl_set (self, "disable_ipv6", value, TRUE);
 }
 
 static inline void
@@ -4283,8 +4290,8 @@ set_nm_ipv6ll (NMDevice *self, gboolean enable)
 			/* Bounce IPv6 to ensure the kernel stops IPv6LL address generation */
 			value = nm_platform_sysctl_get (nm_utils_ip6_property_path (iface, "disable_ipv6"));
 			if (g_strcmp0 (value, "0") == 0) {
-				nm_device_ipv6_sysctl_set (self, "disable_ipv6", "1");
-				nm_device_ipv6_sysctl_set (self, "disable_ipv6", "0");
+				nm_device_ipv6_sysctl_set (self, "disable_ipv6", "1", TRUE);
+				nm_device_ipv6_sysctl_set (self, "disable_ipv6", "0", TRUE);
 			}
 			g_free (value);
 		}
@@ -4416,8 +4423,8 @@ act_stage3_ip6_config_start (NMDevice *self,
 			 * to the interface until disable_ipv6 is bounced.
 			 */
 			set_nm_ipv6ll (self, FALSE);
-			nm_device_ipv6_sysctl_set (self, "disable_ipv6", "1");
-			restore_ip6_properties (self);
+			nm_device_ipv6_sysctl_set (self, "disable_ipv6", "1", TRUE);
+			restore_ip6_properties (self, TRUE);
 		}
 		return NM_ACT_STAGE_RETURN_STOP;
 	}
@@ -4488,7 +4495,7 @@ act_stage3_ip6_config_start (NMDevice *self,
 		ip6_privacy_str = "2";
 	break;
 	}
-	nm_device_ipv6_sysctl_set (self, "use_tempaddr", ip6_privacy_str);
+	nm_device_ipv6_sysctl_set (self, "use_tempaddr", ip6_privacy_str, TRUE);
 
 	return ret;
 }
@@ -7141,8 +7148,8 @@ nm_device_cleanup (NMDevice *self, NMDeviceStateReason reason)
 
 	/* Turn off kernel IPv6 */
 	set_disable_ipv6 (self, "1");
-	nm_device_ipv6_sysctl_set (self, "accept_ra", "0");
-	nm_device_ipv6_sysctl_set (self, "use_tempaddr", "0");
+	nm_device_ipv6_sysctl_set (self, "accept_ra", "0", TRUE);
+	nm_device_ipv6_sysctl_set (self, "use_tempaddr", "0", TRUE);
 
 	/* Call device type-specific deactivation */
 	if (NM_DEVICE_GET_CLASS (self)->deactivate)
@@ -7420,7 +7427,7 @@ _set_state_full (NMDevice *self,
 				nm_device_cleanup (self, reason);
 			nm_device_take_down (self, TRUE);
 			set_nm_ipv6ll (self, FALSE);
-			restore_ip6_properties (self);
+			restore_ip6_properties (self, FALSE);
 		}
 		break;
 	case NM_DEVICE_STATE_UNAVAILABLE:
@@ -7429,10 +7436,10 @@ _set_state_full (NMDevice *self,
 			if (reason != NM_DEVICE_STATE_REASON_CONNECTION_ASSUMED) {
 				set_nm_ipv6ll (self, TRUE);
 				set_disable_ipv6 (self, "1");
-				nm_device_ipv6_sysctl_set (self, "accept_ra_defrtr", "0");
-				nm_device_ipv6_sysctl_set (self, "accept_ra_pinfo", "0");
-				nm_device_ipv6_sysctl_set (self, "accept_ra_rtr_pref", "0");
-				nm_device_ipv6_sysctl_set (self, "use_tempaddr", "0");
+				nm_device_ipv6_sysctl_set (self, "accept_ra_defrtr", "0", TRUE);
+				nm_device_ipv6_sysctl_set (self, "accept_ra_pinfo", "0", TRUE);
+				nm_device_ipv6_sysctl_set (self, "accept_ra_rtr_pref", "0", TRUE);
+				nm_device_ipv6_sysctl_set (self, "use_tempaddr", "0", TRUE);
 			}
 		}
 

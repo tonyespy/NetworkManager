@@ -195,7 +195,7 @@ modem_ip6_config_result (NMModem *modem,
 	}
 
 	/* Re-enable IPv6 on the interface */
-	nm_device_ipv6_sysctl_set (device, "disable_ipv6", "0");
+	nm_device_ipv6_sysctl_set (device, "disable_ipv6", "0", TRUE);
 
 	if (config)
 		nm_device_set_wwan_ip6_config (device, config);
@@ -252,7 +252,7 @@ data_port_changed_cb (NMModem *modem, GParamSpec *pspec, gpointer user_data)
 	 * RA handling code to run before NM is ready.
 	 */
 	if (changed)
-		nm_device_ipv6_sysctl_set (self, "disable_ipv6", "1");
+		nm_device_ipv6_sysctl_set (self, "disable_ipv6", "1", TRUE);
 }
 
 static void
@@ -589,7 +589,7 @@ nm_device_modem_new (NMModem *modem)
 	data_port = nm_modem_get_data_port (modem);
 	if (data_port) {
 		nm_device_set_ip_iface (device, data_port);
-		nm_device_ipv6_sysctl_set (device, "disable_ipv6", "1");
+		nm_device_ipv6_sysctl_set (device, "disable_ipv6", "1", TRUE);
 	}
 
 	return device;

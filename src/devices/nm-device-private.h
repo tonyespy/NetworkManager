@@ -100,6 +100,7 @@ void nm_device_queue_recheck_assume (NMDevice *device);
 void nm_device_set_wwan_ip4_config (NMDevice *device, NMIP4Config *config);
 void nm_device_set_wwan_ip6_config (NMDevice *device, NMIP6Config *config);
 
-gboolean nm_device_ipv6_sysctl_set (NMDevice *self, const char *property, const char *value);
+gboolean nm_device_ipv6_sysctl_set (NMDevice *self, const char *property, const char *value,
+                                    gboolean skip_assumed);
 
 #endif	/* NM_DEVICE_PRIVATE_H */
