@@ -4132,9 +4132,6 @@ addrconf6_start_with_link_ready (NMDevice *self)
 		_LOGW (LOGD_IP6, "failed to apply manual IPv6 configuration");
 
 	nm_device_ipv6_sysctl_set (self, "accept_ra", "1", TRUE);
-	nm_device_ipv6_sysctl_set (self, "accept_ra_defrtr", "0", TRUE);
-	nm_device_ipv6_sysctl_set (self, "accept_ra_pinfo", "0", TRUE);
-	nm_device_ipv6_sysctl_set (self, "accept_ra_rtr_pref", "0", TRUE);
 
 	priv->rdisc_changed_id = g_signal_connect (priv->rdisc,
 	                                           NM_RDISC_CONFIG_CHANGED,
@@ -4451,6 +4448,11 @@ act_stage3_ip6_config_start (NMDevice *self,
 			ip6_privacy = nm_setting_ip6_config_get_ip6_privacy (NM_SETTING_IP6_CONFIG (s_ip6));
 	}
 	ip6_privacy = use_tempaddr_clamp (ip6_privacy);
+
+	nm_device_ipv6_sysctl_set (self, "accept_ra", "0", TRUE);
+	nm_device_ipv6_sysctl_set (self, "accept_ra_defrtr", "0", TRUE);
+	nm_device_ipv6_sysctl_set (self, "accept_ra_pinfo", "0", TRUE);
+	nm_device_ipv6_sysctl_set (self, "accept_ra_rtr_pref", "0", TRUE);
 
 	if (strcmp (method, NM_SETTING_IP6_CONFIG_METHOD_AUTO) == 0) {
 		if (!addrconf6_start (self, ip6_privacy)) {
