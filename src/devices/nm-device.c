@@ -3436,6 +3436,7 @@ ip6_config_merge_and_apply (NMDevice *self,
 	/* If no config was passed in, create a new one */
 	composite = nm_ip6_config_new ();
 	g_assert (composite);
+	nm_ip6_config_set_ifindex (composite, nm_device_get_ifindex (self));
 
 	/* Merge all the IP configs into the composite config */
 	if (priv->ac_ip6_config)
@@ -4007,8 +4008,10 @@ rdisc_config_changed (NMRDisc *rdisc, NMRDiscConfigMap changed, NMDevice *self)
 
 	g_return_if_fail (priv->act_request);
 
-	if (!priv->ac_ip6_config)
+	if (!priv->ac_ip6_config) {
 		priv->ac_ip6_config = nm_ip6_config_new ();
+		nm_ip6_config_set_ifindex (priv->ac_ip6_config, nm_device_get_ifindex (self));
+	}
 
 	if (changed & NM_RDISC_CONFIG_GATEWAYS) {
 		/* Use the first gateway as ordered in router discovery cache. */
@@ -4510,6 +4513,7 @@ act_stage3_ip6_config_start (NMDevice *self,
 		if (ret == NM_ACT_STAGE_RETURN_SUCCESS) {
 			/* New blank config; LL address is already in priv->ext_ip6_config */
 			*out_config = nm_ip6_config_new ();
+			nm_ip6_config_set_ifindex (*out_config, nm_device_get_ifindex (self));
 			g_assert (*out_config);
 		}
 	} else if (strcmp (method, NM_SETTING_IP6_CONFIG_METHOD_DHCP) == 0) {
@@ -4522,6 +4526,7 @@ act_stage3_ip6_config_start (NMDevice *self,
 	} else if (strcmp (method, NM_SETTING_IP6_CONFIG_METHOD_MANUAL) == 0) {
 		/* New blank config */
 		*out_config = nm_ip6_config_new ();
+		nm_ip6_config_set_ifindex (*out_config, nm_device_get_ifindex (self));
 		g_assert (*out_config);
 
 		ret = NM_ACT_STAGE_RETURN_SUCCESS;
