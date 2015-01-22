@@ -1,0 +1,4 @@
+# These are out-of-tree drivers that create Ethernet devices, however
+# they ship with their own management tools.
+SUBSYSTEM=="net", ENV{INTERFACE}=="vboxnet[0-9]*", ENV{NM_UNMANAGED}="1"
+SUBSYSTEM=="net", ENV{INTERFACE}=="vmnet[0-9]*", ENV{NM_UNMANAGED}="1"
