@@ -229,6 +229,15 @@ setup_dev0_ip6 (int ifindex)
 	                                       0);
 	g_array_append_val (routes, *route);
 
+	route = nmtst_platform_ip6_route_full ("2001:db8:1337::",
+	                                       48,
+	                                       NULL,
+	                                       ifindex,
+	                                       NM_IP_CONFIG_SOURCE_USER,
+	                                       0,
+	                                       0);
+	g_array_append_val (routes, *route);
+
 	route = nmtst_platform_ip6_route_full ("2001:db8:abad:c0de::",
 	                                       64,
 	                                       "2001:db8:8086::1",
@@ -264,6 +273,15 @@ setup_dev1_ip6 (int ifindex)
 	                                       ifindex,
 	                                       NM_IP_CONFIG_SOURCE_USER,
 	                                       20,
+	                                       0);
+	g_array_append_val (routes, *route);
+
+	route = nmtst_platform_ip6_route_full ("2001:db8:1337::",
+	                                       48,
+	                                       NULL,
+	                                       ifindex,
+	                                       NM_IP_CONFIG_SOURCE_USER,
+	                                       1024,
 	                                       0);
 	g_array_append_val (routes, *route);
 
@@ -320,6 +338,15 @@ test_ip6 (test_fixture *fixture, gconstpointer user_data)
 		},
 		{
 			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = *nmtst_inet6_from_string ("2001:db8:1337::"),
+			.plen = 48,
+			.ifindex = fixture->ifindex0,
+			.gateway = in6addr_any,
+			.metric = 1024,
+			.mss = 0,
+		},
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
 			.network = *nmtst_inet6_from_string ("2001:db8:abad:c0de::"),
 			.plen = 64,
 			.ifindex = fixture->ifindex1,
@@ -348,6 +375,15 @@ test_ip6 (test_fixture *fixture, gconstpointer user_data)
 			.metric = 20,
 			.mss = 0,
 		},
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = *nmtst_inet6_from_string ("2001:db8:1337::"),
+			.plen = 48,
+			.ifindex = fixture->ifindex1,
+			.gateway = in6addr_any,
+			.metric = 1024,
+			.mss = 0,
+		},
 	};
 
 	setup_dev0_ip6 (fixture->ifindex0);
@@ -372,7 +408,10 @@ test_ip6 (test_fixture *fixture, gconstpointer user_data)
 
 	/* Check that the 2001:db8:8086::/48 is now on dev1 and other dev0 routes went away. */
 	routes = ip6_routes (fixture);
+
 	g_assert_cmpint (routes->len, ==, G_N_ELEMENTS (state2));
+
+
 	nmtst_platform_ip6_routes_equal ((NMPlatformIP6Route *) routes->data, state2, routes->len);
 	g_array_free (routes, TRUE);
 
