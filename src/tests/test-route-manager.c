@@ -92,7 +92,7 @@ setup_dev1_ip4 (int ifindex)
 	route.source = NM_IP_CONFIG_SOURCE_USER;
 	inet_pton (AF_INET, "7.0.0.0", &route.network);
 	route.plen = 8;
-	route.gateway = INADDR_ANY;
+	inet_pton (AF_INET, "6.6.6.1", &route.gateway);
 	route.metric = 22;
 	g_array_append_val (routes, route);
 
@@ -119,7 +119,58 @@ test_ip4 (test_fixture *fixture, gconstpointer user_data)
 {
 	GArray *routes;
 
+	NMPlatformIP4Route state0[] = {
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = nmtst_inet4_from_string ("6.6.6.0"),
+			.plen = 24,
+			.ifindex = fixture->ifindex0,
+			.gateway = INADDR_ANY,
+			.metric = 20,
+			.mss = 0,
+		},
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = nmtst_inet4_from_string ("7.0.0.0"),
+			.plen = 8,
+			.ifindex = fixture->ifindex0,
+			.gateway = nmtst_inet4_from_string ("6.6.6.1"),
+			.metric = 21,
+			.mss = 0,
+		},
+	};
+
 	NMPlatformIP4Route state1[] = {
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = nmtst_inet4_from_string ("7.0.0.0"),
+			.plen = 8,
+			.ifindex = fixture->ifindex0,
+			.gateway = nmtst_inet4_from_string ("6.6.6.1"),
+			.metric = 21,
+			.mss = 0,
+		},
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = nmtst_inet4_from_string ("6.6.6.0"),
+			.plen = 24,
+			.ifindex = fixture->ifindex1,
+			.gateway = INADDR_ANY,
+			.metric = 20,
+			.mss = 0,
+		},
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = nmtst_inet4_from_string ("7.0.0.0"),
+			.plen = 8,
+			.ifindex = fixture->ifindex1,
+			.gateway = nmtst_inet4_from_string ("6.6.6.1"),
+			.metric = 22,
+			.mss = 0,
+		},
+	};
+
+	NMPlatformIP4Route state2[] = {
 		{
 			.source = NM_IP_CONFIG_SOURCE_USER,
 			.network = nmtst_inet4_from_string ("7.0.0.0"),
@@ -138,66 +189,33 @@ test_ip4 (test_fixture *fixture, gconstpointer user_data)
 			.metric = 20,
 			.mss = 0,
 		},
-		{
-			.source = NM_IP_CONFIG_SOURCE_USER,
-			.network = nmtst_inet4_from_string ("7.0.0.0"),
-			.plen = 8,
-			.ifindex = fixture->ifindex1,
-			.gateway = INADDR_ANY,
-			.metric = 22,
-			.mss = 0,
-		},
-	};
-
-	NMPlatformIP4Route state2[] = {
-		{
-			.source = NM_IP_CONFIG_SOURCE_USER,
-			.network = nmtst_inet4_from_string ("7.0.0.0"),
-			.plen = 8,
-			.ifindex = fixture->ifindex1,
-			.gateway = INADDR_ANY,
-			.metric = 22,
-			.mss = 0,
-		},
-		{
-			.source = NM_IP_CONFIG_SOURCE_USER,
-			.network = nmtst_inet4_from_string ("6.6.6.0"),
-			.plen = 24,
-			.ifindex = fixture->ifindex1,
-			.gateway = INADDR_ANY,
-			.metric = 20,
-			.mss = 0,
-		},
 	};
 
 	setup_dev0_ip4 (fixture->ifindex0);
-	setup_dev1_ip4 (fixture->ifindex1);
 
-	/* Check that the 6.6.6.0/24 didn't clash and everything else is fine too. */
+	/* Assert dev0 got configured as requested. */
 	routes = ip4_routes (fixture);
-
-	g_assert_cmpint (routes->len, ==, G_N_ELEMENTS (state1));
-	nmtst_platform_ip4_routes_equal ((NMPlatformIP4Route *) routes->data, state1, routes->len);
+	g_assert_cmpint (routes->len, ==, G_N_ELEMENTS (state0));
+	nmtst_platform_ip4_routes_equal ((NMPlatformIP4Route *) routes->data, state0, routes->len);
 	g_array_free (routes, TRUE);
 
 	setup_dev1_ip4 (fixture->ifindex1);
-	setup_dev0_ip4 (fixture->ifindex0);
 
-	/* Ensure nothing changed. */
+	/* Check that clashing routes got overriden. */
 	routes = ip4_routes (fixture);
 	g_assert_cmpint (routes->len, ==, G_N_ELEMENTS (state1));
 	nmtst_platform_ip4_routes_equal ((NMPlatformIP4Route *) routes->data, state1, routes->len);
 	g_array_free (routes, TRUE);
 
-	nm_route_manager_route_flush (nm_route_manager_get (), fixture->ifindex0);
+	nm_route_manager_route_flush (nm_route_manager_get (), fixture->ifindex1);
 
-	/* Check that the 6.6.6.0/24 is now on dev1 and other dev0 routes went away. */
+	/* Assert that routes got back after dev1 was removed. */
 	routes = ip4_routes (fixture);
 	g_assert_cmpint (routes->len, ==, G_N_ELEMENTS (state2));
 	nmtst_platform_ip4_routes_equal ((NMPlatformIP4Route *) routes->data, state2, routes->len);
 	g_array_free (routes, TRUE);
 
-	nm_route_manager_route_flush (nm_route_manager_get (), fixture->ifindex1);
+	nm_route_manager_route_flush (nm_route_manager_get (), fixture->ifindex0);
 
 	/* No routes left. */
 	routes = ip4_routes (fixture);
@@ -287,7 +305,7 @@ setup_dev1_ip6 (int ifindex)
 
 	route = nmtst_platform_ip6_route_full ("2001:db8:abad:c0de::",
 	                                       64,
-	                                       NULL,
+	                                       "2001:db8:8086::1",
 	                                       ifindex,
 	                                       NM_IP_CONFIG_SOURCE_USER,
 	                                       22,
@@ -317,6 +335,36 @@ test_ip6 (test_fixture *fixture, gconstpointer user_data)
 {
 	GArray *routes;
 
+	NMPlatformIP6Route state0[] = {
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = *nmtst_inet6_from_string ("2001:db8:8086::"),
+			.plen = 48,
+			.ifindex = fixture->ifindex0,
+			.gateway = in6addr_any,
+			.metric = 20,
+			.mss = 0,
+		},
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = *nmtst_inet6_from_string ("2001:db8:1337::"),
+			.plen = 48,
+			.ifindex = fixture->ifindex0,
+			.gateway = in6addr_any,
+			.metric = 1024,
+			.mss = 0,
+		},
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = *nmtst_inet6_from_string ("2001:db8:abad:c0de::"),
+			.plen = 64,
+			.ifindex = fixture->ifindex0,
+			.gateway = *nmtst_inet6_from_string ("2001:db8:8086::1"),
+			.metric = 21,
+			.mss = 0,
+		},
+	};
+
 	NMPlatformIP6Route state1[] = {
 		{
 			.source = NM_IP_CONFIG_SOURCE_USER,
@@ -331,7 +379,7 @@ test_ip6 (test_fixture *fixture, gconstpointer user_data)
 			.source = NM_IP_CONFIG_SOURCE_USER,
 			.network = *nmtst_inet6_from_string ("2001:db8:8086::"),
 			.plen = 48,
-			.ifindex = fixture->ifindex0,
+			.ifindex = fixture->ifindex1,
 			.gateway = in6addr_any,
 			.metric = 20,
 			.mss = 0,
@@ -340,7 +388,7 @@ test_ip6 (test_fixture *fixture, gconstpointer user_data)
 			.source = NM_IP_CONFIG_SOURCE_USER,
 			.network = *nmtst_inet6_from_string ("2001:db8:1337::"),
 			.plen = 48,
-			.ifindex = fixture->ifindex0,
+			.ifindex = fixture->ifindex1,
 			.gateway = in6addr_any,
 			.metric = 1024,
 			.mss = 0,
@@ -350,7 +398,7 @@ test_ip6 (test_fixture *fixture, gconstpointer user_data)
 			.network = *nmtst_inet6_from_string ("2001:db8:abad:c0de::"),
 			.plen = 64,
 			.ifindex = fixture->ifindex1,
-			.gateway = in6addr_any,
+			.gateway = *nmtst_inet6_from_string ("2001:db8:8086::1"),
 			.metric = 22,
 			.mss = 0,
 		},
@@ -361,61 +409,57 @@ test_ip6 (test_fixture *fixture, gconstpointer user_data)
 			.source = NM_IP_CONFIG_SOURCE_USER,
 			.network = *nmtst_inet6_from_string ("2001:db8:abad:c0de::"),
 			.plen = 64,
-			.ifindex = fixture->ifindex1,
-			.gateway = in6addr_any,
-			.metric = 22,
-			.mss = 0,
-		},
-		{
-			.source = NM_IP_CONFIG_SOURCE_USER,
-			.network = *nmtst_inet6_from_string ("2001:db8:8086::"),
-			.plen = 48,
-			.ifindex = fixture->ifindex1,
-			.gateway = in6addr_any,
-			.metric = 20,
+			.ifindex = fixture->ifindex0,
+			.gateway = *nmtst_inet6_from_string ("2001:db8:8086::1"),
+			.metric = 21,
 			.mss = 0,
 		},
 		{
 			.source = NM_IP_CONFIG_SOURCE_USER,
 			.network = *nmtst_inet6_from_string ("2001:db8:1337::"),
 			.plen = 48,
-			.ifindex = fixture->ifindex1,
+			.ifindex = fixture->ifindex0,
 			.gateway = in6addr_any,
 			.metric = 1024,
+			.mss = 0,
+		},
+		{
+			.source = NM_IP_CONFIG_SOURCE_USER,
+			.network = *nmtst_inet6_from_string ("2001:db8:8086::"),
+			.plen = 48,
+			.ifindex = fixture->ifindex0,
+			.gateway = in6addr_any,
+			.metric = 20,
 			.mss = 0,
 		},
 	};
 
 	setup_dev0_ip6 (fixture->ifindex0);
-	setup_dev1_ip6 (fixture->ifindex1);
 
-	/* Check that the 2001:db8:8086::/48 didn't clash and everything else is fine too. */
+	/* Assert dev0 got configured as requested. */
 	routes = ip6_routes (fixture);
-	g_assert_cmpint (routes->len, ==, G_N_ELEMENTS (state1));
-	nmtst_platform_ip6_routes_equal ((NMPlatformIP6Route *) routes->data, state1, routes->len);
+	g_assert_cmpint (routes->len, ==, G_N_ELEMENTS (state0));
+	nmtst_platform_ip6_routes_equal ((NMPlatformIP6Route *) routes->data, state0, routes->len);
 	g_array_free (routes, TRUE);
 
 	setup_dev1_ip6 (fixture->ifindex1);
-	setup_dev0_ip6 (fixture->ifindex0);
 
-	/* Ensure nothing changed. */
+	/* Check that clashing routes got overriden. */
 	routes = ip6_routes (fixture);
 	g_assert_cmpint (routes->len, ==, G_N_ELEMENTS (state1));
 	nmtst_platform_ip6_routes_equal ((NMPlatformIP6Route *) routes->data, state1, routes->len);
-	g_array_free (routes, TRUE);
-
-	nm_route_manager_route_flush (nm_route_manager_get (), fixture->ifindex0);
-
-	/* Check that the 2001:db8:8086::/48 is now on dev1 and other dev0 routes went away. */
-	routes = ip6_routes (fixture);
-
-	g_assert_cmpint (routes->len, ==, G_N_ELEMENTS (state2));
-
-
-	nmtst_platform_ip6_routes_equal ((NMPlatformIP6Route *) routes->data, state2, routes->len);
 	g_array_free (routes, TRUE);
 
 	nm_route_manager_route_flush (nm_route_manager_get (), fixture->ifindex1);
+
+	/* Assert that routes got back after dev1 was removed. */
+	routes = ip6_routes (fixture);
+
+	g_assert_cmpint (routes->len, ==, G_N_ELEMENTS (state2));
+	nmtst_platform_ip6_routes_equal ((NMPlatformIP6Route *) routes->data, state2, routes->len);
+	g_array_free (routes, TRUE);
+
+	nm_route_manager_route_flush (nm_route_manager_get (), fixture->ifindex0);
 
 	/* No routes left. */
 	routes = ip6_routes (fixture);
