@@ -174,25 +174,22 @@ nm_route_manager_ip4_route_sync (NMRouteManager *self, int ifindex, const GArray
 				continue;
 			}
 
-			/* Ignore routes that already exist */
-			if (!array_get_ip4_route (routes, 0, known_route)) {
-				success = nm_platform_ip4_route_add (known_route->ifindex,
-				                                     known_route->source,
-				                                     known_route->network,
-				                                     known_route->plen,
-				                                     known_route->gateway,
-				                                     0,
-				                                     known_route->metric,
-				                                     known_route->mss);
-				if (!success && known_route->source < NM_IP_CONFIG_SOURCE_USER) {
-					nm_log_dbg (LOGD_CORE, "ignore error adding IPv4 route to kernel: %s",
-					                       nm_platform_ip4_route_to_string (known_route));
-					success = TRUE;
-				}
+			success = nm_platform_ip4_route_add (known_route->ifindex,
+							     known_route->source,
+							     known_route->network,
+							     known_route->plen,
+							     known_route->gateway,
+							     0,
+							     known_route->metric,
+							     known_route->mss);
+			if (!success && known_route->source < NM_IP_CONFIG_SOURCE_USER) {
+				nm_log_dbg (LOGD_CORE, "ignore error adding IPv4 route to kernel: %s",
+					       nm_platform_ip4_route_to_string (known_route));
+				success = TRUE;
 			}
 
 			if (!array_get_ip4_route (routes, known_route->ifindex, known_route))
-				g_array_append_val (routes, *known_route);
+				g_array_prepend_val (routes, *known_route);
 		}
 	}
 
@@ -286,24 +283,21 @@ nm_route_manager_ip6_route_sync (NMRouteManager *self, int ifindex, const GArray
 				continue;
 			}
 
-			/* Ignore routes that already exist */
-			if (!array_get_ip6_route (routes, 0, known_route)) {
-				success = nm_platform_ip6_route_add (known_route->ifindex,
-				                                     known_route->source,
-				                                     known_route->network,
-				                                     known_route->plen,
-				                                     known_route->gateway,
-				                                     known_route->metric,
-				                                     known_route->mss);
-				if (!success && known_route->source < NM_IP_CONFIG_SOURCE_USER) {
-					nm_log_dbg (LOGD_CORE, "ignore error adding IPv6 route to kernel: %s",
-					                       nm_platform_ip6_route_to_string (known_route));
-					success = TRUE;
-				}
+			success = nm_platform_ip6_route_add (known_route->ifindex,
+							     known_route->source,
+							     known_route->network,
+							     known_route->plen,
+							     known_route->gateway,
+							     known_route->metric,
+							     known_route->mss);
+			if (!success && known_route->source < NM_IP_CONFIG_SOURCE_USER) {
+				nm_log_dbg (LOGD_CORE, "ignore error adding IPv6 route to kernel: %s",
+						       nm_platform_ip6_route_to_string (known_route));
+				success = TRUE;
 			}
 
 			if (!array_get_ip6_route (routes, known_route->ifindex, known_route))
-				g_array_append_val (routes, *known_route);
+				g_array_prepend_val (routes, *known_route);
 		}
 	}
 
