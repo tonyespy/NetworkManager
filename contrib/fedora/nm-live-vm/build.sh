@@ -1,4 +1,6 @@
 #!/bin/bash
+# vim: ft=sh ts=4 sts=4 sw=4 et ai
+# -*- Mode: bash; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 
 
 set -vx
@@ -6,6 +8,15 @@ set -vx
 die() {
     echo "$@" >&2
     exit 1
+}
+
+help() {
+    echo "Usage: build.sh [--mode test|normal] [--branch BRANCH] [--name NAME]"
+    echo "          --mode normal: (default) simple NM-enabled VM for general use"
+    echo "          --mode test: enable unit-testing (do not enable NM service, run test-vm-agent.py at startup)"
+    echo "          --branch: NM git branch or commit SHA to build"
+    echo "          --name: initramfs name"
+    exit 0
 }
 
 BASEDIR="$(readlink -f "$(dirname "$0")")"
@@ -89,7 +100,7 @@ do_build() {
 
     # run the make script in chroot.
     mock -r "$ROOT" --copyin nm-make-script.sh "/usr/local/sbin/" || exit 1
-    mock -r "$ROOT" --chroot "/usr/local/sbin/nm-make-script.sh \"$NM_BRANCH\"" || exit 1
+    mock -r "$ROOT" --chroot "/usr/local/sbin/nm-make-script.sh -b \"$NM_BRANCH\" -m $MODE" || exit 1
     test -f "$TREE/usr/sbin/NetworkManager" || die "NetworkManager binary not found"
     echo
 }
@@ -97,6 +108,13 @@ do_build() {
 do_live_vm() {
     echo "Preparing kernel and initrd..." || exit 1
     mkdir -p $NAME || exit 1
+
+    if [ "$MODE" = "test" ]; then
+        mock -r "$ROOT" --copyin vm-agent.py "/usr/sbin" || exit 1
+        mock -r "$ROOT" --copyin vm-agent.service "/usr/lib/systemd/system/" || exit 1
+        mock -r "$ROOT" --chroot "/bin/systemctl enable vm-agent.service" || exit 1
+    fi
+
     cp $TREE/boot/vmlinuz* $NAME/vmlinuz || exit 1
     mock -r "$ROOT" --chroot "{ (   cd / ; \
                                     echo 'host0 /mnt/shared 9p x-systemd.automount,x-systemd.device-timeout=10,trans=virtio,version=9p2000.L,rw 0 0' >> /etc/fstab ; \
@@ -121,24 +139,41 @@ do_archive() {
     echo "Now you can run and/or distribute: ${NAME}-bundle.sh"
 }
 
-
-if [ "$1" = "-n" ]; then
-    test -n "$2" || { echo "Name for initramfs is expected"; exit 1; }
-    NAME=$2
-    shift 2
-fi
-
-if [ "$1" = "-b" ]; then
-    test -n "$2" || { echo "NM branch (commit) is expected"; exit 1; }
-    NM_BRANCH=$2
-    shift 2
-fi
+MODE=normal
+OPERATIONS=
+while [[ $# > 0 ]]; do
+    key="$1"
+    case $key in
+        -m|--mode)
+        MODE="$2"
+        if [ "$MODE" != "test" -a "$MODE" != "normal" ]; then
+            exit 1
+        fi
+        shift
+        ;;
+        -b|--branch)
+        NM_BRANCH="$2"
+        shift
+        ;;
+        -n|--name)
+        NAME="$2"
+        shift
+        ;;
+        -h|--help)
+        help
+        ;;
+        *)
+        OPERATIONS="$OPERATIONS $key"
+        ;;
+    esac
+    shift
+done
 
 if [[ $INSIDE_GIT ]]; then
     NM_BRANCH="$(git rev-parse -q --verify "$NM_BRANCH")" || die "Could not resolve branch $NM_BRANCH"
 fi
 
-if [ $# -eq 0 ]; then
+if [ -z "$OPERATIONS" ]; then
     check_root && do_prepare
     do_chroot
     do_build
@@ -147,8 +182,8 @@ if [ $# -eq 0 ]; then
     exit 0
 fi
 
-while [ $# -gt 0 ]; do
-    do_$1; shift
+for i in $OPERATIONS; do
+    do_$i; shift
     exit 0
 done
 

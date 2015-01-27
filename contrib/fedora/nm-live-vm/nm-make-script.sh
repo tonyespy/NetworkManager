@@ -1,4 +1,6 @@
 #!/bin/bash
+# vim: ft=sh ts=4 sts=4 sw=4 et ai
+# -*- Mode: bash; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 
 set -vx
 
@@ -7,9 +9,45 @@ die() {
     exit 1
 }
 
-COMMIT=${1:-origin/master}
+help() {
+    echo "Usage: nm-make-script.sh [--mode test|normal] [--branch BRANCH] [--url URL]"
+    echo "          --mode normal: (default) simple NM-enabled VM for general use"
+    echo "          --mode test: enable unit-testing (do not enable NM service, run test-vm-agent.py at startup)"
+    echo "          --branch: NM git branch or commit SHA to build"
+    echo "          --url: NM git repository URL"
+    exit 0
+}
 
-URL="${2:-"git://anongit.freedesktop.org/NetworkManager/NetworkManager"}"
+MODE=normal
+COMMIT="origin/master"
+URL="git://anongit.freedesktop.org/NetworkManager/NetworkManager"
+while [[ $# > 0 ]]; do
+    key="$1"
+    case $key in
+        -m|--mode)
+        MODE="$2"
+        if [ "$MODE" != "test" -a "$MODE" != "normal" ]; then
+            exit 1
+        fi
+        shift
+        ;;
+        -b|--branch)
+        COMMIT="$2"
+        shift
+        ;;
+        -u|--url)
+        URL="$2"
+        shift
+        ;;
+        -h|--help)
+        help
+        ;;
+        *)
+        die "Unrecognized option '$key'"
+        ;;
+    esac
+    shift
+done
 
 PPP_VERSION=`rpm -q ppp-devel >/dev/null && rpm -q --qf '%{version}' ppp-devel || echo -n bad`
 
@@ -67,7 +105,9 @@ debug=RLIMIT_CORE
 level=DEBUG
 domains=ALL
 EOF
-/bin/systemctl enable NetworkManager.service || exit 1
+if [ "$MODE" != "test" ]; then
+    /bin/systemctl enable NetworkManager.service || exit 1
+fi
 /bin/systemctl enable sshd.service || exit 1
 
 git config --global user.name "NetworkManager Test VM"
