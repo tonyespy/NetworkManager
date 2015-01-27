@@ -24,7 +24,7 @@ if [ "$OS" == "Red Hat Enterprise Linux" ]; then
 
     PATH=$PATH:/usr/libexec
 
-    qemu-kvm -vnc :0 -m $MEMORY $NET_OPTIONS -kernel vmlinuz -append "video=1024x768 rootfstype=ramfs" -initrd initramfs.img &
+    qemu-kvm -vnc :0 -m $MEMORY $NET_OPTIONS -kernel vmlinuz -append "video=1024x640 rootfstype=ramfs" -initrd initramfs.img &
 
     sleep 1
     vncviewer localhost
@@ -39,5 +39,5 @@ else
         QEMU="qemu-system-$ARCH -enable-kvm"
     }
 
-    $QEMU -m $MEMORY -net nic $NET_OPTIONS -virtfs "local,path=$SDIR,mount_tag=host0,security_model=none,id=host0" -device "virtio-9p-pci,fsdev=host0,mount_tag=host0" -kernel vmlinuz -append "video=1024x768 rootfstype=ramfs" -initrd initramfs.img
+    $QEMU -m $MEMORY -net nic $NET_OPTIONS -virtfs "local,path=$SDIR,mount_tag=host0,security_model=none,id=host0" -device "virtio-9p-pci,fsdev=host0,mount_tag=host0" -kernel vmlinuz -append "video=1024x640 rootfstype=ramfs" -initrd initramfs.img
 fi
