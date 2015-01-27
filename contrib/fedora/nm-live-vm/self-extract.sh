@@ -12,6 +12,8 @@ cd $NAME || exit 1
 
 ./run.sh || exit 1
 
-#rm -rf "$TEMP"
+if [ "$1" = "--delete" ]; then
+    rm -rf "$TEMP"
+fi
 exit 0
 __MARK__
