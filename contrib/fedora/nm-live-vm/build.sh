@@ -98,7 +98,7 @@ do_live_vm() {
     mkdir -p $NAME || exit 1
     cp $TREE/boot/vmlinuz* $NAME/vmlinuz || exit 1
     mock -r "$ROOT" --chroot "{ (   cd / ; \
-                                    echo '/dev/sda1 /mnt/sda1 vfat defaults 0 0' >> /etc/fstab ; \
+                                    echo 'host0 /mnt/shared 9p x-systemd.automount,x-systemd.device-timeout=10,trans=virtio,version=9p2000.L,rw 0 0' >> /etc/fstab ; \
                                     find -not \( \
                                         -path ./tmp/initramfs.img -o \
                                         -path './var/cache/yum/*' -o \
