@@ -29,26 +29,27 @@ else
 fi
 
 BUILD_PACKAGES="qemu febootstrap mock rpmdevtools"
-ARCH=i386
-ROOT="${ROOT:-"fedora-20-$ARCH"}"
+ARCH=x86_64
+ROOT="${ROOT:-"fedora-21-$ARCH"}"
 TREE="/var/lib/mock/$ROOT/root"
 PACKAGES="kernel passwd git autoconf automake libtool intltool gtk-doc libnl3-devel
     dbus-glib-devel libgudev1-devel libuuid-devel nss-devel ppp-devel newt-devel libndp-devel
-    readline-devel
+    readline-devel gettext-devel pkgconfig
     gobject-introspection-devel
-    pygobject3
+    pygobject3-base
+    systemd-devel
     dhclient dnsmasq
     bash-completion man-db man-pages vim-minimal
     firewalld
     vim
-    perl-YAML
+    perl-YAML perl-XML-Parser
     wget
     gdb valgrind lsof strace nmap-ncat tcpdump
     net-tools bridge-utils vconfig
     openssh-server
-    teamd libteam"
-KERNEL_URL=http://kojipkgs.fedoraproject.org/packages/kernel/3.12.9/301.fc20/i686/kernel-3.12.9-301.fc20.i686.rpm
-KERNEL=`basename "${KERNEL_URL%.rpm}"`
+    teamd teamd-devel libteam
+    libsoup-devel newt-devel polkit-devel libselinux-devel
+    coreutils"
 #RELEASE="http://kojipkgs.fedoraproject.org/packages/fedora-release/20/1/noarch/fedora-release-20-1.noarch.rpm"
 #PACKAGES="systemd bash"
 

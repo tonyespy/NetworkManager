@@ -11,6 +11,8 @@ COMMIT=${1:-origin/master}
 
 URL="${2:-"git://anongit.freedesktop.org/NetworkManager/NetworkManager"}"
 
+PPP_VERSION=`rpm -q ppp-devel >/dev/null && rpm -q --qf '%{version}' ppp-devel || echo -n bad`
+
 passwd -d root
 test -d /NetworkManager || (
     git init /NetworkManager
@@ -33,10 +35,26 @@ export CFLAGS='-g -Og'
 export CXXFLAGS='-g -Og'
 ./autogen.sh --prefix=/usr \
              --exec-prefix=/usr \
-             --libdir=/usr/lib \
+             --libdir=/usr/lib64 \
              --sysconfdir=/etc \
              --localstatedir=/var \
              --with-nmtui=yes \
+             --with-dhclient=yes \
+             --enable-ppp=yes \
+             --with-modem-manager-1=no \
+             --with-wext=no \
+             --enable-teamdctl=yes \
+             --with-selinux=yes \
+             --enable-polkit=yes \
+             --enable-polkit-agent \
+             --enable-modify-system=yes \
+             --enable-concheck \
+             --with-session-tracking=systemd \
+             --with-suspend-resume=systemd \
+             --enable-ifcfg-rh=yes \
+             --with-system-libndp=yes \
+             --with-pppd-plugin-dir="/usr/lib64/pppd/$PPP_VERSION" \
+             --with-setting-plugins-default='ifcfg-rh,ibft' \
              --enable-gtk-doc || exit 1
 make || exit 1
 #make check || exit 1
