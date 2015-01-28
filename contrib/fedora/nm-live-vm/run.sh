@@ -1,4 +1,6 @@
 #!/bin/sh
+# vim: ft=sh ts=4 sts=4 sw=4 et ai
+# -*- Mode: bash; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 
 # Three network interfaces
 NET_OPTIONS="-net nic -net user,hostfwd=tcp:127.0.0.1:10022-:22 -net nic -net user -net nic -net user"
@@ -8,11 +10,14 @@ if [ -f /etc/redhat-release ]; then
     OS=`cat /etc/redhat-release | cut -d" " -f1,2,3,4`
 fi
 
-DIR="$(dirname "$(readlink -f "$0")")"
-SDIR="$DIR/share"
 MEMORY=$((3*1024))
 
-mkdir "$SDIR"
+DIR="$(dirname "$(readlink -f "$0")")"
+SDIR="$DIR/share"
+if [ -n "$1" ]; then
+    SDIR="$1"
+fi
+mkdir -p "$SDIR"
 
 cd "$DIR"
 

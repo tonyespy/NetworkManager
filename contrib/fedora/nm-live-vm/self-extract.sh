@@ -3,14 +3,16 @@
 # -*- Mode: bash; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 
 help() {
-    echo "Usage: self-extract.sh [--suffix SUFFIX] [--delete]"
+    echo "Usage: self-extract.sh [--suffix SUFFIX] [--delete] [--sharedir DIR]"
     echo "          --suffix: use the given suffix when extracting the live VM directory"
     echo "          --delete: delete the live VM directory when the VM exits"
+    echo "          --sharedir: directory to use for sharing files between guest and host"
     exit 0
 }
 
 SUFFIX=
 DELETE=
+SHAREDIR=
 while [[ $# > 0 ]]; do
     key="$1"
     case $key in
@@ -20,6 +22,10 @@ while [[ $# > 0 ]]; do
         ;;
         -d|--delete)
         DELETE=yes
+        ;;
+        -a|--sharedir)
+        SHAREDIR="$2"
+        shift
         ;;
         -h|--help)
         help
@@ -46,7 +52,7 @@ sed '1,/^__MARK__$/d' "$BUNDLE" > $NAME.tar.gz || exit 1
 tar -xvf $NAME.tar.gz || exit 1
 cd $NAME || exit 1
 
-./run.sh || exit 1
+./run.sh "$SHAREDIR" || exit 1
 
 if [ "$DELETE" = "yes" ]; then
     rm -rf "$TEMP"
