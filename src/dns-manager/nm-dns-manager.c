@@ -398,6 +398,7 @@ dispatch_resolvconf (char **searches,
 	char *cmd;
 	FILE *f;
 	gboolean retval = FALSE;
+	int errnosv, err;
 
 	if (!g_file_test (RESOLVCONF_PATH, G_FILE_TEST_IS_EXECUTABLE)) {
 		g_set_error_literal (error,
@@ -419,7 +420,17 @@ dispatch_resolvconf (char **searches,
 			             g_strerror (errno));
 		else {
 			retval = write_resolv_conf (f, searches, nameservers, error);
-			(void) pclose (f);
+			/* Ignore pclose() failure; can't do anything about it */
+			err = pclose (f);
+			if (err < 0) {
+				errnosv = errno;
+				g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errnosv),
+				             "Failed to close pipe to resolvconf: %d", errnosv);
+				retval = FALSE;
+			} else if (ret > 0) {
+				nm_log_warn (LOGD_DNS, "resolvconf failed with status %d", ret);
+				retval = FALSE;
+			}
 		}
 	} else {
 		cmd = g_strconcat (RESOLVCONF_PATH, " -d ", "NetworkManager", NULL);
