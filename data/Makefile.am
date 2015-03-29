@@ -19,13 +19,6 @@ endif
 NetworkManager-dispatcher.service: NetworkManager-dispatcher.service.in
 	$(edit) $< >$@
 
-servicedir = $(datadir)/dbus-1/system-services
-service_in_files = org.freedesktop.NetworkManager.service.in
-service_DATA = $(service_in_files:.service.in=.service)
-
-$(service_DATA): $(service_in_files) Makefile
-	$(edit) $< >$@
-
 install-exec-local:
 	install -d $(DESTDIR)$(systemdsystemunitdir)/network-online.target.wants
 	ln -sf $(systemdsystemunitdir)/NetworkManager-wait-online.service $(DESTDIR)$(systemdsystemunitdir)/network-online.target.wants
