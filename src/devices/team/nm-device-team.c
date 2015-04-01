@@ -262,7 +262,7 @@ master_update_slave_connection (NMDevice *self,
 /******************************************************************/
 
 static void
-teamd_cleanup (NMDevice *device)
+teamd_cleanup (NMDevice *device, gboolean free_tdc)
 {
 	NMDeviceTeamPrivate *priv = NM_DEVICE_TEAM_GET_PRIVATE (device);
 
@@ -281,7 +281,7 @@ teamd_cleanup (NMDevice *device)
 		priv->teamd_pid = 0;
 	}
 
-	if (priv->tdc) {
+	if (priv->tdc && free_tdc) {
 		teamdctl_disconnect (priv->tdc);
 		teamdctl_free (priv->tdc);
 		priv->tdc = NULL;
@@ -301,7 +301,7 @@ teamd_timeout_cb (gpointer user_data)
 	if (priv->teamd_pid && !priv->tdc) {
 		/* Timed out launching our own teamd process */
 		_LOGW (LOGD_TEAM, "teamd timed out.");
-		teamd_cleanup (device);
+		teamd_cleanup (device, TRUE);
 
 		g_warn_if_fail (nm_device_is_activating (device));
 		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_TEAMD_CONTROL_FAILED);
@@ -331,7 +331,7 @@ teamd_dbus_appeared (GDBusConnection *connection,
 	 */
 	if (priv->teamd_process_watch) {
 		gs_unref_variant GVariant *ret = NULL;
-		guint pid;
+		guint32 pid;
 
 		ret = g_dbus_connection_call_sync (connection,
 		                                   "org.freedesktop.DBus",
@@ -346,10 +346,8 @@ teamd_dbus_appeared (GDBusConnection *connection,
 		                                   NULL);
 		g_variant_get (ret, "(u)", &pid);
 
-		if (pid != priv->teamd_pid) {
-			g_source_remove (priv->teamd_process_watch);
-			priv->teamd_process_watch = 0;
-		}
+		if (pid != priv->teamd_pid)
+			teamd_cleanup (device, FALSE);
 	}
 
 	/* Grab a teamd control handle even if we aren't going to use it
@@ -387,7 +385,7 @@ teamd_dbus_vanished (GDBusConnection *dbus_connection,
 	}
 
 	_LOGI (LOGD_TEAM, "teamd vanished from D-Bus");
-	teamd_cleanup (device);
+	teamd_cleanup (device, TRUE);
 
 	/* Attempt to respawn teamd */
 	if (state >= NM_DEVICE_STATE_PREPARE && state <= NM_DEVICE_STATE_ACTIVATED) {
@@ -419,8 +417,8 @@ teamd_process_watch_cb (GPid pid, gint status, gpointer user_data)
 	if (priv->teamd_timeout &&
 	    (state >= NM_DEVICE_STATE_PREPARE) &&
 	    (state <= NM_DEVICE_STATE_ACTIVATED)) {
-		_LOGW (LOGD_TEAM, "teamd quit too quickly; failing activation");
-		teamd_cleanup (device);
+		_LOGW (LOGD_TEAM, "teamd process quit unexpectedly; failing activation");
+		teamd_cleanup (device, TRUE);
 		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_TEAMD_CONTROL_FAILED);
 	}
 }
@@ -472,7 +470,7 @@ teamd_start (NMDevice *device, NMSettingTeam *s_team)
 		g_warn_if_reached ();
 		if (!priv->teamd_pid)
 			teamd_kill (self, teamd_binary, NULL);
-		teamd_cleanup (device);
+		teamd_cleanup (device, TRUE);
 	}
 
 	/* Start teamd now */
@@ -500,7 +498,7 @@ teamd_start (NMDevice *device, NMSettingTeam *s_team)
 	if (!g_spawn_async ("/", (char **) argv->pdata, NULL, G_SPAWN_DO_NOT_REAP_CHILD,
 	                    nm_utils_setpgid, NULL, &priv->teamd_pid, &error)) {
 		_LOGW (LOGD_TEAM, "Activation: (team) failed to start teamd: %s", error->message);
-		teamd_cleanup (device);
+		teamd_cleanup (device, TRUE);
 		return FALSE;
 	}
 
@@ -513,7 +511,7 @@ teamd_start (NMDevice *device, NMSettingTeam *s_team)
 	                                               teamd_process_watch_cb,
 	                                               device);
 
-	_LOGI (LOGD_TEAM, "Activation: (team) started teamd [pid %u]...", (guint32) priv->teamd_pid);
+	_LOGI (LOGD_TEAM, "Activation: (team) started teamd [pid %u]...", (guint) priv->teamd_pid);
 	return TRUE;
 }
 
@@ -561,7 +559,7 @@ act_stage1_prepare (NMDevice *device, NMDeviceStateReason *reason)
 		}
 
 		_LOGD (LOGD_TEAM, "existing teamd config mismatch; respawning...");
-		teamd_cleanup (device);
+		teamd_cleanup (device, TRUE);
 	}
 
 	return teamd_start (device, s_team) ?
@@ -579,7 +577,7 @@ deactivate (NMDevice *device)
 
 	if (!priv->teamd_pid)
 		teamd_kill (self, NULL, NULL);
-	teamd_cleanup (device);
+	teamd_cleanup (device, TRUE);
 }
 
 static gboolean
@@ -790,7 +788,7 @@ dispose (GObject *object)
 		priv->teamd_dbus_watch = 0;
 	}
 
-	teamd_cleanup (device);
+	teamd_cleanup (device, TRUE);
 
 	G_OBJECT_CLASS (nm_device_team_parent_class)->dispose (object);
 }
