@@ -86,6 +86,7 @@ struct _NMPlatformLink {
 	const char *type_name;
 	const char *udi;
 	const char *driver;
+	gboolean initialized;
 	int master;
 	int parent;
 	gboolean up;
@@ -356,6 +357,7 @@ typedef struct {
 	GObjectClass parent;
 
 	gboolean (*setup) (NMPlatform *);
+	void (*setup_devices) (NMPlatform *);
 
 	gboolean (*sysctl_set) (NMPlatform *, const char *path, const char *value);
 	char * (*sysctl_get) (NMPlatform *, const char *path);
