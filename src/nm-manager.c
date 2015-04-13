@@ -1791,7 +1791,7 @@ add_device (NMManager *self, NMDevice *device, gboolean try_assume)
 	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (self);
 	const char *iface, *driver, *type_desc;
 	const GSList *unmanaged_specs;
-	gboolean user_unmanaged, sleeping, platform_unmanaged;
+	gboolean user_unmanaged, sleeping;
 	gboolean enabled = FALSE;
 	RfKillType rtype;
 	GSList *iter, *remove = NULL;
@@ -1871,11 +1871,12 @@ add_device (NMManager *self, NMDevice *device, gboolean try_assume)
 	user_unmanaged = nm_device_spec_match_list (device, unmanaged_specs);
 	nm_device_set_initial_unmanaged_flag (device, NM_UNMANAGED_USER, user_unmanaged);
 
-	if (nm_platform_link_get_unmanaged (NM_PLATFORM_GET, nm_device_get_ifindex (device), &platform_unmanaged))
-		nm_device_set_initial_unmanaged_flag (device, NM_UNMANAGED_DEFAULT, platform_unmanaged);
-
 	sleeping = manager_sleeping (self);
 	nm_device_set_initial_unmanaged_flag (device, NM_UNMANAGED_INTERNAL, sleeping);
+
+	nm_settings_device_added (priv->settings, device);
+
+	nm_device_set_initial_unmanaged_flag (device, NM_UNMANAGED_PLATFORM_INIT, TRUE);
 
 	nm_device_dbus_export (device);
 	nm_device_finish_init (device);
@@ -1886,13 +1887,6 @@ add_device (NMManager *self, NMDevice *device, gboolean try_assume)
 		                  G_CALLBACK (recheck_assume_connection), self);
 	}
 
-	if (!connection_assumed && nm_device_get_managed (device)) {
-		nm_device_state_changed (device,
-		                         NM_DEVICE_STATE_UNAVAILABLE,
-		                         NM_DEVICE_STATE_REASON_NOW_MANAGED);
-	}
-
-	nm_settings_device_added (priv->settings, device);
 	g_signal_emit (self, signals[DEVICE_ADDED], 0, device);
 	g_object_notify (G_OBJECT (self), NM_MANAGER_DEVICES);
 
