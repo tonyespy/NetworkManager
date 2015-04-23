@@ -923,23 +923,48 @@ nm_link_type_to_string (NMLinkType type)
 	g_return_val_if_reached (NULL);
 }
 
+#define DEVTYPE_PREFIX "DEVTYPE="
+
+static char *
+read_devtype (const char *sysfs_path)
+{
+	gs_free char *uevent = g_strdup_printf ("%s/uevent", sysfs_path);
+	char *contents = NULL;
+	char *cont, *end;
+
+	if (!g_file_get_contents (uevent, &contents, NULL, NULL))
+		return NULL;
+	for (cont = contents; cont; cont = end) {
+		end = strpbrk (cont, "\r\n");
+		if (end)
+			*end++ = '\0';
+		if (strncmp (cont, DEVTYPE_PREFIX, STRLEN (DEVTYPE_PREFIX)) == 0) {
+			cont += STRLEN (DEVTYPE_PREFIX);
+			memmove (contents, cont, strlen (cont) + 1);
+			return contents;
+		}
+	}
+	g_free (contents);
+	return NULL;
+}
+
 static NMLinkType
 link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char **out_name)
 {
-	const char *type, *ifname;
+	const char *rtnl_type, *ifname;
 	int i, arptype;
 
 	if (!rtnllink)
 		return_type (NM_LINK_TYPE_NONE, NULL);
 
-	type = rtnl_link_get_type (rtnllink);
-	if (type) {
+	rtnl_type = rtnl_link_get_type (rtnllink);
+	if (rtnl_type) {
 		for (i = 0; i < G_N_ELEMENTS (linktypes); i++) {
-			if (g_strcmp0 (type, linktypes[i].rtnl_type) == 0)
-				return_type (linktypes[i].nm_type, type);
+			if (g_strcmp0 (rtnl_type, linktypes[i].rtnl_type) == 0)
+				return_type (linktypes[i].nm_type, rtnl_type);
 		}
 
-		if (!strcmp (type, "tun")) {
+		if (!strcmp (rtnl_type, "tun")) {
 			NMPlatformTunProperties props;
 			guint flags;
 
@@ -967,11 +992,13 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 	else if (arptype == ARPHRD_INFINIBAND)
 		return_type (NM_LINK_TYPE_INFINIBAND, "infiniband");
 
+
 	ifname = rtnl_link_get_name (rtnllink);
 	if (ifname) {
 		const char *driver = ethtool_get_driver (ifname);
 		gs_free char *sysfs_path = NULL;
 		gs_free char *anycast_mask = NULL;
+		gs_free char *devtype = NULL;
 
 		if (arptype == 256) {
 			/* Some s390 CTC-type devices report 256 for the encapsulation type
@@ -990,6 +1017,12 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 		if (g_file_test (anycast_mask, G_FILE_TEST_EXISTS))
 			return_type (NM_LINK_TYPE_OLPC_MESH, "olpc-mesh");
 
+		devtype = read_devtype (sysfs_path);
+		for (i = 0; i < G_N_ELEMENTS (linktypes); i++) {
+			if (g_strcmp0 (devtype, linktypes[i].devtype) == 0)
+				return_type (linktypes[i].nm_type, devtype);
+		}
+
 		/* Fallback for drivers that don't call SET_NETDEV_DEVTYPE() */
 		if (wifi_utils_is_wifi (ifname, sysfs_path))
 			return_type (NM_LINK_TYPE_WIFI, "wifi");
@@ -999,11 +1032,11 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 		 * prevent future virtual network drivers from being treated as Ethernet
 		 * when they should be Generic instead.
 		 */
-		if (arptype == ARPHRD_ETHER && !type)
+		if (arptype == ARPHRD_ETHER && !rtnl_type && !devtype)
 			return_type (NM_LINK_TYPE_ETHERNET, "ethernet");
 	}
 
-	return_type (NM_LINK_TYPE_UNKNOWN, type ? type : "unknown");
+	return_type (NM_LINK_TYPE_UNKNOWN, rtnl_type ? rtnl_type : "unknown");
 }
 
 static gboolean
