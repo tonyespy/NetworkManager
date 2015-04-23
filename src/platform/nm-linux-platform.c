@@ -67,6 +67,9 @@
 /* This is only included for the translation of VLAN flags */
 #include "nm-setting-vlan.h"
 
+/* forward-declare if_indextoname, we cannot include <net/if.h> */
+char *if_indextoname (unsigned int ifindex, char *ifname);
+
 /*********************************************************************************************/
 
 #define _LOG_DOMAIN LOGD_PLATFORM
@@ -3066,7 +3069,7 @@ veth_get_properties (NMPlatform *platform, int ifindex, NMPlatformVethProperties
 static gboolean
 tun_get_properties (NMPlatform *platform, int ifindex, NMPlatformTunProperties *props)
 {
-	const char *ifname;
+	char ifname[IFNAMSIZ];
 	char *path, *val;
 	gboolean success = TRUE;
 
@@ -3076,10 +3079,12 @@ tun_get_properties (NMPlatform *platform, int ifindex, NMPlatformTunProperties *
 	props->owner = -1;
 	props->group = -1;
 
-	ifname = nm_platform_link_get_name (platform, ifindex);
-	if (!ifname || !nm_utils_iface_valid_name (ifname))
+	/* Don't ask the platform cache to resolve the ifindex, because tun_get_properties()
+	 * is used during link_extract_type(), before we put the object into the
+	 * platform cache. */
+	if (!if_indextoname (ifindex, ifname))
 		return FALSE;
-	ifname = ASSERT_VALID_PATH_COMPONENT (ifname);
+	ASSERT_VALID_PATH_COMPONENT (ifname);
 
 	path = g_strdup_printf ("/sys/class/net/%s/owner", ifname);
 	val = nm_platform_sysctl_get (platform, path);
