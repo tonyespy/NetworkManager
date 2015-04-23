@@ -10,7 +10,7 @@ This is a new stable release of NetworkManager.  Notable changes include:
 * New config items added to the 'ifcfg-rh' plugin:
   - IPV4_ROUTE_METRIC and IPV6_ROUTE_METRIC
   - DEVTIMEOUT
-  - IPADDR and PREFIX are now supported for specifying address ranges for
+  - IPADDR and PREFIX are now supported for specifying address ranges of
       shared IPv4 connections
 * The dispatcher scripts now get CONNECTION_FILENAME variable with a path
     to the configuration file for the connection
