@@ -851,40 +851,48 @@ check_support_user_ipv6ll (NMPlatform *platform)
 typedef struct {
 	const NMLinkType nm_type;
 	const char *type_string;
+
 	/* IFLA_INFO_KIND / rtnl_link_get_type() where applicable; the rtnl type
 	 * should only be specificed if it is a direct mapping.  eg, tun/tap
 	 * should not be specified since both tun and tap devices use "tun".
+	 * Drivers set this value from their 'struct rtnl_link_ops' structure.
 	 */
 	const char *rtnl_type;
+
+	/* uevent DEVTYPE where applicable, from /sys/class/net/<ifname>/uevent;
+	 * drivers set this value from their SET_NETDEV_DEV() call and the
+	 * 'struct device_type' name member.
+	 */
+	const char *devtype;
 } LinkDesc;
 
-static const LinkDesc linktypes[] = {
-	{ NM_LINK_TYPE_ETHERNET,      "ethernet",    NULL },
-	{ NM_LINK_TYPE_INFINIBAND,    "infiniband",  NULL },
-	{ NM_LINK_TYPE_OLPC_MESH,     "olpc-mesh",   NULL },
-	{ NM_LINK_TYPE_WIFI,          "wifi",        "wlan" },
-	{ NM_LINK_TYPE_WWAN_ETHERNET, "wwan",        "wwan" },
-	{ NM_LINK_TYPE_WIMAX,         "wimax",       "wimax" },
-	{ NM_LINK_TYPE_LOOPBACK,      "loopback",    NULL },
-	{ NM_LINK_TYPE_OPENVSWITCH,   "openvswitch", "openvswitch" },
-	{ NM_LINK_TYPE_TAP,           "tap",         NULL },
-	{ NM_LINK_TYPE_TUN,           "tun",         NULL },
-	{ NM_LINK_TYPE_DUMMY,         "dummy",       "dummy" },
-	{ NM_LINK_TYPE_GRE,           "gre",         "gre" },
-	{ NM_LINK_TYPE_GRETAP,        "gretap",      "gretap" },
-	{ NM_LINK_TYPE_IFB,           "ifb",         "ifb" },
-	{ NM_LINK_TYPE_MACVLAN,       "macvlan",     "macvlan" },
-	{ NM_LINK_TYPE_MACVTAP,       "macvtap",     "macvtap" },
-	{ NM_LINK_TYPE_VETH,          "veth",        "veth" },
-	{ NM_LINK_TYPE_VLAN,          "vlan",        "vlan" },
-	{ NM_LINK_TYPE_VXLAN,         "vxlan",       "vxlan" },
-	{ NM_LINK_TYPE_BRIDGE,        "bridge",      "bridge" },
-	{ NM_LINK_TYPE_BOND,          "bond",        "bond" },
-	{ NM_LINK_TYPE_TEAM,          "team",        "team" }
+static const LinkDesc const linktypes[] = {
+	{ NM_LINK_TYPE_ETHERNET,      "ethernet",    NULL,          NULL },
+	{ NM_LINK_TYPE_INFINIBAND,    "infiniband",  "ipoib",       NULL },
+	{ NM_LINK_TYPE_OLPC_MESH,     "olpc-mesh",   NULL,          NULL },
+	{ NM_LINK_TYPE_WIFI,          "wifi",        NULL,          "wlan" },
+	{ NM_LINK_TYPE_WWAN_ETHERNET, "wwan",        NULL,          "wwan" },
+	{ NM_LINK_TYPE_WIMAX,         "wimax",       "wimax",       "wimax" },
+	{ NM_LINK_TYPE_LOOPBACK,      "loopback",    NULL,          NULL },
+	{ NM_LINK_TYPE_OPENVSWITCH,   "openvswitch", "openvswitch", NULL },
+	{ NM_LINK_TYPE_TAP,           "tap",         NULL,          NULL },
+	{ NM_LINK_TYPE_TUN,           "tun",         NULL,          NULL },
+	{ NM_LINK_TYPE_DUMMY,         "dummy",       "dummy",       NULL },
+	{ NM_LINK_TYPE_GRE,           "gre",         "gre",         NULL },
+	{ NM_LINK_TYPE_GRETAP,        "gretap",      "gretap",      NULL },
+	{ NM_LINK_TYPE_IFB,           "ifb",         "ifb",         NULL },
+	{ NM_LINK_TYPE_MACVLAN,       "macvlan",     "macvlan",     NULL },
+	{ NM_LINK_TYPE_MACVTAP,       "macvtap",     "macvtap",     NULL },
+	{ NM_LINK_TYPE_VETH,          "veth",        "veth",        NULL },
+	{ NM_LINK_TYPE_VLAN,          "vlan",        "vlan",        "vlan" },
+	{ NM_LINK_TYPE_VXLAN,         "vxlan",       "vxlan",       "vxlan" },
+	{ NM_LINK_TYPE_BRIDGE,        "bridge",      "bridge",      "bridge" },
+	{ NM_LINK_TYPE_BOND,          "bond",        "bond",        "bond" },
+	{ NM_LINK_TYPE_TEAM,          "team",        "team",        NULL }
 };
 
 static const char *
-type_to_rtnl_type_string (NMLinkType type)
+nm_type_to_rtnl_type_string (NMLinkType type)
 {
 	int i;
 
@@ -896,7 +904,7 @@ type_to_rtnl_type_string (NMLinkType type)
 }
 
 static const char *
-type_to_string (NMLinkType type)
+nm_type_to_string (NMLinkType type)
 {
 	int i;
 
@@ -2319,7 +2327,7 @@ build_rtnl_link (int ifindex, const char *name, NMLinkType type)
 
 	rtnllink = _nm_rtnl_link_alloc (ifindex, name);
 	if (type) {
-		nle = rtnl_link_set_type (rtnllink, type_to_rtnl_type_string (type));
+		nle = rtnl_link_set_type (rtnllink, nm_type_to_rtnl_type_string (type));
 		g_assert (!nle);
 	}
 	return (struct nl_object *) rtnllink;
@@ -2343,7 +2351,7 @@ link_add (NMPlatform *platform, const char *name, NMLinkType type, const void *a
 	}
 
 	debug ("link: add link '%s' of type '%s' (%d)",
-	       name, type_to_string (type), (int) type);
+	       name, nm_type_to_string (type), (int) type);
 
 	l = build_rtnl_link (0, name, type);
 
