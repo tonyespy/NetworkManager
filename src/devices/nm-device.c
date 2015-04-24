@@ -1065,20 +1065,17 @@ nm_device_finish_init (NMDevice *self)
 	if (priv->master)
 		nm_device_enslave_slave (priv->master, self, NULL);
 
-	/* Clear the PLATFORM_INIT unmanaged flag if the platform has already
-	 * initialized the device, or if the device was created by NM itself.
-	 * An internally-created device must be available for activation
-	 * immediately, and we don't need to wait for platform init for reading
-	 * unmanaged state because the user explicitly asked us to create the device.
-	 */
-	if (priv->ifindex > 0 && (priv->platform_link_initialized || (priv->is_nm_owned && priv->is_software))) {
-		nm_device_set_initial_unmanaged_flag (self, NM_UNMANAGED_PLATFORM_INIT, FALSE);
-
-		if (nm_platform_link_get_unmanaged (NM_PLATFORM_GET, priv->ifindex, &platform_unmanaged)) {
-			nm_device_set_unmanaged (self,
-			                         NM_UNMANAGED_DEFAULT,
-			                         platform_unmanaged,
-			                         NM_DEVICE_STATE_REASON_USER_REQUESTED);
+	if (priv->ifindex > 0) {
+		if (priv->platform_link_initialized || (priv->is_nm_owned && priv->is_software)) {
+			nm_platform_link_get_unmanaged (NM_PLATFORM_GET, priv->ifindex, &platform_unmanaged);
+			nm_device_set_initial_unmanaged_flag (self, NM_UNMANAGED_DEFAULT, platform_unmanaged);
+		} else {
+			/* Hardware and externally-created software links stay unmanaged
+			 * until they are fully initialized by the platform. NM created
+			 * links must be available for activation immediately and thus
+			 * do not get the PLATFORM_INIT unmanaged flag set.
+			 */
+			nm_device_set_initial_unmanaged_flag (self, NM_UNMANAGED_PLATFORM_INIT, TRUE);
 		}
 	}
 
