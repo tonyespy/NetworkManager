@@ -1283,7 +1283,7 @@ device_link_changed (NMDevice *self, NMPlatformLink *info)
 		g_object_notify (G_OBJECT (self), NM_DEVICE_UDI);
 	}
 
-	if (info->driver && g_strcmp0 (info->driver, priv->driver)) {
+	if (g_strcmp0 (info->driver, priv->driver)) {
 		/* Update driver to what udev gives us */
 		g_free (priv->driver);
 		priv->driver = g_strdup (info->driver);
