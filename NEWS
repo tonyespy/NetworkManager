@@ -36,7 +36,13 @@ This is a new stable release of NetworkManager.  Notable changes include:
     server for a dynamic DNS update
 * Connection UUIDs are now checked for uniqueness when connection
     configurations are read
-* Many other bugs were fixed
+* Connectivity state is now more stable and accurate, and checks are run with
+    HTTP keepalive disabled for reduced server resource usage
+* A bug where IPv6 link-local addresses were not flushed correctly has been
+    fixed, which could cause connections to be assumed immediately on disconnect
+* WWAN connections are now properly available after PIN entry
+* Compatibility with external OpenVPN processes routing is improved
+* Many other bugs and crashes were fixed
 * Updates to Telugu, Turkish, Polish, German, Gujarati, Italian and Russian
     translations
 
