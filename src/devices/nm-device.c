@@ -2309,21 +2309,21 @@ recheck_available (gpointer user_data)
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 	gboolean now_available = nm_device_is_available (self, NM_DEVICE_CHECK_DEV_AVAILABLE_NONE);
 	NMDeviceState state = nm_device_get_state (self);
+	NMDeviceState new_state = NM_DEVICE_STATE_UNKNOWN;
 
 	priv->recheck_available.call_id = 0;
 
-	_LOGD (LOGD_DEVICE, "rechecking availability");
 	if (state == NM_DEVICE_STATE_UNAVAILABLE && now_available) {
-		_LOGD (LOGD_DEVICE, "device is available, will transition to DISCONNECTED");
-		nm_device_queue_state (self,
-		                       NM_DEVICE_STATE_DISCONNECTED,
-		                       priv->recheck_available.available_reason);
+		new_state = NM_DEVICE_STATE_DISCONNECTED;
+		nm_device_queue_state (self, new_state, priv->recheck_available.available_reason);
 	} else if (state >= NM_DEVICE_STATE_DISCONNECTED && !now_available) {
-		_LOGD (LOGD_DEVICE, "device no longer available, will transition to UNAVAILABLE");
-		nm_device_queue_state (self,
-		                       NM_DEVICE_STATE_UNAVAILABLE,
-		                       priv->recheck_available.unavailable_reason);
+		new_state = NM_DEVICE_STATE_UNAVAILABLE;
+		nm_device_queue_state (self, new_state, priv->recheck_available.unavailable_reason);
 	}
+	_LOGD (LOGD_DEVICE, "device is %savailable, %s %s",
+	       now_available ? "" : "not ",
+	       new_state == NM_DEVICE_STATE_UNAVAILABLE ? "no change required for" : "will transition to",
+	       state_to_string (new_state == NM_DEVICE_STATE_UNAVAILABLE ? state : new_state));
 
 	priv->recheck_available.available_reason = NM_DEVICE_STATE_REASON_NONE;
 	priv->recheck_available.unavailable_reason = NM_DEVICE_STATE_REASON_NONE;
@@ -2337,11 +2337,10 @@ nm_device_queue_recheck_available (NMDevice *self,
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 
-	if (!priv->recheck_available.call_id) {
-		priv->recheck_available.available_reason = available_reason;
-		priv->recheck_available.unavailable_reason = unavailable_reason;
+	priv->recheck_available.available_reason = available_reason;
+	priv->recheck_available.unavailable_reason = unavailable_reason;
+	if (!priv->recheck_available.call_id)
 		priv->recheck_available.call_id = g_idle_add (recheck_available, self);
-	}
 }
 
 void
