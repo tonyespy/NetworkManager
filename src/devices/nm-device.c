@@ -225,7 +225,7 @@ typedef struct {
 		guint       		call_id;
 		NMDeviceStateReason available_reason;
 		NMDeviceStateReason unavailable_reason;
-	}				recheck_available;
+	}               recheck_available;
 	struct {
 		guint               call_id;
 		NMDeviceState       post_state;
