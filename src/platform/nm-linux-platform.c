@@ -892,7 +892,7 @@ static const LinkDesc linktypes[] = {
 };
 
 static const char *
-nm_type_to_rtnl_type_string (NMLinkType type)
+nm_link_type_to_rtnl_type_string (NMLinkType type)
 {
 	int i;
 
@@ -904,7 +904,7 @@ nm_type_to_rtnl_type_string (NMLinkType type)
 }
 
 static const char *
-nm_type_to_string (NMLinkType type)
+nm_link_type_to_string (NMLinkType type)
 {
 	int i;
 
@@ -2326,7 +2326,7 @@ build_rtnl_link (int ifindex, const char *name, NMLinkType type)
 
 	rtnllink = _nm_rtnl_link_alloc (ifindex, name);
 	if (type) {
-		nle = rtnl_link_set_type (rtnllink, nm_type_to_rtnl_type_string (type));
+		nle = rtnl_link_set_type (rtnllink, nm_link_type_to_rtnl_type_string (type));
 		g_assert (!nle);
 	}
 	return (struct nl_object *) rtnllink;
@@ -2350,7 +2350,7 @@ link_add (NMPlatform *platform, const char *name, NMLinkType type, const void *a
 	}
 
 	debug ("link: add link '%s' of type '%s' (%d)",
-	       name, nm_type_to_string (type), (int) type);
+	       name, nm_link_type_to_string (type), (int) type);
 
 	l = build_rtnl_link (0, name, type);
 
