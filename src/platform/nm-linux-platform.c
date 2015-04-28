@@ -1036,7 +1036,7 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 			return_type (NM_LINK_TYPE_ETHERNET, "ethernet");
 	}
 
-	return_type (NM_LINK_TYPE_UNKNOWN, rtnl_type ? rtnl_type : "unknown");
+	return_type (NM_LINK_TYPE_UNKNOWN, "unknown");
 }
 
 static gboolean
