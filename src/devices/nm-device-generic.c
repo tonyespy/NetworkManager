@@ -117,7 +117,7 @@ constructed (GObject *object)
 		int ifindex = nm_device_get_ip_ifindex (NM_DEVICE (self));
 
 		if (ifindex != 0)
-			priv->type_description = g_strdup (nm_platform_link_get_type_name (NM_PLATFORM_GET, ifindex));
+			priv->type_description = g_strdup (nm_link_type_to_string (nm_platform_link_get_type (NM_PLATFORM_GET, ifindex)));
 	}
 
 	G_OBJECT_CLASS (nm_device_generic_parent_class)->constructed (object);

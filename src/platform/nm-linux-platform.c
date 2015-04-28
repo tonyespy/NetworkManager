@@ -2447,16 +2447,6 @@ link_get_type (NMPlatform *platform, int ifindex)
 	return link_extract_type (platform, rtnllink, NULL);
 }
 
-static const char *
-link_get_type_name (NMPlatform *platform, int ifindex)
-{
-	auto_nl_object struct rtnl_link *rtnllink = link_get (platform, ifindex);
-	const char *type;
-
-	link_extract_type (platform, rtnllink, &type);
-	return type;
-}
-
 static gboolean
 link_get_unmanaged (NMPlatform *platform, int ifindex, gboolean *managed)
 {
@@ -4661,7 +4651,6 @@ nm_linux_platform_class_init (NMLinuxPlatformClass *klass)
 	platform_class->link_get_ifindex = link_get_ifindex;
 	platform_class->link_get_name = link_get_name;
 	platform_class->link_get_type = link_get_type;
-	platform_class->link_get_type_name = link_get_type_name;
 	platform_class->link_get_unmanaged = link_get_unmanaged;
 
 	platform_class->link_refresh = link_refresh;

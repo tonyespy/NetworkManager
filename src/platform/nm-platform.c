@@ -682,26 +682,6 @@ nm_platform_link_get_type (NMPlatform *self, int ifindex)
 }
 
 /**
- * nm_platform_link_get_type_name:
- * @self: platform instance
- * @ifindex: Interface index.
- *
- * Returns: A string describing the type of link. In some cases this
- * may be more specific than nm_platform_link_get_type(), but in
- * other cases it may not. On error, %NULL is returned.
- */
-const char *
-nm_platform_link_get_type_name (NMPlatform *self, int ifindex)
-{
-	_CHECK_SELF (self, klass, NULL);
-	reset_error (self);
-
-	g_return_val_if_fail (klass->link_get_type_name, NULL);
-
-	return klass->link_get_type_name (self, ifindex);
-}
-
-/**
  * nm_platform_link_get_unmanaged:
  * @self: platform instance
  * @ifindex: Interface index.

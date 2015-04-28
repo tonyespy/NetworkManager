@@ -370,7 +370,6 @@ typedef struct {
 	int (*link_get_ifindex) (NMPlatform *, const char *name);
 	const char *(*link_get_name) (NMPlatform *, int ifindex);
 	NMLinkType (*link_get_type) (NMPlatform *, int ifindex);
-	const char *(*link_get_type_name) (NMPlatform *, int ifindex);
 	gboolean (*link_get_unmanaged) (NMPlatform *, int ifindex, gboolean *managed);
 
 	gboolean (*link_refresh) (NMPlatform *, int ifindex);
@@ -523,7 +522,6 @@ gboolean nm_platform_link_delete (NMPlatform *self, int ifindex);
 int nm_platform_link_get_ifindex (NMPlatform *self, const char *name);
 const char *nm_platform_link_get_name (NMPlatform *self, int ifindex);
 NMLinkType nm_platform_link_get_type (NMPlatform *self, int ifindex);
-const char *nm_platform_link_get_type_name (NMPlatform *self, int ifindex);
 gboolean nm_platform_link_get_unmanaged (NMPlatform *self, int ifindex, gboolean *managed);
 gboolean nm_platform_link_is_software (NMPlatform *self, int ifindex);
 gboolean nm_platform_link_supports_slaves (NMPlatform *self, int ifindex);

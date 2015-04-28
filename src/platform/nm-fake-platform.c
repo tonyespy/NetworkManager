@@ -285,12 +285,6 @@ link_get_type (NMPlatform *platform, int ifindex)
 	return device ? device->link.type : NM_LINK_TYPE_NONE;
 }
 
-static const char *
-link_get_type_name (NMPlatform *platform, int ifindex)
-{
-	return nm_link_type_to_string (link_get_type (platform, ifindex));
-}
-
 static gboolean
 link_get_unmanaged (NMPlatform *platform, int ifindex, gboolean *managed)
 {
@@ -1392,7 +1386,6 @@ nm_fake_platform_class_init (NMFakePlatformClass *klass)
 	platform_class->link_get_ifindex = link_get_ifindex;
 	platform_class->link_get_name = link_get_name;
 	platform_class->link_get_type = link_get_type;
-	platform_class->link_get_type_name = link_get_type_name;
 	platform_class->link_get_unmanaged = link_get_unmanaged;
 
 	platform_class->link_set_up = link_set_up;
