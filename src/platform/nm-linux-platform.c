@@ -114,15 +114,6 @@ char *if_indextoname (unsigned int ifindex, char *ifname);
 #define warning(...)    _LOG (LOGL_WARN , _LOG_DOMAIN, NULL, __VA_ARGS__)
 #define error(...)      _LOG (LOGL_ERR  , _LOG_DOMAIN, NULL, __VA_ARGS__)
 
-/******************************************************************/
-
-#define return_type(t, name) \
-	G_STMT_START { \
-		if (out_name) \
-			*out_name = name; \
-		return t; \
-	} G_STMT_END
-
 /******************************************************************
  * libnl unility functions and wrappers
  ******************************************************************/
@@ -949,19 +940,19 @@ read_devtype (const char *sysfs_path)
 }
 
 static NMLinkType
-link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char **out_name)
+link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink)
 {
 	const char *rtnl_type, *ifname;
 	int i, arptype;
 
 	if (!rtnllink)
-		return_type (NM_LINK_TYPE_NONE, NULL);
+		return NM_LINK_TYPE_NONE;
 
 	rtnl_type = rtnl_link_get_type (rtnllink);
 	if (rtnl_type) {
 		for (i = 0; i < G_N_ELEMENTS (linktypes); i++) {
 			if (g_strcmp0 (rtnl_type, linktypes[i].rtnl_type) == 0)
-				return_type (linktypes[i].nm_type, linktypes[i].rtnl_type);
+				return linktypes[i].nm_type;
 		}
 
 		if (!strcmp (rtnl_type, "tun")) {
@@ -970,9 +961,9 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 
 			if (nm_platform_tun_get_properties (platform, rtnl_link_get_ifindex (rtnllink), &props)) {
 				if (!g_strcmp0 (props.mode, "tap"))
-					return_type (NM_LINK_TYPE_TAP, "tap");
+					return NM_LINK_TYPE_TAP;
 				if (!g_strcmp0 (props.mode, "tun"))
-					return_type (NM_LINK_TYPE_TUN, "tun");
+					return NM_LINK_TYPE_TUN;
 			}
 			flags = rtnl_link_get_flags (rtnllink);
 
@@ -981,16 +972,16 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 
 			/* try guessing the type using the link flags instead... */
 			if (flags & IFF_POINTOPOINT)
-				return_type (NM_LINK_TYPE_TUN, "tun");
-			return_type (NM_LINK_TYPE_TAP, "tap");
+				return NM_LINK_TYPE_TUN;
+			return NM_LINK_TYPE_TAP;
 		}
 	}
 
 	arptype = rtnl_link_get_arptype (rtnllink);
 	if (arptype == ARPHRD_LOOPBACK)
-		return_type (NM_LINK_TYPE_LOOPBACK, "loopback");
+		return NM_LINK_TYPE_LOOPBACK;
 	else if (arptype == ARPHRD_INFINIBAND)
-		return_type (NM_LINK_TYPE_INFINIBAND, "infiniband");
+		return NM_LINK_TYPE_INFINIBAND;
 
 
 	ifname = rtnl_link_get_name (rtnllink);
@@ -1005,27 +996,27 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 			 * something other than interface name to detect CTC here.
 			 */
 			if (g_str_has_prefix (ifname, "ctc"))
-				return_type (NM_LINK_TYPE_ETHERNET, "ethernet");
+				return NM_LINK_TYPE_ETHERNET;
 		}
 
 		/* Fallback OVS detection for kernel <= 3.16 */
 		if (!g_strcmp0 (ethtool_get_driver (ifname), "openvswitch"))
-			return_type (NM_LINK_TYPE_OPENVSWITCH, "openvswitch");
+			return NM_LINK_TYPE_OPENVSWITCH;
 
 		sysfs_path = g_strdup_printf ("/sys/class/net/%s", ifname);
 		anycast_mask = g_strdup_printf ("%s/anycast_mask", sysfs_path);
 		if (g_file_test (anycast_mask, G_FILE_TEST_EXISTS))
-			return_type (NM_LINK_TYPE_OLPC_MESH, "olpc-mesh");
+			return NM_LINK_TYPE_OLPC_MESH;
 
 		devtype = read_devtype (sysfs_path);
 		for (i = 0; devtype && i < G_N_ELEMENTS (linktypes); i++) {
 			if (g_strcmp0 (devtype, linktypes[i].devtype) == 0)
-				return_type (linktypes[i].nm_type, linktypes[i].devtype);
+				return linktypes[i].nm_type;
 		}
 
 		/* Fallback for drivers that don't call SET_NETDEV_DEVTYPE() */
 		if (wifi_utils_is_wifi (ifname, sysfs_path))
-			return_type (NM_LINK_TYPE_WIFI, "wifi");
+			return NM_LINK_TYPE_WIFI;
 
 		/* Standard wired ethernet interfaces don't report an rtnl_link_type, so
 		 * only allow fallback to Ethernet if no type is given.  This should
@@ -1033,10 +1024,10 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 		 * when they should be Generic instead.
 		 */
 		if (arptype == ARPHRD_ETHER && !rtnl_type && !devtype)
-			return_type (NM_LINK_TYPE_ETHERNET, "ethernet");
+			return NM_LINK_TYPE_ETHERNET;
 	}
 
-	return_type (NM_LINK_TYPE_UNKNOWN, "unknown");
+	return NM_LINK_TYPE_UNKNOWN;
 }
 
 static gboolean
@@ -1056,7 +1047,7 @@ init_link (NMPlatform *platform, NMPlatformLink *info, struct rtnl_link *rtnllin
 		g_strlcpy (info->name, name, sizeof (info->name));
 	else
 		info->name[0] = '\0';
-	info->type = link_extract_type (platform, rtnllink, NULL);
+	info->type = link_extract_type (platform, rtnllink);
 	info->up = !!(rtnl_link_get_flags (rtnllink) & IFF_UP);
 	info->connected = !!(rtnl_link_get_flags (rtnllink) & IFF_LOWER_UP);
 	info->arp = !(rtnl_link_get_flags (rtnllink) & IFF_NOARP);
@@ -2444,7 +2435,7 @@ link_get_type (NMPlatform *platform, int ifindex)
 {
 	auto_nl_object struct rtnl_link *rtnllink = link_get (platform, ifindex);
 
-	return link_extract_type (platform, rtnllink, NULL);
+	return link_extract_type (platform, rtnllink);
 }
 
 static gboolean
