@@ -1056,7 +1056,7 @@ init_link (NMPlatform *platform, NMPlatformLink *info, struct rtnl_link *rtnllin
 		g_strlcpy (info->name, name, sizeof (info->name));
 	else
 		info->name[0] = '\0';
-	info->type = link_extract_type (platform, rtnllink, &info->type_name);
+	info->type = link_extract_type (platform, rtnllink, NULL);
 	info->up = !!(rtnl_link_get_flags (rtnllink) & IFF_UP);
 	info->connected = !!(rtnl_link_get_flags (rtnllink) & IFF_LOWER_UP);
 	info->arp = !(rtnl_link_get_flags (rtnllink) & IFF_NOARP);

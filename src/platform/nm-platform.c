@@ -2312,7 +2312,7 @@ nm_platform_link_to_string (const NMPlatformLink *link)
 {
 	char master[20];
 	char parent[20];
-	char *driver, *udi, *type;
+	char *driver, *udi;
 	GString *str;
 
 	if (!link)
@@ -2340,16 +2340,14 @@ nm_platform_link_to_string (const NMPlatformLink *link)
 
 	driver = link->driver ? g_strdup_printf (" driver '%s'", link->driver) : NULL;
 	udi = link->udi ? g_strdup_printf (" udi '%s'", link->udi) : NULL;
-	type = link->type_name ? NULL : g_strdup_printf ("(%d)", link->type);
 
 	g_snprintf (to_string_buffer, sizeof (to_string_buffer), "%d: %s%s <%s> mtu %d%s %s%s%s",
 	            link->ifindex, link->name, parent, str->str,
-	            link->mtu, master, link->type_name ? link->type_name : type,
+	            link->mtu, master, nm_link_type_to_string (link->type),
 	            driver ? driver : "", udi ? udi : "");
 	g_string_free (str, TRUE);
 	g_free (driver);
 	g_free (udi);
-	g_free (type);
 	return to_string_buffer;
 }
 
@@ -2614,7 +2612,6 @@ nm_platform_link_cmp (const NMPlatformLink *a, const NMPlatformLink *b)
 	_CMP_FIELD (a, b, connected);
 	_CMP_FIELD (a, b, arp);
 	_CMP_FIELD (a, b, mtu);
-	_CMP_FIELD_STR0 (a, b, type_name);
 	_CMP_FIELD_STR0 (a, b, udi);
 	_CMP_FIELD_STR0 (a, b, driver);
 	return 0;

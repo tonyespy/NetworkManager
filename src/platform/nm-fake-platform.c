@@ -113,7 +113,6 @@ link_init (NMFakePlatformLink *device, int ifindex, int type, const char *name)
 
 	device->link.ifindex = name ? ifindex : 0;
 	device->link.type = type;
-	device->link.type_name = type_to_type_name (type);
 	device->link.driver = type_to_type_name (type);
 	device->link.udi = device->udi = g_strdup_printf ("fake:%d", ifindex);
 	device->link.initialized = TRUE;
@@ -289,7 +288,7 @@ link_get_type (NMPlatform *platform, int ifindex)
 static const char *
 link_get_type_name (NMPlatform *platform, int ifindex)
 {
-	return type_to_type_name (link_get_type (platform, ifindex));
+	return nm_link_type_to_string (link_get_type (platform, ifindex));
 }
 
 static gboolean
