@@ -867,6 +867,8 @@ typedef struct {
 } LinkDesc;
 
 static const LinkDesc linktypes[] = {
+	{ NM_LINK_TYPE_NONE,          "none",        NULL,          NULL },
+	{ NM_LINK_TYPE_UNKNOWN,       "unknown",     NULL,          NULL },
 	{ NM_LINK_TYPE_ETHERNET,      "ethernet",    NULL,          NULL },
 	{ NM_LINK_TYPE_INFINIBAND,    "infiniband",  "ipoib",       NULL },
 	{ NM_LINK_TYPE_OLPC_MESH,     "olpc-mesh",   NULL,          NULL },
