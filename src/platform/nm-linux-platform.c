@@ -961,7 +961,7 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 	if (rtnl_type) {
 		for (i = 0; i < G_N_ELEMENTS (linktypes); i++) {
 			if (g_strcmp0 (rtnl_type, linktypes[i].rtnl_type) == 0)
-				return_type (linktypes[i].nm_type, linktypes[i].rtnl_type);
+				return_type (linktypes[i].nm_type, linktypes[i].type_string);
 		}
 
 		if (!strcmp (rtnl_type, "tun")) {
