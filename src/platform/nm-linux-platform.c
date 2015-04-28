@@ -869,28 +869,31 @@ typedef struct {
 static const LinkDesc linktypes[] = {
 	{ NM_LINK_TYPE_NONE,          "none",        NULL,          NULL },
 	{ NM_LINK_TYPE_UNKNOWN,       "unknown",     NULL,          NULL },
+
 	{ NM_LINK_TYPE_ETHERNET,      "ethernet",    NULL,          NULL },
 	{ NM_LINK_TYPE_INFINIBAND,    "infiniband",  "ipoib",       NULL },
 	{ NM_LINK_TYPE_OLPC_MESH,     "olpc-mesh",   NULL,          NULL },
 	{ NM_LINK_TYPE_WIFI,          "wifi",        NULL,          "wlan" },
 	{ NM_LINK_TYPE_WWAN_ETHERNET, "wwan",        NULL,          "wwan" },
 	{ NM_LINK_TYPE_WIMAX,         "wimax",       "wimax",       "wimax" },
-	{ NM_LINK_TYPE_LOOPBACK,      "loopback",    NULL,          NULL },
-	{ NM_LINK_TYPE_OPENVSWITCH,   "openvswitch", "openvswitch", NULL },
-	{ NM_LINK_TYPE_TAP,           "tap",         NULL,          NULL },
-	{ NM_LINK_TYPE_TUN,           "tun",         NULL,          NULL },
+
 	{ NM_LINK_TYPE_DUMMY,         "dummy",       "dummy",       NULL },
 	{ NM_LINK_TYPE_GRE,           "gre",         "gre",         NULL },
 	{ NM_LINK_TYPE_GRETAP,        "gretap",      "gretap",      NULL },
 	{ NM_LINK_TYPE_IFB,           "ifb",         "ifb",         NULL },
+	{ NM_LINK_TYPE_LOOPBACK,      "loopback",    NULL,          NULL },
 	{ NM_LINK_TYPE_MACVLAN,       "macvlan",     "macvlan",     NULL },
 	{ NM_LINK_TYPE_MACVTAP,       "macvtap",     "macvtap",     NULL },
+	{ NM_LINK_TYPE_OPENVSWITCH,   "openvswitch", "openvswitch", NULL },
+	{ NM_LINK_TYPE_TAP,           "tap",         NULL,          NULL },
+	{ NM_LINK_TYPE_TUN,           "tun",         NULL,          NULL },
 	{ NM_LINK_TYPE_VETH,          "veth",        "veth",        NULL },
 	{ NM_LINK_TYPE_VLAN,          "vlan",        "vlan",        "vlan" },
 	{ NM_LINK_TYPE_VXLAN,         "vxlan",       "vxlan",       "vxlan" },
+
 	{ NM_LINK_TYPE_BRIDGE,        "bridge",      "bridge",      "bridge" },
 	{ NM_LINK_TYPE_BOND,          "bond",        "bond",        "bond" },
-	{ NM_LINK_TYPE_TEAM,          "team",        "team",        NULL }
+	{ NM_LINK_TYPE_TEAM,          "team",        "team",        NULL },
 };
 
 static const char *
