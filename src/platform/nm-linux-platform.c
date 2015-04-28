@@ -1020,7 +1020,7 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 		devtype = read_devtype (sysfs_path);
 		for (i = 0; devtype && i < G_N_ELEMENTS (linktypes); i++) {
 			if (g_strcmp0 (devtype, linktypes[i].devtype) == 0)
-				return_type (linktypes[i].nm_type, linktypes[i].devtype);
+				return_type (linktypes[i].nm_type, linktypes[i].type_string);
 		}
 
 		/* Fallback for drivers that don't call SET_NETDEV_DEVTYPE() */
