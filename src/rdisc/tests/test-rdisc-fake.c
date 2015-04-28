@@ -29,6 +29,8 @@
 
 #include "nm-fake-platform.h"
 
+#include "nm-test-utils.h"
+
 static NMFakeRDisc *
 rdisc_new (void)
 {
@@ -428,17 +430,12 @@ test_dns_solicit_loop (void)
 	g_main_loop_unref (data.loop);
 }
 
+NMTST_DEFINE ();
+
 int
 main (int argc, char **argv)
 {
-	g_test_init (&argc, &argv, NULL);
-
-#if !GLIB_CHECK_VERSION (2, 35, 0)
-	g_type_init ();
-#endif
-
-	nm_logging_setup ("debug", "ip6", NULL, NULL);
-	openlog (G_LOG_DOMAIN, LOG_CONS | LOG_PERROR, LOG_DAEMON);
+	nmtst_init_with_logging (&argc, &argv, NULL, "DEFAULT");
 
 	nm_fake_platform_setup ();
 
