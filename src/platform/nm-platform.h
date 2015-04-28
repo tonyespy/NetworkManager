@@ -493,6 +493,8 @@ void nm_platform_free (void);
 
 /******************************************************************/
 
+const char *nm_link_type_to_string (NMLinkType link_type);
+
 void nm_platform_set_error (NMPlatformError error);
 NMPlatformError nm_platform_get_error (void);
 const char *nm_platform_get_error_msg (void);
