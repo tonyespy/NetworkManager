@@ -961,7 +961,7 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 	if (rtnl_type) {
 		for (i = 0; i < G_N_ELEMENTS (linktypes); i++) {
 			if (g_strcmp0 (rtnl_type, linktypes[i].rtnl_type) == 0)
-				return_type (linktypes[i].nm_type, rtnl_type);
+				return_type (linktypes[i].nm_type, linktypes[i].rtnl_type);
 		}
 
 		if (!strcmp (rtnl_type, "tun")) {
@@ -1018,9 +1018,9 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 			return_type (NM_LINK_TYPE_OLPC_MESH, "olpc-mesh");
 
 		devtype = read_devtype (sysfs_path);
-		for (i = 0; i < G_N_ELEMENTS (linktypes); i++) {
+		for (i = 0; devtype && i < G_N_ELEMENTS (linktypes); i++) {
 			if (g_strcmp0 (devtype, linktypes[i].devtype) == 0)
-				return_type (linktypes[i].nm_type, devtype);
+				return_type (linktypes[i].nm_type, linktypes[i].devtype);
 		}
 
 		/* Fallback for drivers that don't call SET_NETDEV_DEVTYPE() */
