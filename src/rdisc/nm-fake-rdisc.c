@@ -96,7 +96,7 @@ find_ra (GSList *ras, guint id)
 
 guint
 nm_fake_rdisc_add_ra (NMFakeRDisc *self,
-                      guint seconds,
+                      guint seconds_after_previous,
                       NMRDiscDHCPLevel dhcp_level,
                       int hop_limit,
                       guint32 mtu)
@@ -107,7 +107,7 @@ nm_fake_rdisc_add_ra (NMFakeRDisc *self,
 
 	ra = g_malloc0 (sizeof (*ra));
 	ra->id = counter++;
-	ra->when = seconds;
+	ra->when = seconds_after_previous;
 	ra->dhcp_level = dhcp_level;
 	ra->hop_limit = hop_limit;
 	ra->mtu = mtu;

@@ -142,7 +142,7 @@ test_simple (void)
 	TestData data = { g_main_loop_new (NULL, FALSE), 0, 0, now };
 	guint id;
 
-	id = nm_fake_rdisc_add_ra (rdisc, 3, NM_RDISC_DHCP_LEVEL_OTHERCONF, 4, 1500);
+	id = nm_fake_rdisc_add_ra (rdisc, 1, NM_RDISC_DHCP_LEVEL_OTHERCONF, 4, 1500);
 	g_assert (id);
 	nm_fake_rdisc_add_gateway (rdisc, id, "fe80::1", now, 10, NM_RDISC_PREFERENCE_MEDIUM);
 	nm_fake_rdisc_add_address (rdisc, id, "2001:db8:a:a::1", now, 10, 10);
@@ -231,7 +231,7 @@ test_everything (void)
 	nm_fake_rdisc_add_dns_domain (rdisc, id, "foobar.com", now, 10);
 
 	/* expire everything from the first RA in the second */
-	id = nm_fake_rdisc_add_ra (rdisc, 2, NM_RDISC_DHCP_LEVEL_NONE, 4, 1500);
+	id = nm_fake_rdisc_add_ra (rdisc, 1, NM_RDISC_DHCP_LEVEL_NONE, 4, 1500);
 	g_assert (id);
 	nm_fake_rdisc_add_gateway (rdisc, id, "fe80::1", now, 0, NM_RDISC_PREFERENCE_MEDIUM);
 	nm_fake_rdisc_add_address (rdisc, id, "2001:db8:a:a::1", now, 0, 0);
@@ -321,13 +321,13 @@ test_preference (void)
 	nm_fake_rdisc_add_address (rdisc, id, "2001:db8:a:a::1", now, 10, 10);
 	nm_fake_rdisc_add_route (rdisc, id, "2001:db8:a:a::", 64, "fe80::1", now, 10, 5);
 
-	id = nm_fake_rdisc_add_ra (rdisc, 2, NM_RDISC_DHCP_LEVEL_NONE, 4, 1500);
+	id = nm_fake_rdisc_add_ra (rdisc, 1, NM_RDISC_DHCP_LEVEL_NONE, 4, 1500);
 	g_assert (id);
 	nm_fake_rdisc_add_gateway (rdisc, id, "fe80::2", ++now, 10, NM_RDISC_PREFERENCE_MEDIUM);
 	nm_fake_rdisc_add_address (rdisc, id, "2001:db8:a:a::2", now, 10, 10);
 	nm_fake_rdisc_add_route (rdisc, id, "2001:db8:a:b::", 64, "fe80::2", now, 10, 10);
 
-	id = nm_fake_rdisc_add_ra (rdisc, 3, NM_RDISC_DHCP_LEVEL_NONE, 4, 1500);
+	id = nm_fake_rdisc_add_ra (rdisc, 1, NM_RDISC_DHCP_LEVEL_NONE, 4, 1500);
 	g_assert (id);
 	nm_fake_rdisc_add_gateway (rdisc, id, "fe80::1", ++now, 10, NM_RDISC_PREFERENCE_HIGH);
 	nm_fake_rdisc_add_address (rdisc, id, "2001:db8:a:a::1", now, 10, 10);
