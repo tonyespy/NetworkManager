@@ -853,9 +853,12 @@ typedef struct {
 	const char *type_string;
 
 	/* IFLA_INFO_KIND / rtnl_link_get_type() where applicable; the rtnl type
-	 * should only be specificed if it is a direct mapping.  eg, tun/tap
-	 * should not be specified since both tun and tap devices use "tun".
-	 * Drivers set this value from their 'struct rtnl_link_ops' structure.
+	 * should only be specified if the device type can be created without
+	 * additional parameters, and if the device type can be determined from
+	 * the rtnl_type.  eg, tun/tap should not be specified since both
+	 * tun and tap devices use "tun", and InfiniBand should not be
+	 * specified because a PKey is required at creation. Drivers set this
+	 * value from their 'struct rtnl_link_ops' structure.
 	 */
 	const char *rtnl_type;
 
@@ -871,7 +874,7 @@ static const LinkDesc linktypes[] = {
 	{ NM_LINK_TYPE_UNKNOWN,       "unknown",     NULL,          NULL },
 
 	{ NM_LINK_TYPE_ETHERNET,      "ethernet",    NULL,          NULL },
-	{ NM_LINK_TYPE_INFINIBAND,    "infiniband",  "ipoib",       NULL },
+	{ NM_LINK_TYPE_INFINIBAND,    "infiniband",  NULL,          NULL },
 	{ NM_LINK_TYPE_OLPC_MESH,     "olpc-mesh",   NULL,          NULL },
 	{ NM_LINK_TYPE_WIFI,          "wifi",        NULL,          "wlan" },
 	{ NM_LINK_TYPE_WWAN_ETHERNET, "wwan",        NULL,          "wwan" },
