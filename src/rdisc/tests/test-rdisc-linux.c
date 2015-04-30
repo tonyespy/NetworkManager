@@ -43,6 +43,11 @@ main (int argc, char **argv)
 
 	nmtst_init_with_logging (&argc, &argv, NULL, "DEFAULT");
 
+	if (getuid () != 0) {
+		g_print ("Missing permission: must run as root\n");
+		return EXIT_FAILURE;
+	}
+
 	loop = g_main_loop_new (NULL, FALSE);
 
 	nm_linux_platform_setup ();
@@ -51,13 +56,15 @@ main (int argc, char **argv)
 		ifname = argv[1];
 		ifindex = nm_platform_link_get_ifindex (ifname);
 	} else {
-		ifindex = 1;
-		ifname = nm_platform_link_get_name (ifindex);
+		g_print ("Missing command line argument \"interface-name\"\n");
+		return EXIT_FAILURE;
 	}
 
 	rdisc = nm_lndp_rdisc_new (ifindex, ifname);
-	if (!rdisc)
+	if (!rdisc) {
+		g_print ("Failed to create NMRDisc instance\n");
 		return EXIT_FAILURE;
+	}
 
 	nm_rdisc_start (rdisc);
 	g_main_loop_run (loop);
