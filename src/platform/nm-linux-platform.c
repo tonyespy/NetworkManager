@@ -67,9 +67,6 @@
 /* This is only included for the translation of VLAN flags */
 #include "nm-setting-vlan.h"
 
-/* forward-declare if_indextoname, we cannot include <net/if.h> */
-char *if_indextoname (unsigned int ifindex, char *ifname);
-
 /*********************************************************************************************/
 
 #define _LOG_DOMAIN LOGD_PLATFORM
@@ -122,6 +119,8 @@ char *if_indextoname (unsigned int ifindex, char *ifname);
 			*out_name = name; \
 		return t; \
 	} G_STMT_END
+
+static gboolean tun_get_properties_ifname (NMPlatform *platform, const char *ifname, NMPlatformTunProperties *props);
 
 /******************************************************************
  * libnl unility functions and wrappers
@@ -971,7 +970,7 @@ link_extract_type (NMPlatform *platform, struct rtnl_link *rtnllink, const char 
 			NMPlatformTunProperties props;
 			guint flags;
 
-			if (nm_platform_tun_get_properties (platform, rtnl_link_get_ifindex (rtnllink), &props)) {
+			if (tun_get_properties_ifname (platform, rtnl_link_get_name (rtnllink), &props)) {
 				if (!g_strcmp0 (props.mode, "tap"))
 					return_type (NM_LINK_TYPE_TAP, "tap");
 				if (!g_strcmp0 (props.mode, "tun"))
@@ -3067,9 +3066,8 @@ veth_get_properties (NMPlatform *platform, int ifindex, NMPlatformVethProperties
 }
 
 static gboolean
-tun_get_properties (NMPlatform *platform, int ifindex, NMPlatformTunProperties *props)
+tun_get_properties_ifname (NMPlatform *platform, const char *ifname, NMPlatformTunProperties *props)
 {
-	char ifname[IFNAMSIZ];
 	char *path, *val;
 	gboolean success = TRUE;
 
@@ -3079,12 +3077,9 @@ tun_get_properties (NMPlatform *platform, int ifindex, NMPlatformTunProperties *
 	props->owner = -1;
 	props->group = -1;
 
-	/* Don't ask the platform cache to resolve the ifindex, because tun_get_properties()
-	 * is used during link_extract_type(), before we put the object into the
-	 * platform cache. */
-	if (!if_indextoname (ifindex, ifname))
+	if (!ifname || !nm_utils_iface_valid_name (ifname))
 		return FALSE;
-	ASSERT_VALID_PATH_COMPONENT (ifname);
+	ifname = ASSERT_VALID_PATH_COMPONENT (ifname);
 
 	path = g_strdup_printf ("/sys/class/net/%s/owner", ifname);
 	val = nm_platform_sysctl_get (platform, path);
@@ -3130,6 +3125,12 @@ tun_get_properties (NMPlatform *platform, int ifindex, NMPlatformTunProperties *
 		success = FALSE;
 
 	return success;
+}
+
+static gboolean
+tun_get_properties (NMPlatform *platform, int ifindex, NMPlatformTunProperties *props)
+{
+	return tun_get_properties_ifname (platform, nm_platform_link_get_name (platform, ifindex), props);
 }
 
 static const struct nla_policy macvlan_info_policy[IFLA_MACVLAN_MAX + 1] = {
