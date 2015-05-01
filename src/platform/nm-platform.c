@@ -2616,6 +2616,12 @@ nm_platform_ip6_route_to_string (const NMPlatformIP6Route *route)
             return (((a)->field) < ((b)->field)) ? -1 : 1;  \
     } G_STMT_END
 
+#define _CMP_FIELD_BOOL(a, b, field)                        \
+    G_STMT_START {                                          \
+        if ((!((a)->field)) != (!((b)->field)))                 \
+            return ((!((a)->field)) < (!((b)->field))) ? -1 : 1; \
+    } G_STMT_END
+
 #define _CMP_FIELD_STR(a, b, field)                         \
     G_STMT_START {                                          \
         int c = strcmp ((a)->field, (b)->field);            \
@@ -2660,6 +2666,7 @@ nm_platform_link_cmp (const NMPlatformLink *a, const NMPlatformLink *b)
 	_CMP_FIELD (a, b, connected);
 	_CMP_FIELD (a, b, arp);
 	_CMP_FIELD (a, b, mtu);
+	_CMP_FIELD_BOOL (a, b, initialized);
 	_CMP_FIELD_STR_INTERNED (a, b, kind);
 	_CMP_FIELD_STR0 (a, b, udi);
 	_CMP_FIELD_STR_INTERNED (a, b, driver);
