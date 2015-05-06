@@ -762,7 +762,7 @@ nm_ap_dump (NMAccessPoint *self,
 	            priv->flags & NM_802_11_AP_FLAGS_PRIVACY ? 'P' : ' ',
 	            priv->wpa_flags & 0xFFFF,
 	            priv->rsn_flags & 0xFFFF,
-	            nm_utils_get_monotonic_timestamp_s () - priv->last_seen,
+	            priv->last_seen > 0 ? (nm_utils_get_monotonic_timestamp_s () - priv->last_seen) : -1,
 	            ifname,
 	            supplicant_id);
 }
