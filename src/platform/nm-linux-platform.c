@@ -1104,6 +1104,7 @@ init_link (NMPlatform *platform, NMPlatformLink *info, struct rtnl_link *rtnllin
 	if (udev_device) {
 		info->driver = udev_get_driver (udev_device, info->ifindex);
 		info->udi = g_udev_device_get_sysfs_path (udev_device);
+		info->initialized = TRUE;
 	}
 
 	if (!info->driver)
@@ -1118,8 +1119,9 @@ init_link (NMPlatform *platform, NMPlatformLink *info, struct rtnl_link *rtnllin
 		info->driver = "unknown";
 
 	/* Only demand further initialization (udev rules ran, device has
-         * a stable name now) in case udev is running (not in a container). */
-	if (access ("/sys", W_OK) != 0)
+	 * a stable name now) in case udev is running (not in a container). */
+	if (   !info->initialized
+	    && access ("/sys", W_OK) != 0)
 		info->initialized = TRUE;
 
 	return TRUE;
