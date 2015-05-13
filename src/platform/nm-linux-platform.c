@@ -3938,8 +3938,8 @@ ip6_address_exists (NMPlatform *platform, int ifindex, struct in6_addr addr, int
 	return ip_address_exists (platform, AF_INET6, ifindex, &addr, plen);
 }
 
-static gboolean
-ip4_check_reinstall_device_route (NMPlatform *platform, int ifindex, const NMPlatformIP4Address *address, guint32 device_route_metric)
+static guint32
+ip4_get_device_route_metric (NMPlatform *platform, int ifindex, const NMPlatformIP4Address *address, guint32 device_route_metric)
 {
 	NMLinuxPlatformPrivate *priv = NM_LINUX_PLATFORM_GET_PRIVATE (platform);
 	NMPlatformIP4Address addr_candidate;
@@ -3956,29 +3956,32 @@ ip4_check_reinstall_device_route (NMPlatform *platform, int ifindex, const NMPla
 					 * we back off.
 					 * Perform this check first, as we expect to have significantly less
 					 * addresses to search. */
-					return FALSE;
+					return 0;
 				}
 		}
 	}
 
 	device_network = nm_utils_ip4_address_clear_host_address (address->address, address->plen);
 
+bump_metric:
 	for (object = nl_cache_get_first (priv->route_cache); object; object = nl_cache_get_next (object)) {
 		if (_route_match ((struct rtnl_route *) object, AF_INET, 0, TRUE)) {
 			if (init_ip4_route (&route_candidate, (struct rtnl_route *) object)) {
-				if (   route_candidate.network == device_network
-				    && route_candidate.plen == address->plen
-				    && (   route_candidate.metric == 0
-				        || route_candidate.metric == device_route_metric)) {
-					/* There is already any route with metric 0 or the metric we want to install
-					 * for the same subnet. */
-					return FALSE;
-				}
+				if (   route_candidate.network != device_network
+				    || route_candidate.plen != address->plen
+				    || route_candidate.metric != device_route_metric)
+					continue;
+
+				if (route_candidate.ifindex == address->ifindex)
+					break;
+
+				device_route_metric++;
+				goto bump_metric;
 			}
 		}
 	}
 
-	return TRUE;
+	return device_route_metric;
 }
 
 /******************************************************************/
@@ -4880,7 +4883,7 @@ nm_linux_platform_class_init (NMLinuxPlatformClass *klass)
 	platform_class->ip4_address_exists = ip4_address_exists;
 	platform_class->ip6_address_exists = ip6_address_exists;
 
-	platform_class->ip4_check_reinstall_device_route = ip4_check_reinstall_device_route;
+	platform_class->ip4_get_device_route_metric = ip4_get_device_route_metric;
 
 	platform_class->ip4_route_get_all = ip4_route_get_all;
 	platform_class->ip6_route_get_all = ip6_route_get_all;
