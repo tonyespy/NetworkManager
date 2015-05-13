@@ -3939,7 +3939,7 @@ ip6_address_exists (NMPlatform *platform, int ifindex, struct in6_addr addr, int
 }
 
 static guint32
-ip4_get_device_route_metric (NMPlatform *platform, int ifindex, const NMPlatformIP4Address *address, guint32 device_route_metric)
+ip4_check_reinstall_device_route (NMPlatform *platform, int ifindex, const NMPlatformIP4Address *address, guint32 device_route_metric)
 {
 	NMLinuxPlatformPrivate *priv = NM_LINUX_PLATFORM_GET_PRIVATE (platform);
 	NMPlatformIP4Address addr_candidate;
@@ -4905,7 +4905,7 @@ nm_linux_platform_class_init (NMLinuxPlatformClass *klass)
 	platform_class->ip4_address_exists = ip4_address_exists;
 	platform_class->ip6_address_exists = ip6_address_exists;
 
-	platform_class->ip4_get_device_route_metric = ip4_get_device_route_metric;
+	platform_class->ip4_check_reinstall_device_route = ip4_check_reinstall_device_route;
 
 	platform_class->ip4_route_get_all = ip4_route_get_all;
 	platform_class->ip6_route_get_all = ip6_route_get_all;

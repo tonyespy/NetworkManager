@@ -476,7 +476,7 @@ typedef struct {
 	gboolean (*ip4_address_exists) (NMPlatform *, int ifindex, in_addr_t address, int plen);
 	gboolean (*ip6_address_exists) (NMPlatform *, int ifindex, struct in6_addr address, int plen);
 
-	guint32 (*ip4_get_device_route_metric) (NMPlatform *, int ifindex, const NMPlatformIP4Address *address, guint32 device_route_metric);
+	guint32 (*ip4_check_reinstall_device_route) (NMPlatform *, int ifindex, const NMPlatformIP4Address *address, guint32 device_route_metric);
 
 	GArray * (*ip4_route_get_all) (NMPlatform *, int ifindex, NMPlatformGetRouteMode mode);
 	GArray * (*ip6_route_get_all) (NMPlatform *, int ifindex, NMPlatformGetRouteMode mode);

@@ -2097,7 +2097,7 @@ _address_get_lifetime (const NMPlatformIPAddress *address, guint32 now, guint32 
 }
 
 /**
- * nm_platform_ip4_get_device_route_metric:
+ * nm_platform_ip4_check_reinstall_device_route:
  * @ifindex: Interface index
  * @address: IPv4 address on the interface
  * @device_route_metric: Desired metric
@@ -2108,7 +2108,7 @@ _address_get_lifetime (const NMPlatformIPAddress *address, guint32 now, guint32 
  * Return: 0 if the route is already there, otherwise returns the metric to use
  */
 static guint32
-nm_platform_ip4_get_device_route_metric (NMPlatform *self, int ifindex, const NMPlatformIP4Address *address, guint32 device_route_metric)
+nm_platform_ip4_check_reinstall_device_route (NMPlatform *self, int ifindex, const NMPlatformIP4Address *address, guint32 device_route_metric)
 {
 	_CHECK_SELF (self, klass, FALSE);
 	reset_error (self);
@@ -2124,7 +2124,7 @@ nm_platform_ip4_get_device_route_metric (NMPlatform *self, int ifindex, const NM
 		return FALSE;
 	}
 
-	return klass->ip4_get_device_route_metric (self, ifindex, address, device_route_metric);
+	return klass->ip4_check_reinstall_device_route (self, ifindex, address, device_route_metric);
 }
 
 /**
@@ -2174,7 +2174,7 @@ nm_platform_ip4_address_sync (NMPlatform *self, int ifindex, const GArray *known
 		if (!_address_get_lifetime ((NMPlatformIPAddress *) known_address, now, 5, &lifetime, &preferred))
 			continue;
 
-		device_route_metric = nm_platform_ip4_get_device_route_metric (self, ifindex, known_address, device_route_metric);
+		device_route_metric = nm_platform_ip4_check_reinstall_device_route (self, ifindex, known_address, device_route_metric);
 
 		if (!nm_platform_ip4_address_add (self, ifindex, known_address->address, known_address->peer_address, known_address->plen, lifetime, preferred, known_address->label))
 			return FALSE;
@@ -2186,7 +2186,7 @@ nm_platform_ip4_address_sync (NMPlatform *self, int ifindex, const GArray *known
 			 * In face of having the same subnets on two different interfaces with the same metric,
 			 * this is a problem. Surprisingly, kernel is able to add two routes for the same subnet/prefix,metric
 			 * to different interfaces. We cannot. Adding one, would replace the other. This is avoided
-			 * by the above nm_platform_ip4_get_device_route_metric() check.
+			 * by the above nm_platform_ip4_check_reinstall_device_route() check.
 			 */
 			network = nm_utils_ip4_address_clear_host_address (known_address->address, known_address->plen);
 			(void) nm_platform_ip4_route_add (self, ifindex, NM_IP_CONFIG_SOURCE_KERNEL, network, known_address->plen,
