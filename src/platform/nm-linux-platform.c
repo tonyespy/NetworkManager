@@ -3947,6 +3947,9 @@ ip4_get_device_route_metric (NMPlatform *platform, int ifindex, const NMPlatform
 	struct nl_object *object;
 	guint32 device_network;
 
+	if (device_route_metric == 0)
+		return 0;
+
 	for (object = nl_cache_get_first (priv->address_cache); object; object = nl_cache_get_next (object)) {
 		if (_address_match ((struct rtnl_addr *) object, AF_INET, 0)) {
 			if (init_ip4_address (&addr_candidate, (struct rtnl_addr *) object))
@@ -3968,15 +3971,34 @@ bump_metric:
 		if (_route_match ((struct rtnl_route *) object, AF_INET, 0, TRUE)) {
 			if (init_ip4_route (&route_candidate, (struct rtnl_route *) object)) {
 				if (   route_candidate.network != device_network
-				    || route_candidate.plen != address->plen
-				    || route_candidate.metric != device_route_metric)
+				    || route_candidate.plen != address->plen)
 					continue;
 
-				if (route_candidate.ifindex == address->ifindex)
-					break;
+				if (route_candidate.ifindex == address->ifindex) {
+					/* It route is on the same interface we are checking.
+					 * There is no conflict, ignore this one. */
+					continue;
+				}
 
-				device_route_metric++;
-				goto bump_metric;
+				if (route_candidate.metric == 0) {
+					/* There is a conflicting route with metric 0. */
+					/* We cannot install our own route with a different metric,
+					 * because we cannot delete the route that kernel would install
+					 * when adding the address.
+					 *
+					 * Because if we would try, we might wrongly delete this route.
+					 */
+					return 0;
+				}
+
+				if (route_candidate.metric == device_route_metric) {
+					/* there is a conflicting route on another interface.
+					 * Try with the next higher metric. */
+					if (device_route_metric == G_MAXUINT32)
+						return 0;
+					device_route_metric++;
+					goto bump_metric;
+				}
 			}
 		}
 	}
