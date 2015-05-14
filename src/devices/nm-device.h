@@ -291,6 +291,7 @@ typedef struct {
 	void                (* ip6_config_pre_commit) (NMDevice *self, NMIP6Config *config);
 
 	gboolean            (* reapply) (NMDevice *self,
+	                                 NMConnection *old,
 	                                 const char *setting,
 	                                 gboolean reconfigure,
 	                                 GError **error);

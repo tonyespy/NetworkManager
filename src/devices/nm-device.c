@@ -6872,7 +6872,7 @@ nm_device_reapply_connection (NMDevice *self,
 	g_hash_table_iter_init (&iter, diffs);
 	while (g_hash_table_iter_next (&iter, (gpointer *)&setting, NULL)) {
 		if (NM_DEVICE_GET_CLASS (self)->reapply) {
-			if (!NM_DEVICE_GET_CLASS (self)->reapply (self, setting, reconfigure, error))
+			if (!NM_DEVICE_GET_CLASS (self)->reapply (self, old, setting, reconfigure, error))
 				return FALSE;
 		} else {
 			g_set_error (error,
