@@ -972,7 +972,7 @@ _ipx_get_best_activating_device (const VTableIP *vtable, NMDefaultRouteManager *
 			    || state >= NM_DEVICE_STATE_DEACTIVATING)
 				continue;
 
-			if (!_ipx_connection_has_default_route (vtable, self, nm_device_get_connection (device)))
+			if (!_ipx_connection_has_default_route (vtable, self, nm_device_get_applied_connection (device)))
 				continue;
 
 			prio = nm_device_get_ip4_route_metric (device);
