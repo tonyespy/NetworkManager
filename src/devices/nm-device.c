@@ -73,6 +73,7 @@
 #include "nm-device-logging.h"
 _LOG_DECLARE_SELF (NMDevice);
 
+static void impl_device_reapply    (NMDevice *self, DBusGMethodInvocation *context);
 static void impl_device_disconnect (NMDevice *self, DBusGMethodInvocation *context);
 static void impl_device_delete     (NMDevice *self, DBusGMethodInvocation *context);
 
@@ -5453,7 +5454,7 @@ nm_device_activate_ip4_config_commit (gpointer user_data)
 	    && (nm_device_get_state (self) > NM_DEVICE_STATE_IP_CONFIG)) {
 		/* Notify dispatcher scripts of new DHCP4 config */
 		nm_dispatcher_call (DISPATCHER_ACTION_DHCP4_CHANGE,
-		                    nm_device_get_applied_connection (self),
+		                    nm_device_get_connection (self),
 		                    self,
 		                    NULL,
 		                    NULL,
@@ -5557,7 +5558,7 @@ nm_device_activate_ip6_config_commit (gpointer user_data)
 		    && (nm_device_get_state (self) > NM_DEVICE_STATE_IP_CONFIG)) {
 			/* Notify dispatcher scripts of new DHCP6 config */
 			nm_dispatcher_call (DISPATCHER_ACTION_DHCP6_CHANGE,
-			                    nm_device_get_applied_connection (self),
+			                    nm_device_get_connection (self),
 			                    self,
 			                    NULL,
 			                    NULL,
@@ -5765,6 +5766,81 @@ delete_on_deactivate_check_and_schedule (NMDevice *self, int ifindex)
 
 	_LOGD (LOGD_DEVICE, "delete_on_deactivate: schedule cleanup and delete virtual link #%d (id=%u)",
 	       ifindex, data->idle_add_id);
+}
+
+static void
+nm_device_reapply_connection (NMDevice *self)
+{
+	NMConnection *connection = nm_device_get_connection (self);
+	NMConnection *applied = nm_device_get_applied_connection (self);
+	GHashTable *diffs = NULL;
+	GHashTableIter iter;
+	const char *setting;
+
+	nm_connection_diff (connection, applied, NM_SETTING_COMPARE_FLAG_IGNORE_TIMESTAMP, &diffs);
+
+	/* Everything set. */
+	if (!diffs)
+		return;
+
+	g_hash_table_iter_init (&iter, diffs);
+	while (g_hash_table_iter_next (&iter, (gpointer *)&setting, NULL)) {
+	}
+}
+
+static void
+reapply_cb (NMDevice *self,
+            DBusGMethodInvocation *context,
+            GError *error,
+            gpointer user_data)
+{
+	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+	GError *local = NULL;
+
+	if (error) {
+		dbus_g_method_return_error (context, error);
+		return;
+	}
+
+	/* Authorized */
+	if (priv->state != NM_DEVICE_STATE_ACTIVATED) {
+		local = g_error_new_literal (NM_DEVICE_ERROR,
+		                             NM_DEVICE_ERROR_NOT_ACTIVE,
+		                             "Device is not activated");
+		dbus_g_method_return_error (context, local);
+		g_error_free (local);
+	} else {
+		nm_device_reapply_connection (self);
+		dbus_g_method_return (context);
+	}
+}
+
+static void
+impl_device_reapply (NMDevice *self, DBusGMethodInvocation *context)
+{
+	NMConnection *connection;
+	GError *error = NULL;
+
+	if (NM_DEVICE_GET_PRIVATE (self)->act_request == NULL) {
+		error = g_error_new_literal (NM_DEVICE_ERROR,
+		                             NM_DEVICE_ERROR_NOT_ACTIVE,
+		                             "This device is not active");
+		dbus_g_method_return_error (context, error);
+		g_error_free (error);
+		return;
+	}
+
+	connection = nm_device_get_connection (self);
+	g_assert (connection);
+
+	/* Ask the manager to authenticate this request for us */
+	g_signal_emit (self, signals[AUTH_REQUEST], 0,
+	               context,
+	               connection,
+	               NM_AUTH_PERMISSION_NETWORK_CONTROL,
+	               TRUE,
+	               reapply_cb,
+	               NULL);
 }
 
 static void
