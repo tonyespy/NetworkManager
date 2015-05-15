@@ -278,6 +278,46 @@ run_command (const char *format, ...)
 
 NMTST_DEFINE();
 
+static gboolean
+is_root ()
+{
+	FILE *f;
+	uid_t uid = geteuid ();
+	gid_t gid = getegid ();
+
+	/* Already a root? */
+	if (gid == 0 && uid == 0)
+		return TRUE;
+
+	/* Become a root in new user NS. */
+	if (unshare (CLONE_NEWUSER) != 0)
+		return FALSE;
+
+	/* Since Linux 3.19 we have to disable setgroups() in order to map users.
+	 * Just proceed if the file is not there. */
+	f = fopen ("/proc/self/setgroups", "w");
+	if (f) {
+		fprintf (f, "deny");
+		fclose (f);
+	}
+
+	/* Map current UID to root in NS to be created. */
+	f = fopen ("/proc/self/uid_map", "w");
+	if (!f)
+		return FALSE;
+	fprintf (f, "0 %d 1", uid);
+	fclose (f);
+
+	/* Map current GID to root in NS to be created. */
+	f = fopen ("/proc/self/gid_map", "w");
+	if (!f)
+		return FALSE;
+	fprintf (f, "0 %d 1", gid);
+	fclose (f);
+
+	return TRUE;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -286,7 +326,7 @@ main (int argc, char **argv)
 
 	init_tests (&argc, &argv);
 
-	if (nmtst_platform_is_root_test ()  && getuid() != 0) {
+	if (nmtst_platform_is_root_test () && !is_root ()) {
 		/* Try to exec as sudo, this function does not return, if a sudo-cmd is set. */
 		nmtst_reexec_sudo ();
 
