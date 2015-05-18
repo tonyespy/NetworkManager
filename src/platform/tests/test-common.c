@@ -279,7 +279,7 @@ run_command (const char *format, ...)
 NMTST_DEFINE();
 
 static gboolean
-is_root ()
+unshare_user ()
 {
 	FILE *f;
 	uid_t uid = geteuid ();
@@ -326,17 +326,21 @@ main (int argc, char **argv)
 
 	init_tests (&argc, &argv);
 
-	if (nmtst_platform_is_root_test () && !is_root ()) {
-		/* Try to exec as sudo, this function does not return, if a sudo-cmd is set. */
-		nmtst_reexec_sudo ();
+	if (   nmtst_platform_is_root_test ()
+	    && (geteuid () != 0 || getegid () != 0)) {
+		if (   g_getenv ("NMTST_FORCE_REAL_ROOT")
+		    || !unshare_user ()) {
+			/* Try to exec as sudo, this function does not return, if a sudo-cmd is set. */
+			nmtst_reexec_sudo ();
 
 #ifdef REQUIRE_ROOT_TESTS
-		g_print ("Fail test: requires root privileges (%s)\n", program);
-		return EXIT_FAILURE;
+			g_print ("Fail test: requires root privileges (%s)\n", program);
+			return EXIT_FAILURE;
 #else
-		g_print ("Skipping test: requires root privileges (%s)\n", program);
-		return EXIT_SKIP;
+			g_print ("Skipping test: requires root privileges (%s)\n", program);
+			return EXIT_SKIP;
 #endif
+		}
 	}
 
 	if (nmtst_platform_is_root_test () && !g_getenv ("NMTST_NO_UNSHARE")) {
