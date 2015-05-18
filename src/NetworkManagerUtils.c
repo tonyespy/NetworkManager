@@ -250,7 +250,7 @@ nm_spawn_process (const char *args, GError **error)
 }
 
 int
-nm_utils_modprobe (GError **error, const char *arg1, ...)
+nm_utils_modprobe (GError **error, gboolean suppress_error_logging, const char *arg1, ...)
 {
 	gs_unref_ptrarray GPtrArray *argv = NULL;
 	int exit_status;
@@ -258,6 +258,7 @@ nm_utils_modprobe (GError **error, const char *arg1, ...)
 #define ARGV_TO_STR(argv)   (_log_str ? _log_str : (_log_str = g_strjoinv (" ", (char **) argv->pdata)))
 	GError *local = NULL;
 	va_list ap;
+	NMLogLevel llevel = suppress_error_logging ? LOGL_DEBUG : LOGL_ERR;
 
 	g_return_val_if_fail (!error || !*error, -1);
 	g_return_val_if_fail (arg1, -1);
@@ -276,11 +277,11 @@ nm_utils_modprobe (GError **error, const char *arg1, ...)
 
 	nm_log_dbg (LOGD_CORE, "modprobe: '%s'", ARGV_TO_STR (argv));
 	if (!g_spawn_sync (NULL, (char **) argv->pdata, NULL, 0, NULL, NULL, NULL, NULL, &exit_status, &local)) {
-		nm_log_err (LOGD_CORE, "modprobe: '%s' failed: %s", ARGV_TO_STR (argv), local->message);
+		nm_log (llevel, LOGD_CORE, "modprobe: '%s' failed: %s", ARGV_TO_STR (argv), local->message);
 		g_propagate_error (error, local);
 		return -1;
 	} else if (exit_status != 0)
-		nm_log_err (LOGD_CORE, "modprobe: '%s' exited with error %d", ARGV_TO_STR (argv), exit_status);
+		nm_log (llevel, LOGD_CORE, "modprobe: '%s' exited with error %d", ARGV_TO_STR (argv), exit_status);
 
 	return exit_status;
 }

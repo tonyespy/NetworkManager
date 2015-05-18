@@ -5210,7 +5210,7 @@ share_init (void)
 	}
 
 	for (iter = modules; *iter; iter++)
-		nm_utils_modprobe (NULL, *iter, NULL);
+		nm_utils_modprobe (NULL, FALSE, *iter, NULL);
 
 	return TRUE;
 }
