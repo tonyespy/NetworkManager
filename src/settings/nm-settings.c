@@ -1860,6 +1860,10 @@ device_realized (NMDevice *device, GParamSpec *pspec, NMSettings *self)
 	if (!nm_device_is_real (device))
 		return;
 
+	g_signal_handlers_disconnect_by_func (device,
+	                                      G_CALLBACK (device_realized),
+	                                      self);
+
 	/* If the device isn't managed or it already has a default wired connection,
 	 * ignore it.
 	 */
