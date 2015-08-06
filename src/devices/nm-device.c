@@ -1800,15 +1800,13 @@ setup (NMDevice *self, NMPlatformLink *plink)
 	g_object_thaw_notify (G_OBJECT (self));
 }
 
-static gboolean
-unrealize (NMDevice *self, gboolean remove_resources, GError **error)
+static void
+unrealize (NMDevice *self, gboolean remove_resources)
 {
 	int ifindex = nm_device_get_ifindex (self);
 
 	if (ifindex > 0 && nm_device_is_software (self) && remove_resources)
 		nm_platform_link_delete (NM_PLATFORM_GET, ifindex);
-
-	return TRUE;
 }
 
 /**
@@ -1826,7 +1824,6 @@ gboolean
 nm_device_unrealize (NMDevice *self, gboolean remove_resources, GError **error)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
-	gboolean success = TRUE;
 
 	g_return_val_if_fail (nm_device_is_real (self), FALSE);
 	g_return_val_if_fail (nm_device_is_software (self), FALSE);
@@ -1835,7 +1832,7 @@ nm_device_unrealize (NMDevice *self, gboolean remove_resources, GError **error)
 	g_object_freeze_notify (G_OBJECT (self));
 
 	if (NM_DEVICE_GET_CLASS (self)->unrealize)
-		success = NM_DEVICE_GET_CLASS (self)->unrealize (self, remove_resources, error);
+		NM_DEVICE_GET_CLASS (self)->unrealize (self, remove_resources);
 
 	if (priv->ifindex > 0) {
 		priv->ifindex = 0;
@@ -1883,7 +1880,7 @@ nm_device_unrealize (NMDevice *self, gboolean remove_resources, GError **error)
 	                         remove_resources ?
 	                             NM_DEVICE_STATE_REASON_USER_REQUESTED : NM_DEVICE_STATE_REASON_NOW_UNMANAGED);
 
-	return success;
+	return TRUE;
 }
 
 /**
