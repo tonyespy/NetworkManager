@@ -1803,10 +1803,14 @@ setup (NMDevice *self, NMPlatformLink *plink)
 static void
 unrealize (NMDevice *self, gboolean remove_resources)
 {
-	int ifindex = nm_device_get_ifindex (self);
+	int ifindex;
 
-	if (ifindex > 0 && nm_device_is_software (self) && remove_resources)
-		nm_platform_link_delete (NM_PLATFORM_GET, ifindex);
+	if (!remove_resources) {
+		ifindex = nm_device_get_ifindex (self);
+		if (   ifindex > 0
+		    && nm_device_is_software (self))
+			nm_platform_link_delete (NM_PLATFORM_GET, ifindex);
+	}
 }
 
 /**
