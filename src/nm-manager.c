@@ -2136,14 +2136,10 @@ impl_manager_get_devices (NMManager *manager, GPtrArray **devices, GError **err)
 static gboolean
 impl_manager_get_all_devices (NMManager *manager, GPtrArray **devices, GError **err)
 {
-	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (manager);
-	GSList *iter;
-
-	*devices = g_ptr_array_sized_new (g_slist_length (priv->devices));
-
-	for (iter = priv->devices; iter; iter = iter->next)
-		g_ptr_array_add (*devices, g_strdup (nm_device_get_path (NM_DEVICE (iter->data))));
-
+	*devices = nm_exported_object_list_to_object_path_array (NM_MANAGER_GET_PRIVATE (manager)->devices,
+	                                                         FALSE,
+	                                                         NULL,
+	                                                         NULL);
 	return TRUE;
 }
 
@@ -5101,13 +5097,7 @@ get_property (GObject *object, guint prop_id,
 		g_value_set_uint (value, priv->metered);
 		break;
 	case PROP_ALL_DEVICES:
-		array = g_ptr_array_sized_new (10);
-		for (iter = priv->devices; iter; iter = g_slist_next (iter)) {
-			path = nm_device_get_path (NM_DEVICE (iter->data));
-			if (path)
-				g_ptr_array_add (array, g_strdup (path));
-		}
-		g_value_take_boxed (value, array);
+		nm_utils_g_value_set_object_path_array (value, priv->devices, NULL, NULL);
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
