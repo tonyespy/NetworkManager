@@ -54,6 +54,8 @@ const char *nm_exported_object_get_path    (NMExportedObject *self);
 gboolean    nm_exported_object_is_exported (NMExportedObject *self);
 void        nm_exported_object_unexport    (NMExportedObject *self);
 
+GPtrArray * nm_exported_object_list_to_object_path_array (GSList *objects, gboolean set_free_func, NMUtilsObjectFunc filter_func, gpointer user_data);
+
 G_END_DECLS
 
 #endif	/* NM_EXPORTED_OBJECT_H */

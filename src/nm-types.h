@@ -141,4 +141,13 @@ typedef struct _NMSettingsConnection NMSettingsConnection;
 /* utils */
 typedef struct _NMUtilsIPv6IfaceId   NMUtilsIPv6IfaceId;
 
+/**
+ * NMUtilsObjectFunc:
+ * @object: the object to filter on
+ * @user_data: data passed to the function from the caller
+ *
+ * Returns: %TRUE if the object should be used, %FALSE if not
+ */
+typedef gboolean (*NMUtilsObjectFunc) (GObject *object, gpointer user_data);
+
 #endif  /* NM_TYPES_H */

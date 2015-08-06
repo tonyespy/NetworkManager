@@ -2984,17 +2984,10 @@ nm_utils_g_value_set_object_path_array (GValue *value,
                                         gpointer user_data)
 {
 	GPtrArray *paths;
-	GSList *iter;
 
-	paths = g_ptr_array_new ();
-	for (iter = objects; iter; iter = iter->next) {
-		NMExportedObject *object = iter->data;
-
-		if (!nm_exported_object_is_exported (object))
-			continue;
-		if (filter_func && !filter_func (G_OBJECT (object), user_data))
-			continue;
-		g_ptr_array_add (paths, g_strdup (nm_exported_object_get_path (object)));
-	}
+	paths = nm_exported_object_list_to_object_path_array (objects,
+	                                                      FALSE, /* don't set destroy function for GPtrArray */
+	                                                      filter_func,
+	                                                      user_data);
 	g_value_take_boxed (value, paths);
 }

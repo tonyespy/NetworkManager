@@ -182,6 +182,45 @@ nm_exported_object_get_path (NMExportedObject *self)
 }
 
 /**
+ * nm_exported_object_list_to_object_path_array:
+ * @objects: (transfer none): a list of #NMExportedObject
+ * @set_free_func: the returned pointer array contains clones of the string. If
+ *   #TRUE, the free func of the array has the destroy function set to release them.
+ *   Otherwise, you must take care yourself not to leak the strings.
+ *
+ * Returns: a #GPtrArray of object paths for list of #NMExportedObject in @objects.
+ */
+GPtrArray *
+nm_exported_object_list_to_object_path_array (GSList *objects,
+                                              gboolean set_free_func,
+                                              NMUtilsObjectFunc filter_func,
+                                              gpointer user_data)
+{
+	GPtrArray *paths;
+	GSList *iter;
+
+	if (set_free_func)
+		paths = g_ptr_array_new ();
+	else
+		paths = g_ptr_array_new_full (0, g_free);
+	for (iter = objects; iter; iter = iter->next) {
+		NMExportedObject *object = iter->data;
+		NMExportedObjectPrivate *priv;
+
+		if (!NM_IS_EXPORTED_OBJECT (object))
+			continue;
+
+		priv = NM_EXPORTED_OBJECT_GET_PRIVATE (object);
+		if (priv->path) {
+			if (filter_func && !filter_func ((GObject *) object, user_data))
+				continue;
+			g_ptr_array_add (paths, g_strdup (priv->path));
+		}
+	}
+	return paths;
+}
+
+/**
  * nm_exported_object_is_exported:
  * @self: an #NMExportedObject
  *
