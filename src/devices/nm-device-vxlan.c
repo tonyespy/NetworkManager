@@ -141,16 +141,15 @@ setup (NMDevice *device, NMPlatformLink *plink)
 	update_properties (device);
 }
 
-static gboolean
-unrealize (NMDevice *device, gboolean remove_resources, GError **error)
+static void
+unrealize (NMDevice *device, gboolean remove_resources)
 {
 	NMDeviceVxlan *self = NM_DEVICE_VXLAN (device);
 	NMDeviceVxlanPrivate *priv = NM_DEVICE_VXLAN_GET_PRIVATE (self);
 	GParamSpec **properties;
 	guint n_properties, i;
-	gboolean success;
 
-	success = NM_DEVICE_CLASS (nm_device_vxlan_parent_class)->unrealize (device, remove_resources, error);
+	NM_DEVICE_CLASS (nm_device_vxlan_parent_class)->unrealize (device, remove_resources);
 
 	g_object_freeze_notify (G_OBJECT (device));
 
@@ -162,8 +161,6 @@ unrealize (NMDevice *device, gboolean remove_resources, GError **error)
 	g_free (properties);
 
 	g_object_thaw_notify (G_OBJECT (device));
-
-	return success;
 }
 
 /**************************************************************/

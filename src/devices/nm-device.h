@@ -190,10 +190,8 @@ typedef struct {
 	 *
 	 * Clears any properties that depend on backing resources (kernel devices,
 	 * etc) and removes those resources if @remove_resources is %TRUE.
-	 *
-	 * Returns: %TRUE on success, %FALSE on error
 	 */
-	gboolean        (*unrealize)  (NMDevice *self, gboolean remove_resources, GError **error);
+	void            (*unrealize)  (NMDevice *self, gboolean remove_resources);
 
 	/* Hardware state (IFF_UP) */
 	gboolean        (*can_unmanaged_external_down)  (NMDevice *self);

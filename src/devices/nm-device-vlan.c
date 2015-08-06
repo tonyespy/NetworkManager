@@ -218,18 +218,14 @@ create_and_realize (NMDevice *device,
 	return TRUE;
 }
 
-static gboolean
-unrealize (NMDevice *device, gboolean remove_resources, GError **error)
+static void
+unrealize (NMDevice *device, gboolean remove_resources)
 {
-	gboolean success;
-
-	success = NM_DEVICE_CLASS (nm_device_vlan_parent_class)->unrealize (device, remove_resources, error);
+	NM_DEVICE_CLASS (nm_device_vlan_parent_class)->unrealize (device, remove_resources);
 
 	NM_DEVICE_VLAN_GET_PRIVATE (device)->vlan_id = 0;
 	g_object_notify (G_OBJECT (device), NM_DEVICE_VLAN_ID);
 	nm_device_vlan_set_parent (NM_DEVICE_VLAN (device), NULL);
-
-	return success;
 }
 
 /******************************************************************/
