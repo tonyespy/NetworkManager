@@ -2772,7 +2772,7 @@ _internal_activate_device (NMManager *self, NMActiveConnection *active, GError *
 		nm_log_dbg (LOGD_CORE, "Activation of '%s' depends on active connection %p %s",
 		            nm_connection_get_id (connection),
 		            master_ac,
-		            str_if_set (nm_active_connection_get_path (master_ac), ""));
+		            str_if_set (nm_exported_object_get_path (NM_EXPORTED_OBJECT  (master_ac)), ""));
 	}
 
 	/* Check slaves for master connection and possibly activate them */
