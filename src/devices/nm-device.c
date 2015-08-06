@@ -1823,10 +1823,20 @@ unrealize (NMDevice *self, gboolean remove_resources)
 gboolean
 nm_device_unrealize (NMDevice *self, gboolean remove_resources, GError **error)
 {
-	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+	NMDevicePrivate *priv;
 
-	g_return_val_if_fail (nm_device_is_real (self), FALSE);
-	g_return_val_if_fail (nm_device_is_software (self), FALSE);
+	g_return_val_if_fail (NM_IS_DEVICE (self), FALSE);
+
+	if (!nm_device_is_software (self) || !nm_device_is_real (self)) {
+		g_set_error_literal (error,
+		                     NM_DEVICE_ERROR,
+		                     NM_DEVICE_ERROR_NOT_SOFTWARE,
+		                     "This device is not a software device or is not realized");
+		return FALSE;
+	}
+
+	priv = NM_DEVICE_GET_PRIVATE (self);
+
 	g_return_val_if_fail (priv->iface != NULL, FALSE);
 
 	g_object_freeze_notify (G_OBJECT (self));
