@@ -4997,7 +4997,7 @@ get_property (GObject *object, guint prop_id,
 		g_value_set_boolean (value, priv->radio_states[RFKILL_TYPE_WIMAX].hw_enabled);
 		break;
 	case PROP_ACTIVE_CONNECTIONS:
-		nm_utils_g_value_set_object_path_array (value, priv->active_connections);
+		nm_utils_g_value_set_object_path_array (value, priv->active_connections, NULL, NULL);
 		break;
 	case PROP_CONNECTIVITY:
 		g_value_set_uint (value, nm_connectivity_get_state (priv->connectivity));
@@ -5019,7 +5019,7 @@ get_property (GObject *object, guint prop_id,
 		g_value_set_boolean (value, priv->sleeping);
 		break;
 	case PROP_DEVICES:
-		nm_utils_g_value_set_object_path_array (value, priv->devices);
+		nm_utils_g_value_set_object_path_array (value, priv->devices, NULL, NULL);
 		break;
 	case PROP_METERED:
 		g_value_set_uint (value, priv->metered);
