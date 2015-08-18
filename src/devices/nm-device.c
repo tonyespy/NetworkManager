@@ -1575,7 +1575,13 @@ link_changed (NMDevice *self, NMPlatformLink *info)
 		nm_device_set_carrier (self, info->connected);
 }
 
-#define SET_COMPATIBLE(v, c) if (v) *v = c;
+#define SET_COMPATIBLE(v, c) \
+	G_STMT_START { \
+		gboolean *_v = (v); \
+		\
+		if (_v) \
+			*_v = c; \
+	} G_STMT_END
 
 static gboolean
 link_type_compatible (NMDevice *self,
@@ -1587,7 +1593,7 @@ link_type_compatible (NMDevice *self,
 	guint i = 0;
 
 	if (!klass->link_types) {
-		SET_COMPATIBLE(out_compatible, FALSE);
+		SET_COMPATIBLE (out_compatible, FALSE);
 		g_set_error_literal (error, NM_DEVICE_ERROR, NM_DEVICE_ERROR_FAILED,
 		                     "Device does not support platform links");
 		return FALSE;
@@ -1600,7 +1606,7 @@ link_type_compatible (NMDevice *self,
 			return TRUE;
 	}
 
-	SET_COMPATIBLE(out_compatible, FALSE);
+	SET_COMPATIBLE (out_compatible, FALSE);
 	g_set_error (error, NM_DEVICE_ERROR, NM_DEVICE_ERROR_FAILED,
 	             "Device does not support platform link type 0x%X",
 	             link_type);
@@ -1616,7 +1622,7 @@ link_type_compatible (NMDevice *self,
  *
  * Initializes and sets up the device using existing backing resources. Before
  * the device is ready for use nm_device_setup_finish() must be called.
- * @out_compatible will only be set if @plink is not %NULL, and 
+ * @out_compatible will only be set if @plink is not %NULL, and
  *
  * Returns: %TRUE on success, %FALSE on error
  */
@@ -1626,11 +1632,11 @@ nm_device_realize (NMDevice *self,
                    gboolean *out_compatible,
                    GError **error)
 {
-	SET_COMPATIBLE(out_compatible, TRUE);
+	SET_COMPATIBLE (out_compatible, TRUE);
 
 	if (plink) {
 		if (g_strcmp0 (nm_device_get_iface (self), plink->name) != 0) {
-			SET_COMPATIBLE(out_compatible, FALSE);
+			SET_COMPATIBLE (out_compatible, FALSE);
 			g_set_error_literal (error, NM_DEVICE_ERROR, NM_DEVICE_ERROR_FAILED,
 				                 "Device interface name does not match platform link");
 			return FALSE;
