@@ -1575,14 +1575,6 @@ link_changed (NMDevice *self, NMPlatformLink *info)
 		nm_device_set_carrier (self, info->connected);
 }
 
-#define SET_COMPATIBLE(v, c) \
-	G_STMT_START { \
-		gboolean *_v = (v); \
-		\
-		if (_v) \
-			*_v = c; \
-	} G_STMT_END
-
 static gboolean
 link_type_compatible (NMDevice *self,
                       NMLinkType link_type,
@@ -1593,7 +1585,7 @@ link_type_compatible (NMDevice *self,
 	guint i = 0;
 
 	if (!klass->link_types) {
-		SET_COMPATIBLE (out_compatible, FALSE);
+		NM_SET_OUT (out_compatible, FALSE);
 		g_set_error_literal (error, NM_DEVICE_ERROR, NM_DEVICE_ERROR_FAILED,
 		                     "Device does not support platform links");
 		return FALSE;
@@ -1606,7 +1598,7 @@ link_type_compatible (NMDevice *self,
 			return TRUE;
 	}
 
-	SET_COMPATIBLE (out_compatible, FALSE);
+	NM_SET_OUT (out_compatible, FALSE);
 	g_set_error (error, NM_DEVICE_ERROR, NM_DEVICE_ERROR_FAILED,
 	             "Device does not support platform link type 0x%X",
 	             link_type);
@@ -1632,13 +1624,13 @@ nm_device_realize (NMDevice *self,
                    gboolean *out_compatible,
                    GError **error)
 {
-	SET_COMPATIBLE (out_compatible, TRUE);
+	NM_SET_OUT (out_compatible, TRUE);
 
 	if (plink) {
 		if (g_strcmp0 (nm_device_get_iface (self), plink->name) != 0) {
-			SET_COMPATIBLE (out_compatible, FALSE);
+			NM_SET_OUT (out_compatible, FALSE);
 			g_set_error_literal (error, NM_DEVICE_ERROR, NM_DEVICE_ERROR_FAILED,
-				                 "Device interface name does not match platform link");
+			                     "Device interface name does not match platform link");
 			return FALSE;
 		}
 
