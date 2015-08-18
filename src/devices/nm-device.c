@@ -1336,26 +1336,24 @@ device_recheck_slave_status (NMDevice *self, NMPlatformLink *plink)
 
 	g_return_if_fail (plink != NULL);
 
-	if (priv->enslaved) {
-		if (plink->master != nm_device_get_ifindex (priv->master))
-			nm_device_release_one_slave (priv->master, self, FALSE, NM_DEVICE_STATE_REASON_NONE);
-	} else {
-		if (plink->master > 0) {
-			NMDevice *master;
+	if (priv->enslaved && plink->master != nm_device_get_ifindex (priv->master))
+		nm_device_release_one_slave (priv->master, self, FALSE, NM_DEVICE_STATE_REASON_NONE);
 
-			master = nm_manager_get_device_by_ifindex (nm_manager_get (), plink->master);
-			if (master && NM_DEVICE_GET_CLASS (master)->enslave_slave) {
-				g_clear_object (&priv->master);
-				priv->master = g_object_ref (master);
-				nm_device_master_add_slave (master, self, FALSE);
-			} else if (master) {
-				_LOGI (LOGD_DEVICE, "enslaved to non-master-type device %s; ignoring",
-				       nm_device_get_iface (master));
-			} else {
-				_LOGW (LOGD_DEVICE, "enslaved to unknown device %d %s",
-				       plink->master,
-				       nm_platform_link_get_name (NM_PLATFORM_GET, plink->master));
-			}
+	if (plink->master && !priv->enslaved) {
+		NMDevice *master;
+
+		master = nm_manager_get_device_by_ifindex (nm_manager_get (), plink->master);
+		if (master && NM_DEVICE_GET_CLASS (master)->enslave_slave) {
+			g_clear_object (&priv->master);
+			priv->master = g_object_ref (master);
+			nm_device_master_add_slave (master, self, FALSE);
+		} else if (master) {
+			_LOGI (LOGD_DEVICE, "enslaved to non-master-type device %s; ignoring",
+				   nm_device_get_iface (master));
+		} else {
+			_LOGW (LOGD_DEVICE, "enslaved to unknown device %d %s",
+				   plink->master,
+				   nm_platform_link_get_name (NM_PLATFORM_GET, plink->master));
 		}
 	}
 }
