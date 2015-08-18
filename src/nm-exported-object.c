@@ -193,7 +193,7 @@ nm_exported_object_get_path (NMExportedObject *self)
 GPtrArray *
 nm_exported_object_list_to_object_path_array (GSList *objects,
                                               gboolean set_free_func,
-                                              NMUtilsObjectFunc filter_func,
+                                              NMUtilsObjectPredicate filter_func,
                                               gpointer user_data)
 {
 	GPtrArray *paths;

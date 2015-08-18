@@ -2980,7 +2980,7 @@ nm_utils_g_value_set_object_path (GValue *value, gpointer object)
 void
 nm_utils_g_value_set_object_path_array (GValue *value,
                                         GSList *objects,
-                                        NMUtilsObjectFunc filter_func,
+                                        NMUtilsObjectPredicate filter_func,
                                         gpointer user_data)
 {
 	GPtrArray *paths;
