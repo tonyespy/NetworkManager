@@ -26,6 +26,7 @@
 #include "nm-device.h"
 #include "nm-auth-subject.h"
 #include "nm-active-connection.h"
+#include "nm-vpn-plugin-info.h"
 
 #define NM_TYPE_VPN_CONNECTION            (nm_vpn_connection_get_type ())
 #define NM_VPN_CONNECTION(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_VPN_CONNECTION, NMVpnConnection))
@@ -75,7 +76,9 @@ NMVpnConnection * nm_vpn_connection_new (NMConnection *connection,
                                          const char *specific_object,
                                          NMAuthSubject *subject);
 
-void                 nm_vpn_connection_activate        (NMVpnConnection *connection);
+gboolean             nm_vpn_connection_activate        (NMVpnConnection *connection,
+                                                        NMVpnPluginInfo *plugin_info,
+                                                        GError **error);
 NMConnection *       nm_vpn_connection_get_connection  (NMVpnConnection *connection);
 const char*          nm_vpn_connection_get_connection_id (NMVpnConnection *connection);
 NMVpnConnectionState nm_vpn_connection_get_vpn_state   (NMVpnConnection *connection);
