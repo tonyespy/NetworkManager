@@ -243,8 +243,8 @@ vpn_cleanup (NMVpnConnection *connection, NMDevice *parent_dev)
 		nm_platform_address_flush (NM_PLATFORM_GET, priv->ip_ifindex);
 	}
 
-	nm_device_set_vpn4_config (parent_dev, NULL);
-	nm_device_set_vpn6_config (parent_dev, NULL);
+	nm_device_set_vpn4_config (connection, parent_dev, NULL);
+	nm_device_set_vpn6_config (connection, parent_dev, NULL);
 
 	/* Remove zone from firewall */
 	if (priv->ip_iface)
@@ -935,7 +935,7 @@ apply_parent_device_config (NMVpnConnection *connection)
 		if (priv->ip4_external_gw)
 			add_ip4_vpn_gateway_route (vpn4_parent_config, parent_dev, priv->ip4_external_gw);
 
-		nm_device_set_vpn4_config (parent_dev, vpn4_parent_config);
+		nm_device_set_vpn4_config (connection, parent_dev, vpn4_parent_config);
 		g_object_unref (vpn4_parent_config);
 	}
 	if (vpn6_parent_config) {
@@ -943,7 +943,7 @@ apply_parent_device_config (NMVpnConnection *connection)
 		if (priv->ip6_external_gw)
 			add_ip6_vpn_gateway_route (vpn6_parent_config, parent_dev, priv->ip6_external_gw);
 
-		nm_device_set_vpn6_config (parent_dev, vpn6_parent_config);
+		nm_device_set_vpn6_config (connection, parent_dev, vpn6_parent_config);
 		g_object_unref (vpn6_parent_config);
 	}
 }
@@ -2178,8 +2178,8 @@ device_changed (NMActiveConnection *active,
 	 * needs to.
 	 */
 	if (old_device) {
-		nm_device_set_vpn4_config (old_device, NULL);
-		nm_device_set_vpn6_config (old_device, NULL);
+		nm_device_set_vpn4_config (active, old_device, NULL);
+		nm_device_set_vpn6_config (active, old_device, NULL);
 	}
 
 	if (new_device)
