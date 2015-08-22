@@ -80,6 +80,7 @@ NMConnection *       nm_vpn_connection_get_connection  (NMVpnConnection *connect
 const char*          nm_vpn_connection_get_connection_id (NMVpnConnection *connection);
 NMVpnConnectionState nm_vpn_connection_get_vpn_state   (NMVpnConnection *connection);
 const char *         nm_vpn_connection_get_banner      (NMVpnConnection *connection);
+const gchar *        nm_vpn_connection_get_service_type (NMVpnConnection *connection);
 
 gboolean             nm_vpn_connection_deactivate      (NMVpnConnection *connection,
                                                         NMVpnConnectionStateReason reason,

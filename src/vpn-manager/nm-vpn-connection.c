@@ -626,7 +626,7 @@ nm_vpn_connection_new (NMConnection *connection,
 	                                         NULL);
 }
 
-static const char *
+const char *
 nm_vpn_connection_get_service (NMVpnConnection *connection)
 {
 	NMVpnConnectionPrivate *priv = NM_VPN_CONNECTION_GET_PRIVATE (connection);
