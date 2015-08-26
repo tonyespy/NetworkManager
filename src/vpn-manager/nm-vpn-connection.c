@@ -100,11 +100,11 @@ typedef struct {
 	GVariant *connect_hash;
 	guint connect_timeout;
 	gboolean has_ip4;
-	NMIP4Config *ip4_config;
+	NMIP4Config *ip4_config, *parent_ip4_config;
 	guint32 ip4_internal_gw;
 	guint32 ip4_external_gw;
 	gboolean has_ip6;
-	NMIP6Config *ip6_config;
+	NMIP6Config *ip6_config, *parent_ip6_config;
 	struct in6_addr *ip6_internal_gw;
 	struct in6_addr *ip6_external_gw;
 	char *ip_iface;
@@ -233,6 +233,22 @@ fw_call_cleanup (NMVpnConnection *connection)
 }
 
 static void
+remove_parent_device_config (NMVpnConnection *connection, NMDevice *device)
+{
+	NMVpnConnectionPrivate *priv = NM_VPN_CONNECTION_GET_PRIVATE (connection);
+
+	if (priv->parent_ip4_config) {
+		nm_device_replace_vpn4_config (device, priv->parent_ip4_config, NULL);
+		g_clear_object (&priv->parent_ip4_config);
+	}
+
+	if (priv->parent_ip6_config) {
+		nm_device_replace_vpn6_config (device, priv->parent_ip6_config, NULL);
+		g_clear_object (&priv->parent_ip6_config);
+	}
+}
+
+static void
 vpn_cleanup (NMVpnConnection *connection, NMDevice *parent_dev)
 {
 	NMVpnConnectionPrivate *priv = NM_VPN_CONNECTION_GET_PRIVATE (connection);
@@ -243,8 +259,7 @@ vpn_cleanup (NMVpnConnection *connection, NMDevice *parent_dev)
 		nm_platform_address_flush (NM_PLATFORM_GET, priv->ip_ifindex);
 	}
 
-	nm_device_set_vpn4_config (connection, parent_dev, NULL);
-	nm_device_set_vpn6_config (connection, parent_dev, NULL);
+	remove_parent_device_config (connection, parent_dev);
 
 	/* Remove zone from firewall */
 	if (priv->ip_iface)
@@ -930,22 +945,19 @@ apply_parent_device_config (NMVpnConnection *connection)
 		}
 	}
 
-	if (vpn4_parent_config) {
-		/* Add any explicit route to the VPN gateway through the parent device */
-		if (priv->ip4_external_gw)
-			add_ip4_vpn_gateway_route (vpn4_parent_config, parent_dev, priv->ip4_external_gw);
+	/* Add any explicit route to the VPN gateway through the parent device */
+	if (vpn4_parent_config && priv->ip4_external_gw)
+		add_ip4_vpn_gateway_route (vpn4_parent_config, parent_dev, priv->ip4_external_gw);
+	if (vpn6_parent_config && priv->ip6_external_gw)
+		add_ip6_vpn_gateway_route (vpn6_parent_config, parent_dev, priv->ip6_external_gw);
 
-		nm_device_set_vpn4_config (connection, parent_dev, vpn4_parent_config);
-		g_object_unref (vpn4_parent_config);
-	}
-	if (vpn6_parent_config) {
-		/* Add any explicit route to the VPN gateway through the parent device */
-		if (priv->ip6_external_gw)
-			add_ip6_vpn_gateway_route (vpn6_parent_config, parent_dev, priv->ip6_external_gw);
+	nm_device_replace_vpn4_config (parent_dev, priv->parent_ip4_config, vpn4_parent_config);
+	g_clear_object (&priv->parent_ip4_config);
+	priv->parent_ip4_config = vpn4_parent_config;
 
-		nm_device_set_vpn6_config (connection, parent_dev, vpn6_parent_config);
-		g_object_unref (vpn6_parent_config);
-	}
+	nm_device_replace_vpn6_config (parent_dev, priv->parent_ip6_config, vpn6_parent_config);
+	g_clear_object (&priv->parent_ip6_config);
+	priv->parent_ip4_config = vpn4_parent_config;
 }
 
 static gboolean
@@ -2177,10 +2189,8 @@ device_changed (NMActiveConnection *active,
 	 * out that connectivity is down and start its reconnect attempt if it
 	 * needs to.
 	 */
-	if (old_device) {
-		nm_device_set_vpn4_config (active, old_device, NULL);
-		nm_device_set_vpn6_config (active, old_device, NULL);
-	}
+	if (old_device)
+		remove_parent_device_config (NM_VPN_CONNECTION (active), old_device);
 
 	if (new_device)
 		apply_parent_device_config (NM_VPN_CONNECTION (active));

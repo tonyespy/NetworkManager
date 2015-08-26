@@ -263,6 +263,7 @@ typedef struct {
 	NMIP4Config *   dev_ip4_config; /* Config from DHCP, PPP, LLv4, etc */
 	NMIP4Config *   ext_ip4_config; /* Stuff added outside NM */
 	NMIP4Config *   wwan_ip4_config; /* WWAN configuration */
+	GSList *        vpn4_configs;   /* VPNs which use this device */
 	struct {
 		gboolean v4_has;
 		gboolean v4_is_assumed;
@@ -280,7 +281,6 @@ typedef struct {
 	gulong          dhcp4_state_sigid;
 	NMDhcp4Config * dhcp4_config;
 	guint           dhcp4_restart_id;
-	GHashTable *    vpn4_config;  /* connection => config map for VPNs which use this device */
 
 	guint           arp_round2_id;
 	PingInfo        gw_ping;
@@ -300,9 +300,9 @@ typedef struct {
 	NMIP6Config *  ip6_config;
 	IpState        ip6_state;
 	NMIP6Config *  con_ip6_config; /* config from the setting */
-	GHashTable *   vpn6_config;  /* connection => config map for VPNs which use this device */
 	NMIP6Config *  wwan_ip6_config;
 	NMIP6Config *  ext_ip6_config; /* Stuff added outside NM */
+	GSList *       vpn6_configs;   /* VPNs which use this device */
 	gboolean       nm_ipv6ll; /* TRUE if NM handles the device's IPv6LL address */
 	guint32        ip6_mtu;
 
@@ -3418,7 +3418,7 @@ dhcp4_cleanup (NMDevice *self, CleanupType cleanup_type, gboolean release)
 }
 
 static void
-_ip4_config_merge_default (gpointer key, gpointer value, gpointer user_data)
+_ip4_config_merge_default (gpointer value, gpointer user_data)
 {
 	NMIP4Config *src = (NMIP4Config *) value;
 	NMIP4Config *dst = (NMIP4Config *) user_data;
@@ -3472,7 +3472,7 @@ ip4_config_merge_and_apply (NMDevice *self,
 		                     | (ignore_auto_dns ? NM_IP_CONFIG_MERGE_NO_DNS : 0));
 	}
 
-	g_hash_table_foreach (priv->vpn4_config, _ip4_config_merge_default, composite);
+	g_slist_foreach (priv->vpn4_configs, _ip4_config_merge_default, composite);
 
 	if (priv->ext_ip4_config)
 		nm_ip4_config_merge (composite, priv->ext_ip4_config, NM_IP_CONFIG_MERGE_DEFAULT);
@@ -4080,7 +4080,7 @@ dhcp6_cleanup (NMDevice *self, CleanupType cleanup_type, gboolean release)
 }
 
 static void
-_ip6_config_merge_default (gpointer key, gpointer value, gpointer user_data)
+_ip6_config_merge_default (gpointer value, gpointer user_data)
 {
 	NMIP6Config *src = (NMIP6Config *) value;
 	NMIP6Config *dst = (NMIP6Config *) user_data;
@@ -4134,7 +4134,7 @@ ip6_config_merge_and_apply (NMDevice *self,
 		                     | (ignore_auto_dns ? NM_IP_CONFIG_MERGE_NO_DNS : 0));
 	}
 
-	g_hash_table_foreach (priv->vpn6_config, _ip6_config_merge_default, composite);
+	g_slist_foreach (priv->vpn6_configs, _ip6_config_merge_default, composite);
 
 	if (priv->ext_ip6_config)
 		nm_ip6_config_merge (composite, priv->ext_ip6_config, NM_IP_CONFIG_MERGE_DEFAULT);
@@ -6697,14 +6697,31 @@ nm_device_set_ip4_config (NMDevice *self,
 }
 
 void
-nm_device_set_vpn4_config (gpointer conn, NMDevice *self, NMIP4Config *config)
+nm_device_replace_vpn4_config (NMDevice *self, NMIP4Config *old, NMIP4Config *config)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 
-	if (config)
-		g_hash_table_replace (priv->vpn4_config, conn, g_object_ref (config));
-	else
-		g_hash_table_remove (priv->vpn4_config, conn);
+	if (old) {
+		/* Removing a configuration */
+		if (config) {
+			/* Replace it with a new one in the same place in the list,
+			 * an already active connection sent a config update */
+			GSList *link = g_slist_find (priv->vpn4_configs, old);
+			link->data = g_object_ref (config);
+		} else {
+			/* Just remove it without replacement, on a connection teardown */
+			priv->vpn4_configs = g_slist_remove (priv->vpn4_configs, old);
+		}
+		g_object_unref (old);
+	} else {
+		if (config) {
+			/* Appending a new configuration, e.g. when actiating a new connection */
+			priv->vpn4_configs = g_slist_append (priv->vpn4_configs, g_object_ref (config));
+		} else {
+			/* No new config, nor we did have any previously. */
+			return;
+		}
+	}
 
 	/* NULL to use existing configs */
 	if (!ip4_config_merge_and_apply (self, NULL, TRUE, NULL))
@@ -6824,14 +6841,31 @@ nm_device_set_ip6_config (NMDevice *self,
 }
 
 void
-nm_device_set_vpn6_config (gpointer conn, NMDevice *self, NMIP6Config *config)
+nm_device_replace_vpn6_config (NMDevice *self, NMIP6Config *old, NMIP6Config *config)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 
-	if (config)
-		g_hash_table_replace (priv->vpn6_config, conn, g_object_ref (config));
-	else
-		g_hash_table_remove (priv->vpn6_config, conn);
+	if (old) {
+		/* Removing a configuration */
+		if (config) {
+			/* Replace it with a new one in the same place in the list,
+			 * an already active connection sent a config update */
+			GSList *link = g_slist_find (priv->vpn6_configs, old);
+			link->data = g_object_ref (config);
+		} else {
+			/* Just remove it without replacement, on a connection teardown */
+			priv->vpn6_configs = g_slist_remove (priv->vpn6_configs, old);
+		}
+		g_object_unref (old);
+	} else {
+		if (config) {
+			/* Appending a new configuration, e.g. when actiating a new connection */
+			priv->vpn6_configs = g_slist_append (priv->vpn6_configs, g_object_ref (config));
+		} else {
+			/* No new config, nor we did have any previously. */
+			return;
+		}
+	}
 
 	/* NULL to use existing configs */
 	if (!ip6_config_merge_and_apply (self, TRUE, NULL))
@@ -7429,7 +7463,7 @@ capture_lease_config (NMDevice *self,
 }
 
 static void
-_ip4_config_intersect (gpointer key, gpointer value, gpointer user_data)
+_ip4_config_intersect (gpointer value, gpointer user_data)
 {
 	NMIP4Config *dst = (NMIP4Config *) value;
 	NMIP4Config *src = (NMIP4Config *) user_data;
@@ -7438,7 +7472,7 @@ _ip4_config_intersect (gpointer key, gpointer value, gpointer user_data)
 }
 
 static void
-_ip4_config_subtract (gpointer key, gpointer value, gpointer user_data)
+_ip4_config_subtract (gpointer value, gpointer user_data)
 {
 	NMIP4Config *dst = (NMIP4Config *) value;
 	NMIP4Config *src = (NMIP4Config *) user_data;
@@ -7484,7 +7518,7 @@ update_ip4_config (NMDevice *self, gboolean initial)
 		if (priv->dev_ip4_config)
 			nm_ip4_config_intersect (priv->dev_ip4_config, priv->ext_ip4_config);
 
-		g_hash_table_foreach (priv->vpn4_config, _ip4_config_intersect, priv->ext_ip4_config);
+		g_slist_foreach (priv->vpn4_configs, _ip4_config_intersect, priv->ext_ip4_config);
 
 		if (priv->wwan_ip4_config)
 			nm_ip4_config_intersect (priv->wwan_ip4_config, priv->ext_ip4_config);
@@ -7497,7 +7531,7 @@ update_ip4_config (NMDevice *self, gboolean initial)
 		if (priv->dev_ip4_config)
 			nm_ip4_config_subtract (priv->ext_ip4_config, priv->dev_ip4_config);
 
-		g_hash_table_foreach (priv->vpn4_config, _ip4_config_subtract, priv->ext_ip4_config);
+		g_slist_foreach (priv->vpn4_configs, _ip4_config_subtract, priv->ext_ip4_config);
 
 		if (priv->wwan_ip4_config)
 			nm_ip4_config_subtract (priv->ext_ip4_config, priv->wwan_ip4_config);
@@ -7507,7 +7541,7 @@ update_ip4_config (NMDevice *self, gboolean initial)
 }
 
 static void
-_ip6_config_intersect (gpointer key, gpointer value, gpointer user_data)
+_ip6_config_intersect (gpointer value, gpointer user_data)
 {
 	NMIP6Config *dst = (NMIP6Config *) value;
 	NMIP6Config *src = (NMIP6Config *) user_data;
@@ -7516,7 +7550,7 @@ _ip6_config_intersect (gpointer key, gpointer value, gpointer user_data)
 }
 
 static void
-_ip6_config_subtract (gpointer key, gpointer value, gpointer user_data)
+_ip6_config_subtract (gpointer value, gpointer user_data)
 {
 	NMIP6Config *dst = (NMIP6Config *) value;
 	NMIP6Config *src = (NMIP6Config *) user_data;
@@ -7561,7 +7595,7 @@ update_ip6_config (NMDevice *self, gboolean initial)
 			nm_ip6_config_intersect (priv->dhcp6_ip6_config, priv->ext_ip6_config);
 		if (priv->wwan_ip6_config)
 			nm_ip6_config_intersect (priv->wwan_ip6_config, priv->ext_ip6_config);
-		g_hash_table_foreach (priv->vpn6_config, _ip6_config_intersect, priv->ext_ip4_config);
+		g_slist_foreach (priv->vpn6_configs, _ip6_config_intersect, priv->ext_ip4_config);
 
 		/* Remove parts from ext_ip6_config to only contain the information that
 		 * was configured externally -- we already have the same configuration from
@@ -7574,7 +7608,7 @@ update_ip6_config (NMDevice *self, gboolean initial)
 			nm_ip6_config_subtract (priv->ext_ip6_config, priv->dhcp6_ip6_config);
 		if (priv->wwan_ip6_config)
 			nm_ip6_config_subtract (priv->ext_ip6_config, priv->wwan_ip6_config);
-		g_hash_table_foreach (priv->vpn6_config, _ip6_config_subtract, priv->ext_ip4_config);
+		g_slist_foreach (priv->vpn6_configs, _ip6_config_subtract, priv->ext_ip4_config);
 
 		ip6_config_merge_and_apply (self, FALSE, NULL);
 	}
@@ -8262,8 +8296,10 @@ _cleanup_generic_post (NMDevice *self, CleanupType cleanup_type)
 	g_clear_object (&priv->wwan_ip6_config);
 	g_clear_object (&priv->ip6_config);
 
-	g_hash_table_remove_all (priv->vpn4_config);
-	g_hash_table_remove_all (priv->vpn6_config);
+	g_slist_free_full (priv->vpn4_configs, g_object_unref);
+	priv->vpn4_configs = NULL;
+	g_slist_free_full (priv->vpn6_configs, g_object_unref);
+	priv->vpn6_configs = NULL;
 
 	clear_act_request (self);
 
@@ -9202,9 +9238,6 @@ nm_device_init (NMDevice *self)
 
 	priv->v4_commit_first_time = TRUE;
 	priv->v6_commit_first_time = TRUE;
-
-	priv->vpn4_config = g_hash_table_new_full (NULL, NULL, NULL, g_object_unref);
-	priv->vpn6_config = g_hash_table_new_full (NULL, NULL, NULL, g_object_unref);
 }
 
 static void
@@ -9278,9 +9311,6 @@ dispose (GObject *object)
 	set_nm_ipv6ll (self, FALSE);
 
 	_cleanup_generic_post (self, CLEANUP_TYPE_KEEP);
-
-	g_clear_pointer (&priv->vpn4_config, g_hash_table_unref);
-	g_clear_pointer (&priv->vpn6_config, g_hash_table_unref);
 
 	g_hash_table_remove_all (priv->ip6_saved_properties);
 
