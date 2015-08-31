@@ -52,4 +52,6 @@ gboolean nm_vpn_manager_deactivate_connection (NMVpnManager *manager,
                                                NMVpnConnection *connection,
                                                NMVpnConnectionStateReason reason);
 
+guint64 nm_vpn_manager_get_next_service_counter (NMVpnManager *self, const char *service);
+
 #endif /* __NETWORKMANAGER_VPN_MANAGER_H__ */

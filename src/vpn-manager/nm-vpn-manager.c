@@ -37,6 +37,7 @@ G_DEFINE_TYPE (NMVpnManager, nm_vpn_manager, G_TYPE_OBJECT)
 #define NM_VPN_MANAGER_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_VPN_MANAGER, NMVpnManagerPrivate))
 
 typedef struct {
+	GHashTable *service_counters;
 	GSList *plugins;
 	GFileMonitor *monitor_etc;
 	GFileMonitor *monitor_lib;
@@ -118,6 +119,27 @@ nm_vpn_manager_activate_connection (NMVpnManager *manager,
 	}
 
 	return TRUE;
+}
+
+guint64
+nm_vpn_manager_get_next_service_counter (NMVpnManager *self, const char *service)
+{
+	NMVpnManagerPrivate *priv;
+	guint64 *val;
+
+	g_return_val_if_fail (NM_IS_VPN_MANAGER (self), 0);
+	g_return_val_if_fail (service && *service, 0);
+
+	priv = NM_VPN_MANAGER_GET_PRIVATE (self);
+
+	val = g_hash_table_lookup (priv->service_counters, service);
+	if (val)
+		return ++*val;
+
+	val = g_new (guint64, 1);
+	*val = 1;
+	g_hash_table_insert (priv->service_counters, g_strdup (service), val);
+	return 1;
 }
 
 gboolean
@@ -216,6 +238,9 @@ nm_vpn_manager_init (NMVpnManager *self)
 	const char *conf_dir_etc = _nm_vpn_plugin_info_get_default_dir_etc ();
 	const char *conf_dir_lib = _nm_vpn_plugin_info_get_default_dir_lib ();
 
+	priv->service_counters = g_hash_table_new_full (g_str_hash, g_str_equal,
+	                                                g_free, g_free);
+
 	/* Watch the VPN directory for changes */
 	file = g_file_new_for_path (conf_dir_lib);
 	priv->monitor_lib = g_file_monitor_directory (file, G_FILE_MONITOR_NONE, NULL, NULL);
@@ -277,6 +302,8 @@ dispose (GObject *object)
 	g_hash_table_unref (priv->active_services);
 
 	G_OBJECT_CLASS (nm_vpn_manager_parent_class)->dispose (object);
+
+	g_hash_table_destroy (priv->service_counters);
 }
 
 static void

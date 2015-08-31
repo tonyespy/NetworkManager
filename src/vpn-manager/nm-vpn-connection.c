@@ -1997,6 +1997,7 @@ nm_vpn_connection_activate (NMVpnConnection *self,
 {
 	NMVpnConnectionPrivate *priv;
 	NMSettingVpn *s_vpn;
+	const char *service;
 
 	g_return_if_fail (NM_IS_VPN_CONNECTION (self));
 
@@ -2007,13 +2008,13 @@ nm_vpn_connection_activate (NMVpnConnection *self,
 	priv->connection_can_persist = nm_setting_vpn_get_persistent (s_vpn);
 
 	priv->plugin_info = g_object_ref (plugin_info);
+	service = nm_vpn_connection_get_service (self);
 	if (nm_vpn_plugin_info_supports_multiple (priv->plugin_info)) {
-		priv->bus_name = g_strdup_printf ("%s.%s",
-		                                  nm_vpn_connection_get_service (self),
-		                                  nm_connection_get_uuid (_get_applied_connection (self)));
-	} else {
-		priv->bus_name = g_strdup (nm_vpn_connection_get_service (self));
-	}
+		priv->bus_name = g_strdup_printf ("%s.%"G_GUINT64_FORMAT,
+		                                  service,
+		                                  nm_vpn_manager_get_next_service_counter (nm_vpn_manager_get (), service));
+	} else
+		priv->bus_name = g_strdup (service);
 
 	priv->cancellable = g_cancellable_new ();
 
