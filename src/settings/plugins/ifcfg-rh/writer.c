@@ -2521,6 +2521,12 @@ write_ip6_setting (NMConnection *connection, shvarFile *ifcfg, GError **error)
 	break;
 	}
 
+	/* IPv6 Address generation mode */
+	svSetValue (ifcfg,
+	            "IPV6_ADDR_GEN_MODE",
+	            nm_setting_ip6_config_get_addr_gen_mode (NM_SETTING_IP6_CONFIG (s_ip6)),
+	            FALSE);
+
 	/* Static routes go to route6-<dev> file */
 	route6_path = utils_get_route6_path (ifcfg->fileName);
 	if (!route6_path) {

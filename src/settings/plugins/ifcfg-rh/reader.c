@@ -1307,6 +1307,7 @@ make_ip6_setting (shvarFile *ifcfg,
 	gboolean ip6_privacy = FALSE, ip6_privacy_prefer_public_ip;
 	char *ip6_privacy_str;
 	NMSettingIP6ConfigPrivacy ip6_privacy_val;
+	char *addr_gen_mode = NULL;
 
 	s_ip6 = (NMSettingIPConfig *) nm_setting_ip6_config_new ();
 
@@ -1405,6 +1406,9 @@ make_ip6_setting (shvarFile *ifcfg,
 	                      NM_SETTING_IP6_CONFIG_PRIVACY_UNKNOWN;
 	g_free (ip6_privacy_str);
 
+	/* Read IPv6 addressing mode configuration */
+	addr_gen_mode = svGetValue (ifcfg, "IPV6_ADDR_GEN_MODE", FALSE);
+
 	g_object_set (s_ip6,
 	              NM_SETTING_IP_CONFIG_METHOD, method,
 	              NM_SETTING_IP_CONFIG_IGNORE_AUTO_DNS, !svTrueValue (ifcfg, "IPV6_PEERDNS", TRUE),
@@ -1414,6 +1418,7 @@ make_ip6_setting (shvarFile *ifcfg,
 	              NM_SETTING_IP_CONFIG_ROUTE_METRIC, svGetValueInt64 (ifcfg, "IPV6_ROUTE_METRIC", 10,
 	                                                                  -1, G_MAXUINT32, -1),
 	              NM_SETTING_IP6_CONFIG_IP6_PRIVACY, ip6_privacy_val,
+	              NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE, addr_gen_mode,
 	              NULL);
 
 	/* Don't bother to read IP, DNS and routes when IPv6 is disabled */
@@ -1533,11 +1538,13 @@ make_ip6_setting (shvarFile *ifcfg,
 	parse_dns_options (s_ip6, dns_options);
 	g_free (value);
 	g_free (dns_options);
+	g_free (addr_gen_mode);
 
 	return NM_SETTING (s_ip6);
 
 error:
 	g_free (dns_options);
+	g_free (addr_gen_mode);
 	g_free (route6_path);
 	g_object_unref (s_ip6);
 	return NULL;
