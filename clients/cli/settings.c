@@ -320,8 +320,9 @@ NmcOutputField nmc_fields_setting_ip6_config[] = {
 	SETTING_FIELD (NM_SETTING_IP_CONFIG_NEVER_DEFAULT),       /* 11 */
 	SETTING_FIELD (NM_SETTING_IP_CONFIG_MAY_FAIL),            /* 12 */
 	SETTING_FIELD (NM_SETTING_IP6_CONFIG_IP6_PRIVACY),        /* 13 */
-	SETTING_FIELD (NM_SETTING_IP_CONFIG_DHCP_SEND_HOSTNAME),  /* 14 */
-	SETTING_FIELD (NM_SETTING_IP_CONFIG_DHCP_HOSTNAME),       /* 15 */
+	SETTING_FIELD (NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE),      /* 14 */
+	SETTING_FIELD (NM_SETTING_IP_CONFIG_DHCP_SEND_HOSTNAME),  /* 15 */
+	SETTING_FIELD (NM_SETTING_IP_CONFIG_DHCP_HOSTNAME),       /* 16 */
 	{NULL, NULL, 0, NULL, FALSE, FALSE, 0}
 };
 #define NMC_FIELDS_SETTING_IP6_CONFIG_ALL     "name"","\
@@ -338,6 +339,7 @@ NmcOutputField nmc_fields_setting_ip6_config[] = {
                                               NM_SETTING_IP_CONFIG_NEVER_DEFAULT","\
                                               NM_SETTING_IP_CONFIG_MAY_FAIL","\
                                               NM_SETTING_IP6_CONFIG_IP6_PRIVACY","\
+                                              NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE","\
                                               NM_SETTING_IP_CONFIG_DHCP_SEND_HOSTNAME","\
                                               NM_SETTING_IP_CONFIG_DHCP_HOSTNAME
 #define NMC_FIELDS_SETTING_IP6_CONFIG_COMMON  NMC_FIELDS_SETTING_IP4_CONFIG_ALL
@@ -1419,6 +1421,8 @@ nmc_property_ipv6_get_ip6_privacy (NMSetting *setting, NmcPropertyGetType get_ty
 	NMSettingIP6Config *s_ip6 = NM_SETTING_IP6_CONFIG (setting);
 	return ip6_privacy_to_string (nm_setting_ip6_config_get_ip6_privacy (s_ip6), get_type);
 }
+
+DEFINE_GETTER (nmc_property_ipv6_get_addr_gen_mode, NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE)
 
 /* --- NM_SETTING_OLPC_MESH_SETTING_NAME property get functions --- */
 DEFINE_GETTER (nmc_property_olpc_get_channel, NM_SETTING_OLPC_MESH_CHANNEL)
@@ -4072,6 +4076,20 @@ nmc_property_ipv6_set_ip6_privacy (NMSetting *setting, const char *prop, const c
 	return TRUE;
 }
 
+static const char *ipv6_valid_addr_gen_modes[] = {
+	NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_EUI64,
+	NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_STABLE_PRIVACY,
+	NULL
+};
+
+static gboolean
+nmc_property_ipv6_set_addr_gen_mode (NMSetting *setting, const char *prop, const char *val, GError **error)
+{
+	return check_and_set_string (setting, prop, val, ipv6_valid_addr_gen_modes, error);
+}
+
+DEFINE_ALLOWED_VAL_FUNC (nmc_property_ipv6_allowed_addr_gen_mode, ipv6_valid_addr_gen_modes)
+
 /* --- NM_SETTING_OLPC_MESH_SETTING_NAME property setter functions --- */
 static gboolean
 nmc_property_olpc_set_channel (NMSetting *setting, const char *prop, const char *val, GError **error)
@@ -6040,6 +6058,13 @@ nmc_properties_init (void)
 	                    NULL,
 	                    NULL,
 	                    NULL);
+	nmc_add_prop_funcs (GLUE (IP6_CONFIG, ADDR_GEN_MODE),
+	                    nmc_property_ipv6_get_addr_gen_mode,
+	                    nmc_property_ipv6_set_addr_gen_mode,
+	                    NULL,
+	                    NULL,
+	                    nmc_property_ipv6_allowed_addr_gen_mode,
+	                    NULL);
 	nmc_add_prop_funcs (GLUE_IP (6, DHCP_SEND_HOSTNAME),
 	                    nmc_property_ipv6_get_dhcp_send_hostname,
 	                    nmc_property_set_bool,
@@ -7290,8 +7315,9 @@ setting_ip6_config_details (NMSetting *setting, NmCli *nmc,  const char *one_pro
 	set_val_str (arr, 11, nmc_property_ipv6_get_never_default (setting, NMC_PROPERTY_GET_PRETTY));
 	set_val_str (arr, 12, nmc_property_ipv6_get_may_fail (setting, NMC_PROPERTY_GET_PRETTY));
 	set_val_str (arr, 13, nmc_property_ipv6_get_ip6_privacy (setting, NMC_PROPERTY_GET_PRETTY));
-	set_val_str (arr, 14, nmc_property_ipv6_get_dhcp_send_hostname (setting, NMC_PROPERTY_GET_PRETTY));
-	set_val_str (arr, 15, nmc_property_ipv6_get_dhcp_hostname (setting, NMC_PROPERTY_GET_PRETTY));
+	set_val_str (arr, 14, nmc_property_ipv6_get_addr_gen_mode (setting, NMC_PROPERTY_GET_PRETTY));
+	set_val_str (arr, 15, nmc_property_ipv6_get_dhcp_send_hostname (setting, NMC_PROPERTY_GET_PRETTY));
+	set_val_str (arr, 16, nmc_property_ipv6_get_dhcp_hostname (setting, NMC_PROPERTY_GET_PRETTY));
 	g_ptr_array_add (nmc->output_data, arr);
 
 	print_data (nmc);  /* Print all data */
