@@ -41,6 +41,31 @@ G_BEGIN_DECLS
 
 #define NM_SETTING_IP6_CONFIG_IP6_PRIVACY "ip6-privacy"
 
+#define NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE "addr-gen-mode"
+
+/**
+ * NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_EUI64:
+ *
+ * The Interface Identifier for RFC 4862 Stateless Address Autoconfiguration
+ * is derived from the interface hardware address. This makes the host part
+ * of the address to stay constant making, making it possible to track host's
+ * presence when it changes networks. The address changes when the interface
+ * hardware is replaced.
+ */
+#define NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_EUI64 "eui64"
+
+/**
+ * NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_STABLE_PRIVACY:
+ *
+ * The Interface Identifier for RFC 4862 Stateless Address Autoconfiguration
+ * is creating by using a cryptographically secure hash of a secret host-specific
+ * key along with the connection identification and the network address as
+ * specified by RFC 7217. This makes it impossible to use the address track
+ * host's presence, and makes the address stable when the network interface
+ * hardware is replaced.
+ */
+#define NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_STABLE_PRIVACY "stable-privacy"
+
 /**
  * NM_SETTING_IP6_CONFIG_METHOD_IGNORE:
  *
@@ -130,6 +155,8 @@ GType nm_setting_ip6_config_get_type (void);
 NMSetting *nm_setting_ip6_config_new (void);
 
 NMSettingIP6ConfigPrivacy nm_setting_ip6_config_get_ip6_privacy (NMSettingIP6Config *setting);
+
+const char * nm_setting_ip6_config_get_addr_gen_mode (NMSettingIP6Config *setting);
 
 G_END_DECLS
 
