@@ -173,7 +173,17 @@ receive_ra (struct ndp *ndp, struct ndp_msg *msg, gpointer user_data)
 					address.preferred = address.lifetime;
 
 				/* Add the Interface Identifier to the lower 64 bits */
-				nm_utils_ipv6_addr_set_interface_identfier (&address.address, rdisc->iid);
+				if (rdisc->uuid) {
+					if (!nm_utils_ipv6_addr_set_privacy_stable (&address.address,
+					                                            rdisc->ifname,
+					                                            rdisc->uuid,
+					                                            0)) {
+						_LOGW ("Can't generate an IPv6 address");
+						continue;
+					}
+				} else {
+					nm_utils_ipv6_addr_set_interface_identfier (&address.address, rdisc->iid);
+				}
 
 				if (nm_rdisc_add_address (rdisc, &address))
 					changed |= NM_RDISC_CONFIG_ADDRESSES;

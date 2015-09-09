@@ -253,6 +253,21 @@ nm_rdisc_set_iid (NMRDisc *rdisc, const NMUtilsIPv6IfaceId iid)
 	return FALSE;
 }
 
+/**
+ * nm_rdisc_set_privacy_stable:
+ * @rdisc: the #NMRDisc
+ * @uuid: the connection UUID
+ *
+ * Sets the "Network_ID" (the connection UUID is used) to be used with
+ * RFC 7217 Stable Privacy adressing.
+ **/
+void
+nm_rdisc_set_privacy_stable (NMRDisc *rdisc, const char *uuid)
+{
+	g_return_if_fail (!rdisc->uuid);
+	rdisc->uuid = g_strdup (uuid);
+}
+
 static void
 clear_ra_timeout (NMRDisc *rdisc)
 {
@@ -636,6 +651,7 @@ finalize (GObject *object)
 	NMRDisc *rdisc = NM_RDISC (object);
 
 	g_free (rdisc->ifname);
+	g_free (rdisc->uuid);
 	g_array_unref (rdisc->gateways);
 	g_array_unref (rdisc->addresses);
 	g_array_unref (rdisc->routes);

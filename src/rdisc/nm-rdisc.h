@@ -114,6 +114,8 @@ typedef struct {
 
 	int ifindex;
 	char *ifname;
+	char *uuid;
+	//guint dad_counter;
 	NMUtilsIPv6IfaceId iid;
 	gint32 max_addresses;
 	gint32 rtr_solicitations;
@@ -142,6 +144,9 @@ typedef struct {
 GType nm_rdisc_get_type (void);
 
 gboolean nm_rdisc_set_iid (NMRDisc *rdisc, const NMUtilsIPv6IfaceId iid);
+
+void nm_rdisc_set_privacy_stable (NMRDisc *rdisc, const char *uuid);
+
 void nm_rdisc_start (NMRDisc *rdisc);
 
 #endif /* __NETWORKMANAGER_RDISC_H__ */
