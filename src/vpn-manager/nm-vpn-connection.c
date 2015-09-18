@@ -139,7 +139,6 @@ static guint signals[LAST_SIGNAL] = { 0 };
 
 enum {
 	PROP_0,
-	PROP_INT_PLUGIN_INFO,
 	PROP_VPN_STATE,
 	PROP_BANNER,
 	PROP_IP4_CONFIG,
@@ -738,18 +737,15 @@ add_ip6_vpn_gateway_route (NMIP6Config *config,
 
 NMVpnConnection *
 nm_vpn_connection_new (NMSettingsConnection *settings_connection,
-                       NMVpnPluginInfo *plugin_info,
                        NMDevice *parent_device,
                        const char *specific_object,
                        NMAuthSubject *subject)
 {
 	g_return_val_if_fail (!settings_connection || NM_IS_SETTINGS_CONNECTION (settings_connection), NULL);
-	g_return_val_if_fail (NM_IS_VPN_PLUGIN_INFO (plugin_info), NULL);
 	g_return_val_if_fail (NM_IS_DEVICE (parent_device), NULL);
 
 	return (NMVpnConnection *) g_object_new (NM_TYPE_VPN_CONNECTION,
 	                                         NM_ACTIVE_CONNECTION_INT_SETTINGS_CONNECTION, settings_connection,
-	                                         NM_VPN_CONNECTION_INT_PLUGIN_INFO, plugin_info,
 	                                         NM_ACTIVE_CONNECTION_INT_DEVICE, parent_device,
 	                                         NM_ACTIVE_CONNECTION_SPECIFIC_OBJECT, specific_object,
 	                                         NM_ACTIVE_CONNECTION_INT_SUBJECT, subject,
@@ -760,15 +756,10 @@ nm_vpn_connection_new (NMSettingsConnection *settings_connection,
 const char *
 nm_vpn_connection_get_service (NMVpnConnection *self)
 {
-	NMVpnConnectionPrivate *priv;
+	NMSettingVpn *s_vpn;
 
-	g_return_val_if_fail (NM_IS_VPN_CONNECTION (self), NULL);
-
-	priv = NM_VPN_CONNECTION_GET_PRIVATE (self);
-
-	g_return_val_if_fail (priv->plugin_info, NULL);
-
-	return nm_vpn_plugin_info_get_service (priv->plugin_info);
+	s_vpn = nm_connection_get_setting_vpn (_get_applied_connection (self));
+	return nm_setting_vpn_get_service_type (s_vpn);
 }
 
 static const char *
@@ -2470,23 +2461,6 @@ get_property (GObject *object, guint prop_id,
 		break;
 	}
 }
-static void
-set_property (GObject *object, guint prop_id,
-              const GValue *value, GParamSpec *pspec)
-{
-	NMVpnConnectionPrivate *priv = NM_VPN_CONNECTION_GET_PRIVATE (object);
-
-	switch (prop_id) {
-	case PROP_INT_PLUGIN_INFO:
-		/*construct-only*/
-		priv->plugin_info = g_value_dup_object (value);
-		g_return_if_fail (NM_IS_VPN_PLUGIN_INFO (priv->plugin_info));
-		break;
-	default:
-		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-		break;
-	}
-}
 
 static void
 nm_vpn_connection_class_init (NMVpnConnectionClass *connection_class)
@@ -2498,7 +2472,6 @@ nm_vpn_connection_class_init (NMVpnConnectionClass *connection_class)
 
 	/* virtual methods */
 	object_class->get_property = get_property;
-	object_class->set_property = set_property;
 	object_class->dispose = dispose;
 	object_class->finalize = finalize;
 	active_class->device_state_changed = device_state_changed;
@@ -2507,14 +2480,6 @@ nm_vpn_connection_class_init (NMVpnConnectionClass *connection_class)
 	g_object_class_override_property (object_class, PROP_MASTER, NM_ACTIVE_CONNECTION_MASTER);
 
 	/* properties */
-	g_object_class_install_property
-		(object_class, PROP_INT_PLUGIN_INFO,
-		 g_param_spec_object (NM_VPN_CONNECTION_INT_PLUGIN_INFO, "", "",
-		                      NM_TYPE_VPN_PLUGIN_INFO,
-		                      G_PARAM_WRITABLE |
-		                      G_PARAM_CONSTRUCT_ONLY |
-		                      G_PARAM_STATIC_STRINGS));
-
 	g_object_class_install_property
 		(object_class, PROP_VPN_STATE,
 		 g_param_spec_uint (NM_VPN_CONNECTION_VPN_STATE, "", "",
