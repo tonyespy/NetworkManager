@@ -131,6 +131,11 @@ static void
 try_add_plugin (NMVpnManager *self, NMVpnPluginInfo *plugin_info)
 {
 	NMVpnManagerPrivate *priv = NM_VPN_MANAGER_GET_PRIVATE (self);
+	const char *program;
+
+	program = nm_vpn_plugin_info_get_program (plugin_info);
+	if (!program || !*program)
+		return;
 
 	/* Make sure we don't add dupes.
 	 * We don't really allow reload of the same file. What we do allow is however to
