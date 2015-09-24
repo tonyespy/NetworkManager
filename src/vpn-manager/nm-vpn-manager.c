@@ -48,6 +48,8 @@ typedef struct {
 	GHashTable *active_services;
 } NMVpnManagerPrivate;
 
+/******************************************************************************/
+
 static void
 vpn_state_changed (NMVpnConnection *vpn,
                    GParamSpec *pspec,
@@ -126,6 +128,8 @@ nm_vpn_manager_deactivate_connection (NMVpnManager *self,
 {
 	return nm_vpn_connection_deactivate (connection, reason, FALSE);
 }
+
+/******************************************************************************/
 
 static void
 try_add_plugin (NMVpnManager *self, NMVpnPluginInfo *plugin_info)
