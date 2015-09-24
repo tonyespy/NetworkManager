@@ -273,10 +273,8 @@ dispose (GObject *object)
 		g_clear_object (&priv->monitor_lib);
 	}
 
-	while (priv->plugins) {
-		NMVpnPluginInfo *plugin_info = priv->plugins->data;
-		nm_vpn_plugin_info_list_remove (&priv->plugins, plugin_info);
-	}
+	while (priv->plugins)
+		nm_vpn_plugin_info_list_remove (&priv->plugins, priv->plugins->data);
 
 	g_hash_table_unref (priv->active_services);
 
