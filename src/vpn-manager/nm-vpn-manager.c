@@ -76,8 +76,7 @@ nm_vpn_manager_activate_connection (NMVpnManager *manager,
 
 	g_return_val_if_fail (NM_IS_VPN_MANAGER (manager), FALSE);
 	g_return_val_if_fail (NM_IS_VPN_CONNECTION (vpn), FALSE);
-	g_return_val_if_fail (error != NULL, FALSE);
-	g_return_val_if_fail (*error == NULL, FALSE);
+	g_return_val_if_fail (!error || !*error, FALSE);
 
 	priv = NM_VPN_MANAGER_GET_PRIVATE (manager);
 	device = nm_active_connection_get_device (NM_ACTIVE_CONNECTION (vpn));
