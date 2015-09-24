@@ -107,7 +107,7 @@ nm_vpn_manager_activate_connection (NMVpnManager *manager,
 		return FALSE;
 	}
 
-	nm_vpn_connection_activate (vpn, plugin_info, error);
+	nm_vpn_connection_activate (vpn, plugin_info);
 
 	if (!nm_vpn_plugin_info_supports_multiple (plugin_info)) {
 		/* Block activations of the connections of the same service type. */

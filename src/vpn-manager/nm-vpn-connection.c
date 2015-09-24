@@ -1992,8 +1992,7 @@ on_proxy_acquired (GObject *object, GAsyncResult *result, gpointer user_data)
 
 void
 nm_vpn_connection_activate (NMVpnConnection *self,
-                            NMVpnPluginInfo *plugin_info,
-                            GError **error)
+                            NMVpnPluginInfo *plugin_info)
 {
 	NMVpnConnectionPrivate *priv;
 	NMSettingVpn *s_vpn;
