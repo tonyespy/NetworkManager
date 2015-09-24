@@ -1998,8 +1998,10 @@ nm_vpn_connection_activate (NMVpnConnection *self,
 	NMSettingVpn *s_vpn;
 
 	g_return_if_fail (NM_IS_VPN_CONNECTION (self));
+	g_return_if_fail (NM_IS_VPN_PLUGIN_INFO (plugin_info));
 
 	priv = NM_VPN_CONNECTION_GET_PRIVATE (self);
+	g_return_if_fail (!priv->plugin_info);
 
 	s_vpn = nm_connection_get_setting_vpn (_get_applied_connection (self));
 	g_assert (s_vpn);
