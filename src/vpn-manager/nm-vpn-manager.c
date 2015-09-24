@@ -121,14 +121,6 @@ nm_vpn_manager_activate_connection (NMVpnManager *manager,
 	return TRUE;
 }
 
-gboolean
-nm_vpn_manager_deactivate_connection (NMVpnManager *self,
-                                      NMVpnConnection *connection,
-                                      NMVpnConnectionStateReason reason)
-{
-	return nm_vpn_connection_deactivate (connection, reason, FALSE);
-}
-
 /******************************************************************************/
 
 static void
