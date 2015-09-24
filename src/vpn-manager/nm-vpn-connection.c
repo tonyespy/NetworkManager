@@ -1857,7 +1857,7 @@ _name_owner_changed (GObject *object,
 	if (owner && !priv->service_running) {
 		/* service appeared */
 		priv->service_running = TRUE;
-		nm_log_info (LOGD_VPN, "Saw the service appear; activating connection");
+		_LOGI ("Saw the service appear; activating connection");
 
 		/* No need to wait for the timeout any longer */
 		nm_clear_g_source (&priv->start_timeout);
@@ -1887,7 +1887,7 @@ _name_owner_changed (GObject *object,
 	} else if (!owner && priv->service_running) {
 		/* service went away */
 		priv->service_running = FALSE;
-		nm_log_info (LOGD_VPN, "VPN service disappeared");
+		_LOGI ("VPN service disappeared");
 		nm_vpn_connection_disconnect (self, NM_VPN_CONNECTION_STATE_REASON_SERVICE_STOPPED, FALSE);
 	}
 
@@ -1901,7 +1901,7 @@ _daemon_exec_timeout (gpointer data)
 	NMVpnConnection *self = NM_VPN_CONNECTION (data);
 	NMVpnConnectionPrivate *priv = NM_VPN_CONNECTION_GET_PRIVATE (self);
 
-	nm_log_warn (LOGD_VPN, "Timed out waiting for the service to start");
+	_LOGW ("Timed out waiting for the service to start");
 	priv->start_timeout = 0;
 	nm_vpn_connection_disconnect (self, NM_VPN_CONNECTION_STATE_REASON_SERVICE_START_TIMEOUT, FALSE);
 
@@ -1934,7 +1934,7 @@ nm_vpn_service_daemon_exec (NMVpnConnection *self, GError **error)
 	success = g_spawn_async (NULL, vpn_argv, NULL, 0, nm_utils_setpgid, NULL, &pid, &spawn_error);
 
 	if (success) {
-		nm_log_info (LOGD_VPN, "Started the VPN service, PID %ld", (long int) pid);
+		_LOGI ("Started the VPN service, PID %ld", (long int) pid);
 		priv->start_timeout = g_timeout_add_seconds (5, _daemon_exec_timeout, g_object_ref (self));
 	} else {
 		g_set_error (error,
@@ -1983,8 +1983,8 @@ on_proxy_acquired (GObject *object, GAsyncResult *result, gpointer user_data)
 		return;
 
 	if (!nm_vpn_service_daemon_exec (self, &error)) {
-		nm_log_warn (LOGD_VPN, "Could not launch the VPN service. error: %s.",
-		             error->message);
+		_LOGW ("Could not launch the VPN service. error: %s.",
+		       error->message);
 
 		nm_vpn_connection_disconnect (self, NM_VPN_CONNECTION_STATE_REASON_SERVICE_START_FAILED, FALSE);
 	}
