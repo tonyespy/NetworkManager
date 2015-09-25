@@ -37,5 +37,5 @@ if __name__ == "__main__":
     print "------------------------------"
     for d in devices:
         if not d.is_real():
-            print "%s (%s): %s" % (d.get_iface(), d.get_type_description())
+            print "%s (%s): %s" % (d.get_iface(), d.get_type_description(), d.get_state())
 
