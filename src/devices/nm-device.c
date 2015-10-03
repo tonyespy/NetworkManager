@@ -4602,16 +4602,20 @@ linklocal6_cleanup (NMDevice *self)
 	}
 }
 
+static void
+linklocal6_failed (NMDevice *self)
+{
+	linklocal6_cleanup (self);
+	nm_device_activate_schedule_ip6_config_timeout (self);
+}
+
 static gboolean
 linklocal6_timeout_cb (gpointer user_data)
 {
 	NMDevice *self = user_data;
 
-	linklocal6_cleanup (self);
-
 	_LOGD (LOGD_DEVICE, "linklocal6: waiting for link-local addresses failed due to timeout");
-
-	nm_device_activate_schedule_ip6_config_timeout (self);
+	linklocal6_failed (self);
 	return G_SOURCE_REMOVE;
 }
 
@@ -4668,7 +4672,8 @@ check_and_add_ipv6ll_addr (NMDevice *self)
 			const NMPlatformIP6Address *addr;
 
 			addr = nm_ip6_config_get_address (priv->ip6_config, i);
-			if (IN6_IS_ADDR_LINKLOCAL (&addr->address)) {
+			if (   IN6_IS_ADDR_LINKLOCAL (&addr->address)
+		            && !(addr->flags & IFA_F_DADFAILED)) {
 				/* Already have an LL address, nothing to do */
 				return;
 			}
@@ -4683,6 +4688,14 @@ check_and_add_ipv6ll_addr (NMDevice *self)
 	memset (&lladdr, 0, sizeof (lladdr));
 	lladdr.s6_addr16[0] = htons (0xfe80);
 	nm_utils_ipv6_addr_set_interface_identfier (&lladdr, iid);
+
+	if (priv->linklocal6_timeout_id) {
+		/* LL generation already running and we can't do anything about it */
+		_LOGW (LOGD_IP6, "DAD failed for an EUI-64 address");
+		linklocal6_failed (self);
+		return;
+	}
+
 	_LOGD (LOGD_IP6, "adding IPv6LL address %s", nm_utils_inet6_ntop (&lladdr, NULL));
 	if (!nm_platform_ip6_address_add (NM_PLATFORM_GET,
 	                                  ip_ifindex,
@@ -7648,6 +7661,23 @@ queued_ip6_config_change (gpointer user_data)
 }
 
 static void
+dad6_failed (NMDevice *self, NMPlatformIP6Address *addr)
+{
+	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+
+	if (addr->source >= NM_IP_CONFIG_SOURCE_USER)
+		return;
+
+	_LOGI (LOGD_IP6, "duplicate address check failed for the %s address",
+	                 nm_platform_ip6_address_to_string (addr));
+
+	if (IN6_IS_ADDR_LINKLOCAL (&addr->address))
+		check_and_add_ipv6ll_addr (self);
+	else
+		nm_rdisc_dad_failed (priv->rdisc, &addr->address);
+}
+
+static void
 device_ipx_changed (NMPlatform *platform,
                     NMPObjectType obj_type,
                     int ifindex,
@@ -7660,6 +7690,14 @@ device_ipx_changed (NMPlatform *platform,
 
 	if (nm_device_get_ip_ifindex (self) != ifindex)
 		return;
+
+	if (obj_type == NMP_OBJECT_TYPE_IP6_ADDRESS) {
+		NMPlatformIP6Address *addr = platform_object;
+		if (   (change_type == NM_PLATFORM_SIGNAL_CHANGED && addr->flags & IFA_F_DADFAILED)
+		    || (change_type == NM_PLATFORM_SIGNAL_REMOVED && addr->flags & IFA_F_TENTATIVE)) {
+			dad6_failed (self, addr);
+		}
+	}
 
 	priv = NM_DEVICE_GET_PRIVATE (self);
 	switch (obj_type) {
