@@ -150,8 +150,6 @@ unrealize (NMDevice *device, gboolean remove_resources)
 	GParamSpec **properties;
 	guint n_properties, i;
 
-	g_object_freeze_notify (G_OBJECT (device));
-
 	NM_DEVICE_CLASS (nm_device_vxlan_parent_class)->unrealize (device, remove_resources);
 
 	memset (&priv->props, 0, sizeof (NMPlatformLnkVxlan));
@@ -160,8 +158,6 @@ unrealize (NMDevice *device, gboolean remove_resources)
 	for (i = 0; i < n_properties; i++)
 		g_object_notify_by_pspec (G_OBJECT (self), properties[i]);
 	g_free (properties);
-
-	g_object_thaw_notify (G_OBJECT (device));
 }
 
 /**************************************************************/

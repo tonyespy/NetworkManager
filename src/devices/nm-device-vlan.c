@@ -259,15 +259,11 @@ create_and_realize (NMDevice *device,
 static void
 unrealize (NMDevice *device, gboolean remove_resources)
 {
-	g_object_freeze_notify (G_OBJECT (device));
-
 	NM_DEVICE_CLASS (nm_device_vlan_parent_class)->unrealize (device, remove_resources);
 
 	NM_DEVICE_VLAN_GET_PRIVATE (device)->vlan_id = 0;
 	g_object_notify (G_OBJECT (device), NM_DEVICE_VLAN_ID);
 	nm_device_vlan_set_parent (NM_DEVICE_VLAN (device), NULL);
-
-	g_object_thaw_notify (G_OBJECT (device));
 }
 
 /******************************************************************/
