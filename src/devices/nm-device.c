@@ -6554,11 +6554,13 @@ delete_on_deactivate_link_delete (gpointer user_data)
 
 	if (data->device) {
 		NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (data->device);
+		gs_free_error GError *error = NULL;
 
 		g_object_remove_weak_pointer (G_OBJECT (data->device), (void **) &data->device);
 		priv->delete_on_deactivate_data = NULL;
 
-		nm_device_unrealize (data->device, TRUE, NULL);
+		if (!nm_device_unrealize (data->device, TRUE, &error))
+			_LOGD (LOGD_DEVICE, "delete_on_deactivate: unrealizing %d failed (%s)", data->ifindex, error->message);
 	} else
 		nm_platform_link_delete (NM_PLATFORM_GET, data->ifindex);
 
