@@ -271,6 +271,7 @@ receive_ra (gpointer user_data)
 			NMRDiscAddress address;
 
 			address.address = item->network;
+			address.dad_counter = 0;
 			address.timestamp = item->timestamp;
 			address.lifetime = item->lifetime;
 			address.preferred = item->preferred;
