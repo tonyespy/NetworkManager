@@ -1873,7 +1873,7 @@ unrealize (NMDevice *self, gboolean remove_resources)
 {
 	int ifindex;
 
-	if (!remove_resources) {
+	if (remove_resources) {
 		ifindex = nm_device_get_ifindex (self);
 		if (   ifindex > 0
 		    && nm_device_is_software (self))
