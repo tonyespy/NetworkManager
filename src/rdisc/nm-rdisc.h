@@ -115,6 +115,8 @@ typedef struct {
 
 	int ifindex;
 	char *ifname;
+	char *uuid;
+	char *addr_gen_mode;
 	NMUtilsIPv6IfaceId iid;
 	gint32 max_addresses;
 	gint32 rtr_solicitations;

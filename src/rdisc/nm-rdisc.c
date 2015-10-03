@@ -30,6 +30,8 @@
 #include "nm-default.h"
 #include "nm-utils.h"
 
+#include <nm-setting-ip6-config.h>
+
 #define _NMLOG_PREFIX_NAME                "rdisc"
 
 typedef struct {
@@ -104,6 +106,15 @@ nm_rdisc_add_gateway (NMRDisc *rdisc, const NMRDiscGateway *new)
 static gboolean
 complete_address (NMRDisc *rdisc, NMRDiscAddress *addr)
 {
+	if (!g_strcmp0 (rdisc->addr_gen_mode,
+	                NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_STABLE_PRIVACY)) {
+		_LOGD ("Adding an stable-privacy address");
+		return nm_utils_ipv6_addr_set_stable_privacy (&addr->address,
+		                                              rdisc->ifname,
+		                                              rdisc->uuid,
+		                                              addr->dad_counter++);
+	}
+
 	if (!rdisc->iid.id) {
 		_LOGW ("Can't generate an EUI-64 address: no interface identifier");
 		return FALSE;
@@ -269,7 +280,10 @@ nm_rdisc_add_dns_domain (NMRDisc *rdisc, const NMRDiscDNSDomain *new)
  * the old identifier are removed. The caller should ensure the addresses
  * will be reset by soliciting router advertisements.
  *
- * Returns: %TRUE if the token was changed, %FALSE otherwise.
+ * In case the stable privacy addressing is used %FALSE is returned and
+ * addresses are left untouched.
+ *
+ * Returns: %TRUE if addresses need to be regenerated, %FALSE otherwise.
  **/
 gboolean
 nm_rdisc_set_iid (NMRDisc *rdisc, const NMUtilsIPv6IfaceId iid)
@@ -278,6 +292,11 @@ nm_rdisc_set_iid (NMRDisc *rdisc, const NMUtilsIPv6IfaceId iid)
 
 	if (rdisc->iid.id != iid.id) {
 		rdisc->iid = iid;
+
+		if (!g_strcmp0 (rdisc->addr_gen_mode,
+	                        NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_STABLE_PRIVACY))
+			return FALSE;
+
 		if (rdisc->addresses->len) {
 			_LOGD ("IPv6 interface identifier changed, flushing addresses");
 			g_array_remove_range (rdisc->addresses, 0, rdisc->addresses->len);
@@ -693,6 +712,7 @@ finalize (GObject *object)
 	NMRDisc *rdisc = NM_RDISC (object);
 
 	g_free (rdisc->ifname);
+	g_free (rdisc->uuid);
 	g_array_unref (rdisc->gateways);
 	g_array_unref (rdisc->addresses);
 	g_array_unref (rdisc->routes);

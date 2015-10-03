@@ -29,6 +29,7 @@
 #include <resolv.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <linux/if.h>
 #include <linux/if_infiniband.h>
 
@@ -3085,6 +3086,80 @@ nm_utils_ipv6_interface_identfier_get_from_addr (NMUtilsIPv6IfaceId *iid,
                                                  const struct in6_addr *addr)
 {
 	memcpy (iid, addr->s6_addr + 8, 8);
+}
+
+#define RFC7217_IDGEN_RETRIES 3
+/**
+ * nm_utils_ipv6_addr_set_stable_privacy:
+ *
+ * Extend the address prefix with an interface identifier using the
+ * RFC 7217 Stable Privacy mechanism.
+ *
+ * Returns: %TRUE on success, %FALSE if the address could not be generated.
+ */
+gboolean
+nm_utils_ipv6_addr_set_stable_privacy (struct in6_addr *addr,
+                                       const char *ifname,
+                                       const char *uuid,
+                                       guint dad_counter)
+{
+	GChecksum *sum;
+	guint8 digest[32];
+	gsize len = sizeof (digest);
+	gchar *secret_key = NULL;
+	gsize key_len = 0;
+
+	if (dad_counter >= RFC7217_IDGEN_RETRIES)
+		return FALSE;
+
+	/* Let's try to load a saved secret key first. */
+	if (!g_file_get_contents (NMSTATEDIR "/secret_key", &secret_key, &key_len, NULL)) {
+		int urandom = open ("/dev/urandom", O_RDONLY);
+		mode_t key_mask;
+
+		if (!urandom) {
+			nm_log_warn (LOGD_CORE, "/dev/urandom: %s", strerror (errno));
+			return FALSE;
+		}
+
+		/* RFC7217 mandates the key SHOULD be at least 128 bits.
+		 * Let's use twice as much. */
+		key_len = 32;
+		secret_key = g_malloc (key_len);
+
+		key_mask = umask (0077);
+		if (   read (urandom, secret_key, key_len) != key_len
+		    || !g_file_set_contents (NMSTATEDIR "/secret_key", secret_key, key_len, NULL)) {
+			nm_log_warn (LOGD_CORE, "can not generate a secret for IPv6 stable privacy address");
+			key_len = 0;
+		}
+		umask (key_mask);
+		close (urandom);
+	}
+
+	/* Documentation suggests that this can fail.
+	 * Maybe in case of a missing algorithm in crypto library? */
+	sum = g_checksum_new (G_CHECKSUM_SHA256);
+
+	if (key_len < 16 || !sum) {
+		g_free (secret_key);
+		return FALSE;
+	}
+
+	g_checksum_update (sum, addr->s6_addr, 8);
+	g_checksum_update (sum, (const guchar *) ifname, -1);
+	if (uuid)
+		g_checksum_update (sum, (const guchar *) uuid, -1);
+	g_checksum_update (sum, (const guchar *) &dad_counter, sizeof (dad_counter));
+	g_checksum_update (sum, (const guchar *) secret_key, key_len);
+	g_free (secret_key);
+
+	g_checksum_get_digest (sum, digest, &len);
+	g_checksum_free (sum);
+
+	memcpy (addr->s6_addr + 8, &digest[len - 8], 8);
+
+	return TRUE;
 }
 
 /**

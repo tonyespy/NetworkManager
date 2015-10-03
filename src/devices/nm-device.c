@@ -32,6 +32,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netlink/route/addr.h>
+#include <linux/if_addr.h>
 
 #include "nm-default.h"
 #include "nm-device.h"
@@ -322,6 +323,7 @@ typedef struct {
 	NMIP6Config *  ac_ip6_config;
 
 	guint          linklocal6_timeout_id;
+	guint8         linklocal6_dad_counter;
 
 	GHashTable *   ip6_saved_properties;
 
@@ -4717,9 +4719,10 @@ check_and_add_ipv6ll_addr (NMDevice *self)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 	int ip_ifindex = nm_device_get_ip_ifindex (self);
-	NMUtilsIPv6IfaceId iid;
 	struct in6_addr lladdr;
 	guint i, n;
+	NMConnection *connection;
+	NMSettingIP6Config *s_ip6 = NULL;
 
 	if (priv->nm_ipv6ll == FALSE)
 		return;
@@ -4738,20 +4741,41 @@ check_and_add_ipv6ll_addr (NMDevice *self)
 		}
 	}
 
-	if (!nm_device_get_ip_iface_identifier (self, &iid)) {
-		_LOGW (LOGD_IP6, "failed to get interface identifier; IPv6 may be broken");
-		return;
-	}
-
 	memset (&lladdr, 0, sizeof (lladdr));
 	lladdr.s6_addr16[0] = htons (0xfe80);
-	nm_utils_ipv6_addr_set_interface_identfier (&lladdr, iid);
 
-	if (priv->linklocal6_timeout_id) {
-		/* LL generation already running and we can't do anything about it */
-		_LOGW (LOGD_IP6, "DAD failed for an EUI-64 address");
-		linklocal6_failed (self);
-		return;
+	connection = nm_device_get_applied_connection (self);
+	if (connection)
+		s_ip6 = NM_SETTING_IP6_CONFIG (nm_connection_get_setting_ip6_config (connection));
+
+	if (s_ip6 && !g_strcmp0 (nm_setting_ip6_config_get_addr_gen_mode (s_ip6),
+	                         NM_SETTING_IP6_CONFIG_ADDR_GEN_MODE_STABLE_PRIVACY)) {
+		_LOGD (LOGD_IP6, "Using IPv6 stable-privacy addressing");
+		if (!nm_utils_ipv6_addr_set_stable_privacy (&lladdr,
+		                                            nm_device_get_iface (self),
+			                                    nm_connection_get_uuid (connection),
+		                                            priv->linklocal6_dad_counter++)) {
+			_LOGW (LOGD_IP6, "failed to generate and adderss; IPv6 cannot continue");
+			linklocal6_failed (self);
+			return;
+		}
+	} else {
+		NMUtilsIPv6IfaceId iid;
+
+		if (priv->linklocal6_timeout_id) {
+			/* LL generation already running and we can't do anything about it */
+			_LOGW (LOGD_IP6, "DAD failed for an EUI-64 address");
+			linklocal6_failed (self);
+			return;
+		}
+
+		_LOGD (LOGD_IP6, "Using EUI-64 identifier to generate IPv6LL address");
+		if (!nm_device_get_ip_iface_identifier (self, &iid)) {
+			_LOGW (LOGD_IP6, "failed to get interface identifier; IPv6 cannot continue");
+			return;
+		}
+
+		nm_utils_ipv6_addr_set_interface_identfier (&lladdr, iid);
 	}
 
 	_LOGD (LOGD_IP6, "adding IPv6LL address %s", nm_utils_inet6_ntop (&lladdr, NULL));
@@ -5078,10 +5102,15 @@ addrconf6_start_with_link_ready (NMDevice *self)
 	g_assert (priv->rdisc);
 
 	if (nm_platform_link_get_ipv6_token (NM_PLATFORM_GET, priv->ifindex, &iid)) {
-		_LOGD (LOGD_DEVICE, "IPv6 tokenized identifier present on device %s", priv->iface);
-	} else if (!nm_device_get_ip_iface_identifier (self, &iid)) {
-		_LOGW (LOGD_IP6, "failed to get interface identifier; IPv6 cannot continue");
-		return FALSE;
+		_LOGD (LOGD_IP6, "IPv6 tokenized identifier present");
+		nm_rdisc_set_iid (priv->rdisc, iid);
+	} else if (nm_device_get_ip_iface_identifier (self, &iid)) {
+		_LOGD (LOGD_IP6, "Using the device EUI-64 identifier");
+		nm_rdisc_set_iid (priv->rdisc, iid);
+	} else {
+		/* Don't abort the addrconf at this point -- if rdisc needs the iid
+		 * it will notice this itself. */
+		_LOGI (LOGD_IP6, "no interface identifier; IPv6 adddress creation may fail");
 	}
 
 	/* Apply any manual configuration before starting RA */
@@ -5102,7 +5131,6 @@ addrconf6_start_with_link_ready (NMDevice *self)
 	                                           G_CALLBACK (rdisc_ra_timeout),
 	                                           self);
 
-	nm_rdisc_set_iid (priv->rdisc, iid);
 	nm_rdisc_start (priv->rdisc);
 	return TRUE;
 }
@@ -5113,7 +5141,7 @@ addrconf6_start (NMDevice *self, NMSettingIP6ConfigPrivacy use_tempaddr)
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 	NMConnection *connection;
 	NMActStageReturn ret;
-	const char *ip_iface = nm_device_get_ip_iface (self);
+	NMSettingIP6Config *s_ip6 = NULL;
 
 	connection = nm_device_get_applied_connection (self);
 	g_assert (connection);
@@ -5124,9 +5152,15 @@ addrconf6_start (NMDevice *self, NMSettingIP6ConfigPrivacy use_tempaddr)
 		priv->ac_ip6_config = NULL;
 	}
 
-	priv->rdisc = nm_lndp_rdisc_new (nm_device_get_ip_ifindex (self), ip_iface);
+	s_ip6 = NM_SETTING_IP6_CONFIG (nm_connection_get_setting_ip6_config (connection));
+	g_assert (s_ip6);
+
+	priv->rdisc = nm_lndp_rdisc_new (nm_device_get_ip_ifindex (self),
+	                                 nm_device_get_ip_iface (self),
+	                                 nm_connection_get_uuid (connection),
+	                                 nm_setting_ip6_config_get_addr_gen_mode (s_ip6));
 	if (!priv->rdisc) {
-		_LOGE (LOGD_IP6, "failed to start router discovery (%s)", ip_iface);
+		_LOGE (LOGD_IP6, "failed to start router discovery");
 		return FALSE;
 	}
 
@@ -8469,6 +8503,8 @@ _cleanup_generic_post (NMDevice *self, CleanupType cleanup_type)
 	priv->v4_commit_first_time = TRUE;
 	priv->v6_commit_first_time = TRUE;
 
+	priv->linklocal6_dad_counter = 0;
+
 	nm_default_route_manager_ip4_update_default_route (nm_default_route_manager_get (), self);
 	nm_default_route_manager_ip6_update_default_route (nm_default_route_manager_get (), self);
 
@@ -8689,6 +8725,7 @@ nm_device_spawn_iface_helper (NMDevice *self)
 	if (g_strcmp0 (method, NM_SETTING_IP6_CONFIG_METHOD_AUTO) == 0) {
 		NMSettingIPConfig *s_ip6;
 		char *hex_iid;
+		const char *addr_gen_mode;
 		NMUtilsIPv6IfaceId iid = NM_UTILS_IPV6_IFACE_ID_INIT;
 
 		s_ip6 = nm_connection_get_setting_ip6_config (connection);
@@ -8709,6 +8746,12 @@ nm_device_spawn_iface_helper (NMDevice *self)
 			g_ptr_array_add (argv, g_strdup ("--iid"));
 			hex_iid = bin2hexstr ((const char *) iid.id_u8, sizeof (NMUtilsIPv6IfaceId));
 			g_ptr_array_add (argv, hex_iid);
+		}
+
+		addr_gen_mode = nm_setting_ip6_config_get_addr_gen_mode (NM_SETTING_IP6_CONFIG (s_ip6));
+		if (addr_gen_mode) {
+			g_ptr_array_add (argv, g_strdup ("--addr-gen-mode"));
+			g_ptr_array_add (argv, g_strdup (addr_gen_mode));
 		}
 
 		configured = TRUE;
