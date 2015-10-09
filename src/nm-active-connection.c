@@ -836,7 +836,7 @@ set_property (GObject *object, guint prop_id,
 		}
 		break;
 	case PROP_INT_DEVICE:
-		g_return_if_fail (priv->device == NULL);
+		/* construct-only */
 		nm_active_connection_set_device (NM_ACTIVE_CONNECTION (object), g_value_get_object (value));
 		break;
 	case PROP_INT_SUBJECT:
