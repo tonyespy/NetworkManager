@@ -2936,6 +2936,82 @@ nm_utils_ipv6_interface_identfier_get_from_addr (NMUtilsIPv6IfaceId *iid,
 	memcpy (iid, addr->s6_addr + 8, 8);
 }
 
+#define MACHINE_SECRET_SIZE 16
+
+static gchar *
+/**
+ * machine_secret:
+ *
+ * Return the machine secret (machine-secret(5)). Initialize it if it's not set.
+ *
+ * Returns: %NULL on failure, a pointer to a machine secret of
+ * %MACHINE_SECRET_SIZE size (full transfer) otherwise
+ */
+machine_secret ()
+{
+	gchar *machine_secret_hex = NULL;
+	gchar *machine_secret = NULL;
+	int urandom = -1;
+	gsize len = 0;
+	mode_t umask_save = umask (0277);
+	GBytes *bytes = NULL;
+
+	/* Let's try to load a saved secret key first. */
+
+	if (!g_file_get_contents ("/etc/machine-secret", &machine_secret_hex, &len, NULL))
+		nm_log_info (LOGD_CORE, "could not read the /etc/machine-secret");
+
+	if (len < MACHINE_SECRET_SIZE * 2) {
+		nm_log_warn (LOGD_CORE, "/etc/machine-secret too short");
+	} else {
+		machine_secret_hex[MACHINE_SECRET_SIZE * 2] = '\0';
+		bytes = nm_utils_hexstr2bin (machine_secret_hex);
+	}
+	g_clear_pointer (&machine_secret_hex, g_free);
+
+	if (bytes) {
+		machine_secret = g_bytes_unref_to_data (bytes, &len);
+		if (len == MACHINE_SECRET_SIZE)
+			goto out;
+		nm_log_warn (LOGD_CORE, "wrong size of /etc/machine-secret");
+		g_clear_pointer (&machine_secret, g_free);
+	} else {
+		nm_log_warn (LOGD_CORE, "wrong format of /etc/machine-secret");
+	}
+
+	/* Could not get a useful machine secret. Try to generate a new one. */
+
+	urandom = open ("/dev/urandom", O_RDONLY);
+	if (!urandom) {
+		nm_log_warn (LOGD_CORE, "/dev/urandom: %s", strerror (errno));
+		goto out;
+	}
+
+	machine_secret = g_malloc (MACHINE_SECRET_SIZE);
+	if (read (urandom, machine_secret, MACHINE_SECRET_SIZE) != MACHINE_SECRET_SIZE) {
+		nm_log_err (LOGD_CORE, "can't generate /etc/machine-secret from /dev/urandom");
+		g_clear_pointer (&machine_secret, g_free);
+		goto out;
+	}
+
+	/* And store it for future use. */
+
+	machine_secret_hex = nm_utils_bin2hexstr (machine_secret, MACHINE_SECRET_SIZE, -1);
+	if (!g_file_set_contents ("/etc/machine-secret", machine_secret_hex, -1, NULL)) {
+		nm_log_err (LOGD_CORE, "could not save /etc/machine-secret");
+		g_clear_pointer (&machine_secret, g_free);
+		goto out;
+	}
+
+out:
+	if (urandom != -1)
+		close (urandom);
+	umask (umask_save);
+	g_clear_pointer (&machine_secret_hex, g_free);
+
+	return machine_secret;
+}
+
 #define RFC7217_IDGEN_RETRIES 3
 /**
  * nm_utils_ipv6_addr_set_stable_privacy:
@@ -2954,42 +3030,19 @@ nm_utils_ipv6_addr_set_stable_privacy (struct in6_addr *addr,
 	GChecksum *sum;
 	guint8 digest[32];
 	gsize len = sizeof (digest);
-	gchar *secret_key = NULL;
-	gsize key_len = 0;
+	gchar *secret_key;
 
 	if (dad_counter >= RFC7217_IDGEN_RETRIES)
 		return FALSE;
 
-	/* Let's try to load a saved secret key first. */
-	if (!g_file_get_contents (NMSTATEDIR "/secret_key", &secret_key, &key_len, NULL)) {
-		int urandom = open ("/dev/urandom", O_RDONLY);
-		mode_t key_mask;
-
-		if (!urandom) {
-			nm_log_warn (LOGD_CORE, "/dev/urandom: %s", strerror (errno));
-			return FALSE;
-		}
-
-		/* RFC7217 mandates the key SHOULD be at least 128 bits.
-		 * Let's use twice as much. */
-		key_len = 32;
-		secret_key = g_malloc (key_len);
-
-		key_mask = umask (0077);
-		if (   read (urandom, secret_key, key_len) != key_len
-		    || !g_file_set_contents (NMSTATEDIR "/secret_key", secret_key, key_len, NULL)) {
-			nm_log_warn (LOGD_CORE, "can not generate a secret for IPv6 stable privacy address");
-			key_len = 0;
-		}
-		umask (key_mask);
-		close (urandom);
-	}
+	secret_key = machine_secret ();
+	if (!secret_key)
+		return FALSE;
 
 	/* Documentation suggests that this can fail.
 	 * Maybe in case of a missing algorithm in crypto library? */
 	sum = g_checksum_new (G_CHECKSUM_SHA256);
-
-	if (key_len < 16 || !sum) {
+	if (!sum) {
 		g_free (secret_key);
 		return FALSE;
 	}
@@ -2999,7 +3052,7 @@ nm_utils_ipv6_addr_set_stable_privacy (struct in6_addr *addr,
 	if (uuid)
 		g_checksum_update (sum, (const guchar *) uuid, -1);
 	g_checksum_update (sum, (const guchar *) &dad_counter, sizeof (dad_counter));
-	g_checksum_update (sum, (const guchar *) secret_key, key_len);
+	g_checksum_update (sum, (const guchar *) secret_key, MACHINE_SECRET_SIZE);
 	g_free (secret_key);
 
 	g_checksum_get_digest (sum, digest, &len);
