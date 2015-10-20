@@ -140,6 +140,7 @@ nm_manager_init (NMManager *manager)
 
 	priv->permissions = g_hash_table_new (g_direct_hash, g_direct_equal);
 	priv->devices = g_ptr_array_new ();
+	priv->all_devices = g_ptr_array_new ();
 	priv->active_connections = g_ptr_array_new ();
 }
 
