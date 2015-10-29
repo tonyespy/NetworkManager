@@ -21,3 +21,8 @@ endif
 if CONFIG_PLUGIN_IFNET
 SUBDIRS+=ifnet
 endif
+
+if CONFIG_PLUGIN_OFONO
+SUBDIRS+=ofono
+endif
+
