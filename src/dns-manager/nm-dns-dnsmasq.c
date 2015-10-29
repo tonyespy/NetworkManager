@@ -330,7 +330,7 @@ update (NMDnsPlugin *plugin,
 	/* Work on a copy of the vpn_configs list because we might want to remove
 	 * some items from it, yet not affect other DNS plugins that might run
 	 */
-	vpn_configs_copy = g_slist_copy (vpn_configs);
+	vpn_configs_copy = g_slist_copy ((GSList *) vpn_configs);
 
 	/* Look for a VPN config that is set to get a default route, and if
 	 * there is one, install it *without* splitting into per-domain servers.
