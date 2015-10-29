@@ -4256,9 +4256,6 @@ ifstate_file_changed (GFileMonitor *monitor,
                       GFileMonitorEvent event_type,
                       gpointer user_data)
 {
-	NMManager *self = NM_MANAGER (user_data);
-	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (self);
-
 	switch (event_type) {
 //	case G_FILE_MONITOR_EVENT_CREATED:
 //#if GLIB_CHECK_VERSION(2,23,4)
