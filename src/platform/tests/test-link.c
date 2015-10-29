@@ -547,7 +547,9 @@ setup_tests (void)
 	g_test_add_func ("/link/internal", test_internal);
 	g_test_add_func ("/link/software/bridge", test_bridge);
 	g_test_add_func ("/link/software/bond", test_bond);
+#if WITH_TEAMDCTL
 	g_test_add_func ("/link/software/team", test_team);
+#endif
 	g_test_add_func ("/link/software/vlan", test_vlan);
 
 	if (strcmp (g_type_name (G_TYPE_FROM_INSTANCE (nm_platform_get ())), "NMFakePlatform"))
