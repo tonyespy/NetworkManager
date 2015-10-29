@@ -425,8 +425,6 @@ check_connection_available (NMDevice *device,
 		return FALSE;
 
 	state = nm_modem_get_state (priv->modem);
-	if (state <= NM_MODEM_STATE_INITIALIZING)
-		return FALSE;
 
 	if (state == NM_MODEM_STATE_LOCKED) {
 		NMSettingGsm *s_gsm = nm_connection_get_setting_gsm (connection);
@@ -435,6 +433,9 @@ check_connection_available (NMDevice *device,
 		if (!s_gsm || !nm_setting_gsm_get_pin (s_gsm))
 			return FALSE;
 	}
+
+	if (state <= NM_MODEM_STATE_SEARCHING)
+		return FALSE;
 
 	return TRUE;
 }
@@ -615,7 +616,7 @@ is_available (NMDevice *device, NMDeviceCheckDevAvailableFlags flags)
 
 	g_assert (priv->modem);
 	modem_state = nm_modem_get_state (priv->modem);
-	if (modem_state <= NM_MODEM_STATE_INITIALIZING)
+	if (modem_state <= NM_MODEM_STATE_SEARCHING)
 		return FALSE;
 
 	return TRUE;
