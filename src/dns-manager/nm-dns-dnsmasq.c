@@ -65,7 +65,6 @@ typedef struct {
 static gboolean
 add_ip4_config (DBusMessage *message, NMIP4Config *ip4, gboolean split)
 {
-	char buf[INET_ADDRSTRLEN];
 	in_addr_t addr;
 	int nnameservers, i_nameserver, n, i;
 	gboolean added = FALSE;
@@ -87,7 +86,7 @@ add_ip4_config (DBusMessage *message, NMIP4Config *ip4, gboolean split)
 			/* searches are preferred over domains */
 			n = nm_ip4_config_get_num_searches (ip4);
 			for (i = 0; i < n; i++) {
-				char *search = nm_ip4_config_get_search (ip4, i);
+				const char *search = nm_ip4_config_get_search (ip4, i);
 				dbus_message_append_args (message,
 				                          DBUS_TYPE_STRING, &search,
 				                          DBUS_TYPE_INVALID);
@@ -98,7 +97,7 @@ add_ip4_config (DBusMessage *message, NMIP4Config *ip4, gboolean split)
 				/* If not searches, use any domains */
 				n = nm_ip4_config_get_num_domains (ip4);
 				for (i = 0; i < n; i++) {
-					char *domain = nm_ip4_config_get_domain (ip4, i);
+					const char *domain = nm_ip4_config_get_domain (ip4, i);
 					dbus_message_append_args (message,
 					                          DBUS_TYPE_STRING, &domain,
 					                          DBUS_TYPE_INVALID);
@@ -175,7 +174,7 @@ add_ip6_config (DBusMessage *message, NMIP6Config *ip6, gboolean split)
 			/* searches are preferred over domains */
 			n = nm_ip6_config_get_num_searches (ip6);
 			for (i = 0; i < n; i++) {
-				char *search = nm_ip6_config_get_search (ip6, i);
+				const char *search = nm_ip6_config_get_search (ip6, i);
 				dbus_message_append_args (message,
 				                          DBUS_TYPE_STRING, &search,
 				                          DBUS_TYPE_INVALID);
@@ -186,7 +185,7 @@ add_ip6_config (DBusMessage *message, NMIP6Config *ip6, gboolean split)
 				/* If not searches, use any domains */
 				n = nm_ip6_config_get_num_domains (ip6);
 				for (i = 0; i < n; i++) {
-					char *domain = nm_ip6_config_get_domain (ip6, i);
+					const char *domain = nm_ip6_config_get_domain (ip6, i);
 					dbus_message_append_args (message,
 					                          DBUS_TYPE_STRING, &domain,
 					                          DBUS_TYPE_INVALID);
@@ -306,7 +305,7 @@ update (NMDnsPlugin *plugin,
 	NMDnsDnsmasq *self = NM_DNS_DNSMASQ (plugin);
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
 	DBusConnection *connection;
-	DBusMessage *message;
+	DBusMessage *message = NULL;
 	GSList *iter;
 	GError *error = NULL;
 	gboolean have_dnsmasq = FALSE;
@@ -371,9 +370,9 @@ update (NMDnsPlugin *plugin,
 	 * we cleared up the dnsmasq cache; but we should also fail the update, so
 	 * that we don't write 127.0.0.1 to resolv.conf.
 	 */
-	if (((vpn_configs && g_slist_length (vpn_configs) < 1) || !vpn_configs) &&
-	    ((dev_configs && g_slist_length (dev_configs) < 1) || !dev_configs) &&
-	    ((other_configs && g_slist_length (other_configs) < 1) || !other_configs))
+	if (((vpn_configs && g_slist_length ((GSList *) vpn_configs) < 1) || !vpn_configs) &&
+	    ((dev_configs && g_slist_length ((GSList *) dev_configs) < 1) || !dev_configs) &&
+	    ((other_configs && g_slist_length ((GSList *) other_configs) < 1) || !other_configs))
 		ret = FALSE;
 
 out:
