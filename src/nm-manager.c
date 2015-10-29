@@ -1949,6 +1949,16 @@ platform_link_added (NMManager *self,
 		!strncmp (plink->name, "ccmni", STRLEN ("ccmni")))
 		return;
 
+	/*
+	 * Ubuntu: Explicitly unmanage p2p Wi-Fi devices exposed by Android JB Wi-Fi drivers.
+	 */
+	NMDeviceType devtype = nm_device_get_device_type (device);
+	if ((plink->type == NM_LINK_TYPE_WIFI)
+	    && !strncmp (plink->name, "p2p0", STRLEN ("p2p0"))) {
+		nm_log_info (LOGD_HW, "(%s): ignoring P2P wireless iface", plink->name);
+		return;
+	}
+
 	if (device == NULL) {
 		switch (plink->type) {
 		case NM_LINK_TYPE_WWAN_ETHERNET:
