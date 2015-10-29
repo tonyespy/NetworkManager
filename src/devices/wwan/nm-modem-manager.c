@@ -311,7 +311,6 @@ static void
 ofono_enumerate_devices_done (GDBusProxy *proxy, GAsyncResult *res, gpointer user_data)
 {
 	NMModemManager *manager = NM_MODEM_MANAGER (user_data);
-	GPtrArray *modems;
 	GError *error = NULL;
 	GVariant *results;
 	GVariantIter *iter;
@@ -529,8 +528,9 @@ static void
 ensure_client (NMModemManager *self)
 {
 	NMModemManagerPrivate *priv = self->priv;
-	g_assert (priv->dbus_connection);
 	gboolean created = FALSE;
+
+	g_assert (priv->dbus_connection);
 
 	/* Create the GDBusObjectManagerClient. We do not request to autostart, as
 	 * we don't really want the MMManager creation to fail. We can always poke
@@ -547,7 +547,7 @@ ensure_client (NMModemManager *self)
 #if WITH_OFONO
 	if (!priv->ofono_proxy) {
 		g_dbus_proxy_new (priv->dbus_connection,
-		                  G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
+		                  G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
 		                  NULL,
 		                  OFONO_DBUS_SERVICE,
 		                  OFONO_DBUS_PATH,

@@ -64,17 +64,6 @@ typedef struct {
 
 } NMModemOfonoPrivate;
 
-#define NM_OFONO_ERROR (nm_ofono_error_quark ())
-
-static GQuark
-nm_ofono_error_quark (void)
-{
-	static GQuark quark = 0;
-	if (!quark)
-		quark = g_quark_from_static_string ("nm-ofono-error");
-	return quark;
-}
-
 static gboolean
 ip_string_to_network_address (const gchar *str,
                               guint32 *out)
@@ -157,7 +146,6 @@ disconnect_done (DBusGProxy *proxy, DBusGProxyCall *call, gpointer user_data)
 {
 	SimpleDisconnectContext *ctx = (SimpleDisconnectContext*) user_data;
 	NMModemOfono *self = ctx->self;
-	NMModemOfonoPrivate *priv = NM_MODEM_OFONO_GET_PRIVATE (self);
 	GError *error = NULL;
 
 	nm_log_dbg (LOGD_MB, "in %s", __func__);
@@ -214,7 +202,7 @@ disconnect (NMModem *self,
 static void
 deactivate_cleanup (NMModem *_self, NMDevice *device)
 {
-	NMModemOfono *self = NM_MODEM_OFONO (_self);
+	/* NMModemOfono *self = NM_MODEM_OFONO (_self); */
 
 	/* TODO: cancel SimpleConnect() if any */
 
@@ -232,7 +220,7 @@ deactivate_cleanup (NMModem *_self, NMDevice *device)
 	NM_MODEM_CLASS (nm_modem_ofono_parent_class)->deactivate_cleanup (_self, device);
 }
 
-DBusGProxy *
+static DBusGProxy *
 get_ofono_proxy (NMModemOfono *self, const char *path, const char *interface)
 {
 	NMModemOfonoPrivate *priv = NM_MODEM_OFONO_GET_PRIVATE (self);
@@ -271,7 +259,6 @@ static void
 get_ofono_conn_manager_properties_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
 {
 	NMModemOfono *self = NM_MODEM_OFONO (user_data);
-	NMModemOfonoPrivate *priv = NM_MODEM_OFONO_GET_PRIVATE (self);
 	GError *error = NULL;
 	GHashTable *properties = NULL;
 	GValue *value = NULL;
@@ -343,12 +330,9 @@ static void
 get_ofono_sim_properties_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
 {
 	NMModemOfono *self = NM_MODEM_OFONO (user_data);
-	NMModemOfonoPrivate *priv = NM_MODEM_OFONO_GET_PRIVATE (self);
-	NMModemState state = nm_modem_get_state (NM_MODEM (self));
 	GError *error = NULL;
 	GHashTable *properties = NULL;
 	GValue *value = NULL;
-	const gchar *value_str;
 
 	nm_log_dbg (LOGD_MB, "in %s", __func__);
 
@@ -393,17 +377,12 @@ ofono_context_added (DBusGProxy *proxy,
                      GValue *prop,
                      gpointer user_data)
 {
-	NMModemOfono *self = NM_MODEM_OFONO (user_data);
-
 	nm_log_dbg (LOGD_MB, "context %s added", path);
 }
 
 static void
 ofono_context_removed (DBusGProxy *proxy, const char *path, gpointer user_data)
 {
-	NMModemOfono *self = NM_MODEM_OFONO (user_data);
-	NMModemOfonoPrivate *priv = NM_MODEM_OFONO_GET_PRIVATE (self);
-
 	nm_log_dbg (LOGD_MB, "context %s removed", path);
 }
 
@@ -732,7 +711,6 @@ context_properties_changed (DBusGProxy *proxy,
                             gpointer user_data)
 {
 	NMModemOfono *self = NM_MODEM_OFONO (user_data);
-	NMModemOfonoPrivate *priv = NM_MODEM_OFONO_GET_PRIVATE (self);
 
 	if (g_strcmp0("Settings", key) == 0) {
 		ofono_context_get_ip_properties (self);
@@ -745,8 +723,8 @@ do_context_activate (NMModemOfono *self, char *context_path)
 	NMModemOfonoPrivate *priv = NM_MODEM_OFONO_GET_PRIVATE (self);
 	GValue value = G_VALUE_INIT;
 
-	g_return_val_if_fail (self != NULL, FALSE);
-	g_return_val_if_fail (NM_IS_MODEM_OFONO (self), FALSE);
+	g_return_if_fail (self != NULL);
+	g_return_if_fail (NM_IS_MODEM_OFONO (self));
 
 	nm_log_dbg (LOGD_MB, "in %s", __func__);
 
@@ -799,66 +777,6 @@ do_context_activate (NMModemOfono *self, char *context_path)
 
 }
 
-static void
-context_set_property (gpointer key, gpointer value, gpointer user_data)
-{
-	NMModemOfono *self = NM_MODEM_OFONO (user_data);
-	NMModemOfonoPrivate *priv = NM_MODEM_OFONO_GET_PRIVATE (self);
-	GValue val = G_VALUE_INIT;
-
-	nm_log_dbg (LOGD_MB, "%s -- setting context prop: %s == %s",
-	            __func__,
-	            (char*)key,
-	            (char*)value);
-
-	g_value_init (&val, G_TYPE_STRING);
-	g_value_set_string (&val, (char*)value);
-
-	if (!priv->property_error) {
-		dbus_g_proxy_call_with_timeout (priv->context_proxy,
-		                                "SetProperty",
-		                                20000,
-		                                &priv->property_error,
-		                                G_TYPE_STRING, (char*)key,
-		                                G_TYPE_VALUE, &val,
-		                                G_TYPE_INVALID);
-	} else {
-		nm_log_warn (LOGD_MB, "could not set context property '%s': %s", (char*)key,
-		             priv->property_error
-		             && priv->property_error->message
-		             ? priv->property_error->message : "(unknown)");
-	}
-}
-
-static void stage1_enable_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data);
-
-static void
-stage1_enable_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
-{
-	NMModemOfono *self = NM_MODEM_OFONO (user_data);
-	NMModemOfonoPrivate *priv = NM_MODEM_OFONO_GET_PRIVATE (self);
-	GError *error = NULL;
-
-	nm_log_dbg (LOGD_MB, "in %s", __func__);
-
-	if (dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_INVALID)) {
-		if (priv->context_path)
-			do_context_activate (self, priv->context_path);
-		else
-			g_signal_emit_by_name (self, NM_MODEM_PREPARE_RESULT, FALSE, NM_DEVICE_STATE_REASON_MODEM_INIT_FAILED);
-	} else {
-		nm_log_warn (LOGD_MB, "OFONO modem enable failed: (%d) %s",
-		             error ? error->code : -1,
-		             error && error->message ? error->message : "(unknown)");
-
-		g_signal_emit_by_name (self, NM_MODEM_PREPARE_RESULT, FALSE, NM_DEVICE_STATE_REASON_MODEM_INIT_FAILED);
-
-		g_error_free (error);
-	}
-
-	g_object_unref (self);
-}
-
 static GHashTable *
 create_connect_properties (NMConnection *connection)
 {
@@ -894,7 +812,6 @@ act_stage1_prepare (NMModem *modem,
 	NMModemOfono *self = NM_MODEM_OFONO (modem);
 	NMModemOfonoPrivate *priv = NM_MODEM_OFONO_GET_PRIVATE (self);
 	const char *context_id;
-	char *context_path;
 	char **id = NULL;
 
 	nm_log_dbg (LOGD_MB, "in %s", __func__);
@@ -1051,7 +968,6 @@ get_capabilities (NMModem *_self,
                   NMDeviceModemCapabilities *modem_caps,
                   NMDeviceModemCapabilities *current_caps)
 {
-	NMModemOfono *self = NM_MODEM_OFONO (_self);
 	NMDeviceModemCapabilities all_ofono_caps = NM_DEVICE_MODEM_CAPABILITY_GSM_UMTS;
 
 	*modem_caps = all_ofono_caps;
