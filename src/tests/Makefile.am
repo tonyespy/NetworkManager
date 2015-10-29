@@ -125,7 +125,6 @@ TESTS = \
 	test-dcb \
 	test-resolvconf-capture \
 	test-general \
-	test-general-with-expect \
 	test-wired-defname
 
 
