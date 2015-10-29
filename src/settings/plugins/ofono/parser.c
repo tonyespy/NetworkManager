@@ -49,6 +49,7 @@ ofono_update_connection_from_context (NMConnection *connection,
 {
 	NMSettingConnection *s_con;
 	NMSettingGsm *s_gsm;
+	NMSettingIP6Config *s_ip6_config;
 	gboolean success = FALSE;
 	char *idstr = NULL;
 	char *uuid_base = NULL;
@@ -88,6 +89,20 @@ ofono_update_connection_from_context (NMConnection *connection,
 	 * insists on having a number. Pass the usual *99#.
 	 */
 	g_object_set (s_gsm, NM_SETTING_GSM_NUMBER, "*99#", NULL);
+
+	/* IP6 setting */
+	s_ip6_config = NM_SETTING_IP6_CONFIG (nm_setting_ip6_config_new());
+	g_assert (s_ip6_config);
+	nm_connection_add_setting (connection, NM_SETTING (s_ip6_config));
+
+	/*
+	 * Set IP6_CONFIG_METHOD to ignore to prevent NM from configuring IPv6
+	 * for ofono connections.
+	 */
+	g_object_set (s_ip6_config,
+	              "method",
+	              NM_SETTING_IP6_CONFIG_METHOD_IGNORE,
+	              NULL);
 
 	nm_log_info (LOGD_SETTINGS, "SCPlugin-Ofono: "
 	             "update_connection_setting_from_context: name:%s, path:%s, id:%s, uuid: %s",
