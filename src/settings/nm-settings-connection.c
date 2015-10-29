@@ -157,6 +157,7 @@ typedef struct {
 
 	int autoconnect_retries;
 	gint32 autoconnect_retry_time;
+	int reset_retries_timeout;
 	NMDeviceStateReason autoconnect_blocked_reason;
 
 	char *filename;
@@ -2114,6 +2115,19 @@ nm_settings_connection_get_autoconnect_retries (NMSettingsConnection *self)
 	return NM_SETTINGS_CONNECTION_GET_PRIVATE (self)->autoconnect_retries;
 }
 
+int
+nm_settings_connection_get_reset_retries_timeout (NMSettingsConnection *connection)
+{
+	return NM_SETTINGS_CONNECTION_GET_PRIVATE (connection)->reset_retries_timeout;
+}
+
+void
+nm_settings_connection_set_reset_retries_timeout (NMSettingsConnection *connection,
+                                                  int timeout)
+{
+	NM_SETTINGS_CONNECTION_GET_PRIVATE (connection)->reset_retries_timeout = timeout;
+}
+
 void
 nm_settings_connection_set_autoconnect_retries (NMSettingsConnection *self,
                                                 int retries)
@@ -2124,7 +2138,7 @@ nm_settings_connection_set_autoconnect_retries (NMSettingsConnection *self,
 	if (retries)
 		priv->autoconnect_retry_time = 0;
 	else
-		priv->autoconnect_retry_time = nm_utils_get_monotonic_timestamp_s () + AUTOCONNECT_RESET_RETRIES_TIMER;
+		priv->autoconnect_retry_time = nm_utils_get_monotonic_timestamp_s () + priv->reset_retries_timeout;
 }
 
 void
@@ -2288,6 +2302,7 @@ nm_settings_connection_init (NMSettingsConnection *self)
 
 	priv->autoconnect_retries = AUTOCONNECT_RETRIES_DEFAULT;
 	priv->autoconnect_blocked_reason = NM_DEVICE_STATE_REASON_NONE;
+	priv->reset_retries_timeout = AUTOCONNECT_RESET_RETRIES_TIMER;
 
 	g_signal_connect (self, NM_CONNECTION_SECRETS_CLEARED, G_CALLBACK (secrets_cleared_cb), NULL);
 	g_signal_connect (self, NM_CONNECTION_CHANGED, G_CALLBACK (changed_cb), GUINT_TO_POINTER (TRUE));

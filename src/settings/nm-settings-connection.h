@@ -195,6 +195,9 @@ void nm_settings_connection_reset_autoconnect_retries (NMSettingsConnection *sel
 
 gint32 nm_settings_connection_get_autoconnect_retry_time (NMSettingsConnection *self);
 
+int nm_settings_connection_get_reset_retries_timeout (NMSettingsConnection *connection);
+void nm_settings_connection_set_reset_retries_timeout (NMSettingsConnection *connection, int timeout);
+
 NMDeviceStateReason nm_settings_connection_get_autoconnect_blocked_reason (NMSettingsConnection *self);
 void nm_settings_connection_set_autoconnect_blocked_reason (NMSettingsConnection *self,
                                                             NMDeviceStateReason reason);
