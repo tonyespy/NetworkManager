@@ -201,7 +201,9 @@ nm_modem_set_mm_enabled (NMModem *self,
 		return;
 	}
 
-	NM_MODEM_GET_CLASS (self)->set_mm_enabled (self, enabled);
+	/* Not all modem classes support set_mm_enabled */
+	if (NM_MODEM_GET_CLASS (self)->set_mm_enabled)
+		NM_MODEM_GET_CLASS (self)->set_mm_enabled (self, enabled);
 
 	/* Pre-empt the state change signal */
 	nm_modem_set_state (self,
