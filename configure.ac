@@ -249,6 +249,17 @@ else
 fi
 
 dnl
+dnl Default to using WEXT but allow it to be disabled
+dnl
+AC_ARG_WITH(urfkill, AS_HELP_STRING([--with-urfkill=yes], [Enable or disable support for urfkill]), ac_with_urfkill=$withval, ac_with_urfkill="yes")
+if test x"$ac_with_urfkill" = x"yes"; then
+	AC_DEFINE(WITH_URFKILL, 1, [Define if you want to build with support for the urfkill daemon])
+else
+	AC_DEFINE(WITH_URFKILL, 0, [Define if you want to build with support for the urfkill daemon])
+fi
+AM_CONDITIONAL(WITH_URFKILL, test x"${ac_with_urfkill}" = x"yes")
+
+dnl
 dnl Checks for libm - needed for pow()
 dnl
 LT_LIB_M
@@ -1100,6 +1111,7 @@ echo "  modemmanager-1: $with_modem_manager_1"
 echo "  concheck: $enable_concheck"
 echo "  libteamdctl: $enable_teamdctl"
 echo "  nmtui: $build_nmtui"
+echo "  urfkill: $ac_with_urfkill"
 echo
 
 echo "Configuration plugins (main.plugins=${config_plugins_default})"
