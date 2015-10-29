@@ -1624,7 +1624,7 @@ nmc_property_wireless_get_mtu (NMSetting *setting, NmcPropertyGetType get_type)
 }
 
 static char *
-nmc_property_wifi_get_powersave (NMSetting *setting)
+nmc_property_wifi_get_powersave (NMSetting *setting, NmcPropertyGetType get_type)
 {
 	NMSettingWireless *s_wireless = NM_SETTING_WIRELESS (setting);
 
