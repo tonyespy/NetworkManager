@@ -1995,6 +1995,12 @@ platform_link_added (NMManager *self,
 		}
 	}
 
+	/* Ignore rmnet_usb devices, which will be handled by their modem parent
+	 */
+	if (!strncmp (plink->name, "rmnet_usb", STRLEN ("rmnet_usb")) ||
+		!strncmp (plink->name, "ccmni", STRLEN ("ccmni")))
+		return;
+
 	if (device == NULL) {
 		switch (plink->type) {
 		case NM_LINK_TYPE_WWAN_ETHERNET:
