@@ -275,9 +275,9 @@ start_dnsmasq (NMDnsDnsmasq *self)
 	argv[idx++] = "--no-hosts"; /* don't use /etc/hosts to resolve */
 	argv[idx++] = "--bind-interfaces";
 	argv[idx++] = "--pid-file=" PIDFILE;
-	argv[idx++] = "--listen-address=127.0.0.1"; /* Should work for both 4 and 6 */
+	argv[idx++] = "--listen-address=127.0.1.1"; /* Should work for both 4 and 6 */
 	argv[idx++] = "--conf-file=" CONFFILE;
-	argv[idx++] = "--cache-size=400";
+	argv[idx++] = "--cache-size=0";
 	argv[idx++] = "--proxy-dnssec"; /* Allow DNSSEC to pass through */
 	argv[idx++] = "--enable-dbus=" DNSMASQ_DBUS_SERVICE;
 
@@ -369,7 +369,7 @@ update (NMDnsPlugin *plugin,
 
 	/* If all the configs lists are empty, there is just nothing to be caching --
 	 * we cleared up the dnsmasq cache; but we should also fail the update, so
-	 * that we don't write 127.0.0.1 to resolv.conf.
+	 * that we don't write 127.0.1.1 to resolv.conf.
 	 */
 	if (((vpn_configs && g_slist_length (vpn_configs) < 1) || !vpn_configs) &&
 	    ((dev_configs && g_slist_length (dev_configs) < 1) || !dev_configs) &&
