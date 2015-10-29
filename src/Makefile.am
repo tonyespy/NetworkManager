@@ -346,6 +346,13 @@ nm_sources = \
 	NetworkManagerUtils.c \
 	NetworkManagerUtils.h
 
+if WITH_URFKILL
+nm_sources += \
+	nm-urfkill-manager.c \
+	nm-urfkill-manager.h \
+	$(NULL)
+endif
+
 if SESSION_TRACKING_SYSTEMD
 nm_sources += nm-session-monitor-systemd.c
 else
