@@ -589,14 +589,14 @@ build_plugin_config_lists (NMDnsManager *self,
 	 * still use the domain information in each config to provide split DNS if
 	 * they want to.
 	 */
-	if (priv->ip4_vpn_config)
-		*out_vpn_configs = g_slist_append (*out_vpn_configs, priv->ip4_vpn_config);
 	if (priv->ip6_vpn_config)
 		*out_vpn_configs = g_slist_append (*out_vpn_configs, priv->ip6_vpn_config);
-	if (priv->ip4_device_config)
-		*out_dev_configs = g_slist_append (*out_dev_configs, priv->ip4_device_config);
+	if (priv->ip4_vpn_config)
+		*out_vpn_configs = g_slist_append (*out_vpn_configs, priv->ip4_vpn_config);
 	if (priv->ip6_device_config)
 		*out_dev_configs = g_slist_append (*out_dev_configs, priv->ip6_device_config);
+	if (priv->ip4_device_config)
+		*out_dev_configs = g_slist_append (*out_dev_configs, priv->ip4_device_config);
 
 	for (iter = priv->configs; iter; iter = g_slist_next (iter)) {
 		if (   (iter->data != priv->ip4_vpn_config)
