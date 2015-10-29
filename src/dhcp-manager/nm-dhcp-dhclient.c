@@ -331,7 +331,7 @@ dhclient_start (NMDhcpClient *client,
 		return FALSE;
 	}
 
-	pid_file = g_strdup_printf (LOCALSTATEDIR "/run/dhclient%s-%s.pid",
+	pid_file = g_strdup_printf ("/run/sendsigs.omit.d/network-manager.dhclient%s-%s.pid",
 		                        ipv6 ? "6" : "",
 		                        iface);
 
