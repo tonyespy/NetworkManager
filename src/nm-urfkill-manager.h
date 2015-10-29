@@ -39,7 +39,7 @@ typedef struct _NMUrfkillManager NMUrfkillManager;
 
 GType nm_urfkill_manager_get_type (void);
 
-NMUrfkillManager *nm_urfkill_manager_new ();
+NMUrfkillManager *nm_urfkill_manager_new (void);
 
 gboolean nm_urfkill_get_wlan_state (NMUrfkillManager *self);
 gboolean nm_urfkill_get_wwan_state (NMUrfkillManager *self);

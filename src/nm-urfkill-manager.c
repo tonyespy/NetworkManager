@@ -63,7 +63,6 @@ wlan_state_changed (GDBusProxy *proxy,
                     gpointer             user_data)
 {
 	NMUrfkillManager *self = NM_URFKILL_MANAGER (user_data);
-	GVariant *state;
 	gboolean enabled;
 
 	enabled = nm_urfkill_get_wlan_state (self);
@@ -81,7 +80,6 @@ wwan_state_changed (GDBusProxy *proxy,
                     gpointer             user_data)
 {
 	NMUrfkillManager *self = NM_URFKILL_MANAGER (user_data);
-	GVariant *state = NULL;
 	gboolean enabled;
 
 	enabled = nm_urfkill_get_wwan_state (self);
@@ -234,8 +232,6 @@ on_urfkill_vanished (GDBusConnection *connection,
 static void
 nm_urfkill_manager_init (NMUrfkillManager *self)
 {
-	DBusGConnection *bus;
-
 	self->urfkill_watch = g_bus_watch_name (G_BUS_TYPE_SYSTEM,
 	                                        "org.freedesktop.URfkill",
 	                                        0,

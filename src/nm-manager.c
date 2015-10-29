@@ -4846,7 +4846,6 @@ urfkill_wlan_state_changed_cb (NMUrfkillManager *mgr,
 {
 	NMManager *self = NM_MANAGER (user_data);
 	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (self);
-	GError *error = NULL;
 
 	nm_log_dbg (LOGD_RFKILL, "urfkill wlan state changed to %s",
 	            enabled ? "enabled" : "disabled");
@@ -4869,7 +4868,6 @@ urfkill_wwan_state_changed_cb (NMUrfkillManager *mgr,
 {
 	NMManager *self = NM_MANAGER (user_data);
 	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (self);
-	GError *error = NULL;
 
 	nm_log_dbg (LOGD_RFKILL, "urfkill wwan state changed to %s",
 	            enabled ? "enabled" : "disabled");
@@ -4946,6 +4944,7 @@ nm_manager_new (NMSettings *settings,
 	NMManagerPrivate *priv;
 	DBusConnection *dbus_connection;
 	NMConfigData *config_data;
+	KillState *kill_state;
 
 	g_assert (settings);
 
@@ -5046,7 +5045,7 @@ nm_manager_new (NMSettings *settings,
 	 * changes to the WirelessEnabled/WWANEnabled properties which toggle kernel
 	 * rfkill.
 	 */
-	KillState *kill_state = g_slice_new0 (KillState);
+	kill_state = g_slice_new0 (KillState);
 	kill_state->manager = g_object_ref (singleton);
 	kill_state->wlan_enabled = initial_wifi_enabled;
 	kill_state->wwan_enabled = initial_wwan_enabled;
