@@ -94,16 +94,11 @@ ofono_plugin_error_quark (void)
 }
 
 static void
-ignore_cb ()
-{
-}
-
-static void
 SCPluginOfono_parse_contexts (SCPluginOfono *self, GSList *contexts, const char *imsi)
 {
 	SCPluginOfonoPrivate *priv = SC_PLUGIN_OFONO_GET_PRIVATE (self);
 	GSList *list;
-	GList *keys;
+	GList *keys = NULL;
 	NMOfonoConnection *exported;
 	gboolean found = FALSE;
 	char *uuid;
@@ -201,7 +196,6 @@ next_context:
 static gboolean
 nm_ofono_read_imsi_contexts (SCPluginOfono *self, const char *imsi, GError **error)
 {
-	SCPluginOfonoPrivate *priv = SC_PLUGIN_OFONO_GET_PRIVATE (self);
 	GHashTable *context;
 	GHashTable *pref_context = NULL;
 	GSList *contexts = NULL;
@@ -362,7 +356,6 @@ ofono_imsi_changed (GFileMonitor *monitor,
                    gpointer user_data)
 {
 	SCPluginOfono *self = SC_PLUGIN_OFONO (user_data);
-	SCPluginOfonoPrivate *priv = SC_PLUGIN_OFONO_GET_PRIVATE (self);
 	GFile *parent;
 	gchar *path, *imsi;
 	GError *error = NULL;
@@ -469,9 +462,8 @@ ofono_dir_changed (GFileMonitor *monitor,
 	SCPluginOfono *self = SC_PLUGIN_OFONO (user_data);
 	SCPluginOfonoPrivate *priv = SC_PLUGIN_OFONO_GET_PRIVATE (self);
 	GFileMonitor *imsi_monitor;
-	GFile *config_path;
 	gulong id;
-	gchar *imsi, *path;
+	gchar *imsi;
 	gboolean res;
 	GError *error = NULL;
 
@@ -601,8 +593,6 @@ static void
 GObject__get_property (GObject *object, guint prop_id,
 				   GValue *value, GParamSpec *pspec)
 {
-	NMSystemConfigInterface *self = NM_SYSTEM_CONFIG_INTERFACE (object);
-
 	switch (prop_id) {
 	case NM_SYSTEM_CONFIG_INTERFACE_PROP_NAME:
 		g_value_set_string (value, OFONO_PLUGIN_NAME);
@@ -680,8 +670,6 @@ SCPluginOfono_init (NMSystemConfigInterface *config)
 {
 	SCPluginOfono *self = SC_PLUGIN_OFONO (config);
 	SCPluginOfonoPrivate *priv = SC_PLUGIN_OFONO_GET_PRIVATE (self);
-	GError *error = NULL;
-	gboolean success = FALSE;
 
 	/* Keep a hash table of GFileMonitors per IMSI for later removal */
 	if (!priv->ofono_imsi_monitors)
@@ -712,10 +700,8 @@ sort_by_context_id (gconstpointer a, gconstpointer b)
 	g_return_val_if_fail (a != NULL, 0);
 	g_return_val_if_fail (b != NULL, 0);
 
-	const char *context_a = nm_connection_get_id (NM_CONNECTION (a));
-	const char *context_b = nm_connection_get_id (NM_CONNECTION (b));
-
-	return g_strcmp0 (context_a, context_b);
+	return g_strcmp0 (nm_connection_get_id (NM_CONNECTION (a)),
+	                  nm_connection_get_id (NM_CONNECTION (b)));
 }
 
 /* Returns the plugins currently known list of connections.  The returned
