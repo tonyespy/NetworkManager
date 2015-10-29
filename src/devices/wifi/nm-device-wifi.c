@@ -1789,9 +1789,12 @@ cull_scan_list (NMDeviceWifi *self)
 		 * and we'll end up here even if the AP was still found by the
 		 * supplicant in the last scan.
 		 */
-		if (   nm_ap_get_supplicant_path (ap)
-		    && g_object_get_data (G_OBJECT (ap), WPAS_REMOVED_TAG) == NULL) {
-			nm_ap_set_last_seen (ap, nm_utils_get_monotonic_timestamp_s ());
+		if (   nm_ap_get_supplicant_path (ap)) {
+		    if (g_object_get_data (G_OBJECT (ap), WPAS_REMOVED_TAG) == NULL)
+				nm_ap_set_last_seen (ap, nm_utils_get_monotonic_timestamp_s ());
+			else
+				outdated_list = g_slist_prepend (outdated_list, ap);
+
 			continue;
 		}
 
