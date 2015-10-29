@@ -86,6 +86,7 @@ AC_ARG_ENABLE(ifcfg-rh, AS_HELP_STRING([--enable-ifcfg-rh], [enable ifcfg-rh con
 AC_ARG_ENABLE(ifcfg-suse, AS_HELP_STRING([--enable-ifcfg-suse], [enable ifcfg-suse configuration plugin (SUSE)]))
 AC_ARG_ENABLE(ifupdown, AS_HELP_STRING([--enable-ifupdown], [enable ifupdown configuration plugin (Debian/Ubuntu)]))
 AC_ARG_ENABLE(ifnet, AS_HELP_STRING([--enable-ifnet], [enable ifnet configuration plugin (Gentoo)]))
+AC_ARG_ENABLE(ofono, AS_HELP_STRING([--enable-ofono], [enable ofono configuration plugin (Ubuntu)]))
 # Default alternative plugins by distribution
 AS_IF([test -z "$enable_ifcfg_rh"], AC_CHECK_FILE(/etc/redhat-release, enable_ifcfg_rh=yes))
 AS_IF([test -z "$enable_ifcfg_rh"], AC_CHECK_FILE(/etc/fedora-release, enable_ifcfg_rh=yes))
@@ -93,6 +94,8 @@ AS_IF([test -z "$enable_ifcfg_rh"], AC_CHECK_FILE(/etc/mandriva-release, enable_
 AS_IF([test -z "$enable_ifcfg_suse"], AC_CHECK_FILE(/etc/SuSE-release, enable_ifcfg_suse=yes))
 AS_IF([test -z "$enable_ifupdown"], AC_CHECK_FILE(/etc/debian_version, enable_ifupdown=yes))
 AS_IF([test -z "$enable_ifnet"], AC_CHECK_FILE(/etc/gentoo-release, enable_ifnet=yes))
+# Ofono is always enabled.
+AS_IF([test -z "$enable_ofono"], enable_ofono=yes)
 # Otherwise plugins default to "no"
 AS_IF([test -z "$enable_ifcfg_rh"], enable_ifcfg_rh=no)
 AS_IF([test -z "$enable_ifcfg_suse"], enable_ifcfg_suse=no)
@@ -106,6 +109,7 @@ AM_CONDITIONAL(CONFIG_PLUGIN_IFCFG_RH, test "$enable_ifcfg_rh" = "yes")
 AM_CONDITIONAL(CONFIG_PLUGIN_IFCFG_SUSE, test "$enable_ifcfg_suse" = "yes")
 AM_CONDITIONAL(CONFIG_PLUGIN_IFUPDOWN, test "$enable_ifupdown" = "yes")
 AM_CONDITIONAL(CONFIG_PLUGIN_IFNET, test "$enable_ifnet" = "yes")
+AM_CONDITIONAL(CONFIG_PLUGIN_OFONO, test "$enable_ofono" = "yes")
 
 AC_ARG_WITH(config-plugins-default, AS_HELP_STRING([--with-config-plugins-default=PLUGINS], [Default configuration option for main.plugins setting, used as fallback if the configuration option is unset]), [config_plugins_default="$withval"], [config_plugins_default=""])
 if test -z "$config_plugins_default" -o "$config_plugins_default" = no; then
@@ -969,6 +973,7 @@ src/ppp-manager/Makefile
 src/settings/plugins/Makefile
 src/settings/plugins/ifupdown/Makefile
 src/settings/plugins/ifupdown/tests/Makefile
+src/settings/plugins/ofono/Makefile
 src/settings/plugins/ifnet/Makefile
 src/settings/plugins/ifnet/tests/Makefile
 src/settings/plugins/ifcfg-rh/Makefile
@@ -1103,6 +1108,7 @@ echo "  ifcfg-rh: ${enable_ifcfg_rh}"
 echo "  ifcfg-suse: ${enable_ifcfg_suse}"
 echo "  ifupdown: ${enable_ifupdown}"
 echo "  ifnet: ${enable_ifnet}"
+echo "  ofono: ${enable_ofono}"
 echo
 
 echo "Handlers for /etc/resolv.conf:"
