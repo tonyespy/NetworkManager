@@ -1789,7 +1789,7 @@ cull_scan_list (NMDeviceWifi *self)
 		 */
 		if (   nm_ap_get_supplicant_path (ap)
 		    && g_object_get_data (G_OBJECT (ap), WPAS_REMOVED_TAG) == NULL) {
-			nm_ap_update_last_seen (ap);
+			nm_ap_set_last_seen (ap, nm_utils_get_monotonic_timestamp_s ());
 			continue;
 		}
 
