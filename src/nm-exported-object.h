@@ -40,6 +40,7 @@ typedef struct {
 	GObjectClass parent;
 
 	const char *export_path;
+	gboolean export_on_construction:1;
 } NMExportedObjectClass;
 
 GType nm_exported_object_get_type (void);
