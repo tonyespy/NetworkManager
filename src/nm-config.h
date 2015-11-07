@@ -90,6 +90,16 @@ typedef enum {
 	NM_CONFIG_RUN_STATE_PROPERTY_NETWORKING_ENABLED,
 	NM_CONFIG_RUN_STATE_PROPERTY_WIFI_ENABLED,
 	NM_CONFIG_RUN_STATE_PROPERTY_WWAN_ENABLED,
+
+	/* 2 set-arguments (const char *ifname,
+	 *                  const char *hwaddr) */
+	NM_CONFIG_RUN_STATE_PROPERTY_DEVICE_MANAGED,
+	NM_CONFIG_RUN_STATE_PROPERTY_DEVICE_UNMANAGED,
+
+	/* 3 set-arguments (const char *ifname,
+	 *                  const char *hwaddr,
+	 *                  const char *uuid_activated_connection) */
+	NM_CONFIG_RUN_STATE_PROPERTY_DEVICE_ACTIVATED_CONNECTION,
 } NMConfigRunStatePropertyType;
 
 typedef struct {

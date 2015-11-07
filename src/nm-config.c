@@ -40,6 +40,9 @@
 #define DEFAULT_INTERN_CONFIG_FILE      NMSTATEDIR "/NetworkManager-intern.conf"
 #define DEFAULT_STATE_FILE              NMSTATEDIR "/NetworkManager.state"
 
+
+#define RUN_STATE_KF_DEVICE_PREFIX         "d/"
+
 /*****************************************************************************/
 
 #define _NMLOG_PREFIX_NAME                "config"
@@ -73,7 +76,30 @@ struct NMConfigCmdLineOptions {
 };
 
 typedef struct {
+	/* The ifindex of the device. Must be present. */
+	char *ifname;
+
+	/* The hw addr of the device. Might be missing. */
+	char *hwaddr;
+
+	char *activated_connection;
+
+	/* whether the device was seen during the current boot. */
+	char last_seen_current_boot;
+
+	/* whether the device was seen in the current run. */
+	char last_seen_current_run;
+
+	/* Whether the device is marked as managed. */
+	char managed;
+
+	char *to_keyfile_cache;
+} RunStateDevice;
+
+typedef struct {
 	NMConfigRunState p;
+	guint num_track_devices;
+	GPtrArray *devices;
 } RunState;
 
 typedef struct {
@@ -1692,6 +1718,79 @@ run_state_get_filename (const NMConfigCmdLineOptions *cli)
 	return cli->state_file[0] ? cli->state_file : NULL;
 }
 
+/******************************************************************************/
+
+static RunStateDevice *
+run_state_device_new (const char *ifname)
+{
+	RunStateDevice *run_state_device;
+
+	run_state_device = g_slice_new0 (RunStateDevice);
+	run_state_device->ifname = g_strdup (ifname);
+	return run_state_device;
+}
+
+static void
+run_state_device_free (RunStateDevice *run_state_device)
+{
+	if (!run_state_device)
+		return;
+	g_free (run_state_device->ifname);
+	g_free (run_state_device->hwaddr);
+	g_free (run_state_device->activated_connection);
+	g_free (run_state_device->to_keyfile_cache);
+	g_slice_free (RunStateDevice, run_state_device);
+}
+
+static const char *
+run_state_device_to_keyfile (RunStateDevice *run_state_device, guint idx)
+{
+	GKeyFile *keyfile;
+	char group[20];
+
+	g_snprintf (group, sizeof (group), "[" RUN_STATE_KF_DEVICE_PREFIX "%09u", idx);
+
+	if (run_state_device->to_keyfile_cache) {
+		nm_assert (strlen (run_state_device->to_keyfile_cache) > strlen (group));
+		memcpy (run_state_device->to_keyfile_cache, group, strlen (group));
+	} else {
+		keyfile = nm_config_create_keyfile ();
+
+		g_key_file_unref (keyfile);
+	}
+
+	return run_state_device->to_keyfile_cache;
+}
+
+static int
+_run_state_dev_cmp (const RunStateDevice *a, const char **lookup_idx, gpointer unused)
+{
+	int i;
+
+	i = strcmp (a->ifname, lookup_idx[0]);
+	if (i)
+		return i;
+	return g_strcmp0 (a->hwaddr, lookup_idx[2]);
+}
+
+static gssize
+_run_state_dev_lookup (RunState *run_state, const char *ifname, const char *hwaddr)
+{
+	const char *lookup_idx[2] = {
+		ifname,
+		hwaddr,
+	};
+
+	nm_assert (ifname && *ifname);
+	nm_assert (!hwaddr || nm_utils_hwaddr_valid (hwaddr, -1));
+
+	return _nm_utils_ptrarray_find_binary_search (run_state->devices->pdata, run_state->devices->len,
+	                                              (gpointer) lookup_idx,
+	                                              (GCompareDataFunc) _run_state_dev_cmp, NULL);
+}
+
+/*****************************************************************************/
+
 static RunState *
 run_state_new (void)
 {
@@ -1701,6 +1800,7 @@ run_state_new (void)
 	run_state->p.net_enabled = TRUE;
 	run_state->p.wifi_enabled = TRUE;
 	run_state->p.wwan_enabled = TRUE;
+	run_state->devices = g_ptr_array_new_with_free_func ((GDestroyNotify) run_state_device_free);
 
 	return run_state;
 }
@@ -1710,7 +1810,133 @@ run_state_free (RunState *run_state)
 {
 	if (!run_state)
 		return;
+	g_ptr_array_unref (run_state->devices);
 	g_slice_free (RunState, run_state);
+}
+
+static RunStateDevice *
+run_state_set_device (RunState *run_state,
+                      const char *ifname,
+                      const char *hwaddr,
+                      gboolean set_managed,
+                      gboolean managed,
+                      gboolean set_activated_connection,
+                      const char *activated_connection,
+                      gboolean last_seen_current_boot,
+                      gboolean last_seen_current_run)
+{
+	gssize idx;
+	RunStateDevice *run_state_device;
+	gboolean dirty;
+
+	g_return_val_if_fail (ifname && *ifname, NULL);
+
+	idx = _run_state_dev_lookup (run_state, ifname, hwaddr);
+
+	if (idx < 0) {
+		run_state_device = run_state_device_new (ifname);
+		run_state_device->hwaddr = g_strdup (hwaddr);
+		run_state_device->managed = set_managed && managed;
+		run_state_device->activated_connection = set_activated_connection ? g_strdup (activated_connection) : NULL;
+		run_state_device->last_seen_current_boot = last_seen_current_boot;
+		run_state_device->last_seen_current_run = last_seen_current_run;
+		g_ptr_array_insert (run_state->devices, ~idx, run_state_device);
+		dirty = TRUE;
+	} else {
+		run_state_device = run_state->devices->pdata[idx];
+
+		nm_assert (g_strcmp0 (run_state_device->ifname, ifname) == 0);
+		nm_assert (g_strcmp0 (run_state_device->hwaddr, hwaddr) == 0);
+
+		if (   set_managed
+		    && run_state_device->managed != managed) {
+			run_state_device->managed = managed;
+			dirty = TRUE;
+		}
+		if (   set_activated_connection
+		    && !g_strcmp0 (run_state_device->activated_connection, activated_connection)) {
+			g_free (run_state_device->activated_connection);
+			run_state_device->activated_connection = g_strdup (activated_connection);
+			dirty = TRUE;
+		}
+		if (run_state_device->last_seen_current_boot != last_seen_current_boot) {
+			run_state_device->last_seen_current_boot = last_seen_current_boot;
+			dirty = TRUE;
+		}
+		if (run_state_device->last_seen_current_run != last_seen_current_run) {
+			run_state_device->last_seen_current_run = last_seen_current_run;
+			dirty = TRUE;
+		}
+	}
+	if (dirty) {
+		g_clear_pointer (&run_state_device->to_keyfile_cache, g_free);
+		run_state->p.dirty = TRUE;
+	}
+	return run_state_device;
+}
+
+static int
+_prune_cmp (const guint *idx1, const guint *idx2, const RunStateDevice **devices)
+{
+	const RunStateDevice *d1 = devices[*idx1];
+	const RunStateDevice *d2 = devices[*idx2];
+
+	if (d1->last_seen_current_boot != d2->last_seen_current_boot)
+		return d1->last_seen_current_boot ? -1 : 1;
+	if (d1->last_seen_current_run != d2->last_seen_current_run)
+		return d1->last_seen_current_run ? -1 : 1;
+	/* we prefer to remember managed devices. */
+	if (d1->managed != d2->managed)
+		return d1->managed ? -1 : 0;
+	return 0;
+}
+
+static void
+run_state_prune_devices (RunState *run_state)
+{
+	guint *indexes;
+	guint len;
+	guint len_after;
+
+	/* The number of different devices that NM seens can be unlimited. E.g. docker
+	 * creates veth interfaces with randomized names. We must therefor limit the number
+	 * of devices our list.
+	 *
+	 * For that, we support configuring the maximum number of tracked devices. If you have
+	 * more devices, NM will for some devices forget whether they were managed. */
+
+	len_after = run_state->num_track_devices;
+	len = run_state->devices->len;
+
+	if (len < 2 * len_after) {
+		/* We do this housekeeping only occationally, i.e. when we have twice as many
+		 * devices as we want to track. Otherwise, return. */
+		return;
+	}
+
+	/* Create a list of the indexes that we want to preserve. The rest will be pruned... */
+	indexes = g_new (guint, len);
+	for (guint i = 0; i < len; i++)
+		indexes[i] = i;
+
+	/* Now sort the indexes, so that the more relevant interfaces are at the beginning. */
+	g_qsort_with_data (indexes, len,
+	                   sizeof (indexes[0]),
+	                   (GCompareDataFunc) _prune_cmp,
+	                   run_state->devices->pdata);
+
+#if 0
+	/* Now, the second half of indexes contains the elements we want to delete.
+	 * Sort those indexes descendingly... */
+	g_qsort_with_data (&indexes[len_after], len - len_after,
+	                   sizeof (indexes[0]),
+	                   _prune_sort_idx,
+	                   NULL);
+	for (i = len_after, i < len; i++) {
+		/* unfortunately, this has O(n^2)... */
+		g_ptr_array_remove_index (run_state->devices, indexes[i]);
+	}
+#endif
 }
 
 static RunState *
@@ -1719,13 +1945,16 @@ run_state_new_from_file (const char *filename)
 	GKeyFile *keyfile;
 	gs_free_error GError *error = NULL;
 	RunState *run_state;
+	gs_strfreev char **groups = NULL;
+	guint g;
+	NMRefString cur_boot_id;
 
 	run_state = run_state_new ();
 
 	if (!filename)
 		return run_state;
 
-	keyfile = g_key_file_new ();
+	keyfile = nm_config_create_keyfile ();
 	g_key_file_set_list_separator (keyfile, ',');
 	if (!g_key_file_load_from_file (keyfile, filename, G_KEY_FILE_NONE, &error)) {
 		if (g_error_matches (error, G_FILE_ERROR, G_FILE_ERROR_NOENT))
@@ -1740,6 +1969,45 @@ run_state_new_from_file (const char *filename)
 	run_state->p.net_enabled  = nm_config_keyfile_get_boolean (keyfile, "main", "NetworkingEnabled", run_state->p.net_enabled);
 	run_state->p.wifi_enabled = nm_config_keyfile_get_boolean (keyfile, "main", "WirelessEnabled", run_state->p.wifi_enabled);
 	run_state->p.wwan_enabled = nm_config_keyfile_get_boolean (keyfile, "main", "WWANEnabled", run_state->p.wwan_enabled);
+
+	cur_boot_id = nm_utils_get_boot_id ();
+
+	groups = g_key_file_get_groups (keyfile, NULL);
+	for (g = 0; groups && groups[g]; g++) {
+		const char *group = groups[g];
+		gboolean managed;
+		gs_free char *ifname = NULL;
+		gs_free char *hwaddr = NULL;
+		gs_free char *boot_id = NULL;
+		gs_free char *activated_connection = NULL;
+		RunStateDevice *run_state_device;
+
+		if (!g_str_has_prefix (group, RUN_STATE_KF_DEVICE_PREFIX))
+			continue;
+
+		ifname = g_key_file_get_string (keyfile, group, "ifname", NULL);
+		if (!ifname || !*ifname)
+			continue;
+		hwaddr = g_key_file_get_string (keyfile, group, "hwaddr", NULL);
+
+		managed = nm_config_keyfile_get_boolean (keyfile, group, "managed", FALSE);
+		if (managed)
+			activated_connection = g_key_file_get_string (keyfile, group, "con", NULL);
+
+		boot_id = g_key_file_get_string (keyfile, group, "boot-id", NULL);
+
+		run_state_device = run_state_set_device (run_state,
+		                                         ifname,
+		                                         hwaddr,
+		                                         TRUE,
+		                                         managed,
+		                                         TRUE,
+		                                         activated_connection,
+		                                         g_strcmp0 (boot_id, cur_boot_id) == 0,
+		                                         FALSE);
+	}
+
+	run_state->p.dirty = FALSE;
 
 out:
 	g_key_file_unref (keyfile);
@@ -1773,6 +2041,9 @@ run_state_write (NMConfig *self)
 	const char *filename;
 	GString *str;
 	GError *error = NULL;
+	guint i;
+	GKeyFile *keyfile;
+	NMRefString cur_boot_id;
 
 	filename = run_state_get_filename (&priv->cli);
 
@@ -1785,10 +2056,42 @@ run_state_write (NMConfig *self)
 
 	/* Let's construct the keyfile data by hand. */
 
-	g_string_append (str, "[main]\n");
-	g_string_append_printf (str, "NetworkingEnabled=%s\n", priv->run_state->p.net_enabled ? "true" : "false");
-	g_string_append_printf (str, "WirelessEnabled=%s\n", priv->run_state->p.wifi_enabled ? "true" : "false");
-	g_string_append_printf (str, "WWANEnabled=%s\n", priv->run_state->p.wwan_enabled ? "true" : "false");
+	keyfile = nm_config_create_keyfile ();
+
+	g_key_file_set_boolean (keyfile, "main", "NetworkingEnabled", priv->run_state->p.net_enabled);
+	g_key_file_set_boolean (keyfile, "main", "WirelessEnabled", priv->run_state->p.wifi_enabled);
+	g_key_file_set_boolean (keyfile, "main", "WWANEnabled", priv->run_state->p.wwan_enabled);
+
+	cur_boot_id = nm_utils_get_boot_id ();
+
+	for (i = 0; i < priv->run_state->devices->len; i++) {
+#if 0
+		const RunStateDevice *r = priv->run_state->devices->pdata[i];
+		char group[STRLEN (RUN_STATE_KF_DEVICE_PREFIX) + 20];
+
+		if (   !r->managed
+		    && !nm_ref_string_equal (cur_boot_id, r->boot_id)) {
+			/* For example docker generates randomized interface names. We somehow want to ensure
+			 * that our statefile does not grow beyond */
+		}
+
+		g_snprintf (group, sizeof (group), "%s%u", RUN_STATE_KF_DEVICE_PREFIX, i + 1);
+
+
+
+
+		g_string_append_printf (str, "[" RUN_STATE_KF_DEVICE_PREFIX "%s]\n", r->ifname);
+		g_string_append_printf (str, "managed=%s\n", r->managed ? "true" : "false");
+		if (r->managed) {
+			if (r->activated_connection)
+				g_string_append_printf (str, "con=%s\n", r->activated_connection);
+			if (r->boot_id)
+				g_string_append_printf (str, "boot-id=%s\n", r->boot_id);
+		}
+#endif
+			(void)run_state_device_to_keyfile;
+			(void)run_state_prune_devices;
+	}
 
 	if (!g_file_set_contents (filename,
 	                          str->str, str->len,
@@ -1829,6 +2132,7 @@ _nm_config_run_state_set (NMConfig *self,
 
 	while ((property_type = va_arg (ap, int)) != NM_CONFIG_RUN_STATE_PROPERTY_NONE) {
 		bool *p_bool, v_bool;
+		const char *v_str_ifname, *v_str_hwaddr, *v_str_activated_connection;
 
 		switch (property_type) {
 		case NM_CONFIG_RUN_STATE_PROPERTY_NETWORKING_ENABLED:
@@ -1840,6 +2144,37 @@ _nm_config_run_state_set (NMConfig *self,
 		case NM_CONFIG_RUN_STATE_PROPERTY_WWAN_ENABLED:
 			p_bool = &priv->run_state->p.wwan_enabled;
 			goto handle_p_bool;
+
+		case NM_CONFIG_RUN_STATE_PROPERTY_DEVICE_MANAGED:
+		case NM_CONFIG_RUN_STATE_PROPERTY_DEVICE_UNMANAGED:
+			v_str_ifname = va_arg (ap, const char *);
+			v_str_hwaddr = va_arg (ap, const char *);
+			run_state_set_device (priv->run_state,
+			                      v_str_ifname,
+			                      v_str_hwaddr,
+			                      TRUE,
+			                      property_type == NM_CONFIG_RUN_STATE_PROPERTY_DEVICE_MANAGED,
+			                      FALSE,
+			                      NULL,
+			                      TRUE,
+			                      TRUE);
+			continue;
+
+		case NM_CONFIG_RUN_STATE_PROPERTY_DEVICE_ACTIVATED_CONNECTION:
+			v_str_ifname = va_arg (ap, const char *);
+			v_str_hwaddr = va_arg (ap, const char *);
+			v_str_activated_connection = va_arg (ap, const char *);
+			run_state_set_device (priv->run_state,
+			                      v_str_ifname,
+			                      v_str_hwaddr,
+			                      FALSE,
+			                      FALSE,
+			                      TRUE,
+			                      v_str_activated_connection,
+			                      TRUE,
+			                      TRUE);
+			continue;
+
 		default:
 			break;
 		}
