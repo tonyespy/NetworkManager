@@ -3178,3 +3178,26 @@ nm_ref_string_equal (NMRefString nmstr1, NMRefString nmstr2)
 	return nm_ref_string_cmp (nmstr1, nmstr2) == 0;
 }
 
+/*****************************************************************************/
+
+NMRefString
+nm_utils_get_boot_id (void)
+{
+	static NMRefString boot_id = NULL;
+
+	if (!G_UNLIKELY (boot_id)) {
+		gs_free char *content = NULL;
+
+		if (!g_file_get_contents ("/proc/sys/kernel/random/boot_id", &content, NULL, NULL)) {
+			content = g_strdup_printf ("fake-boot-id-%u", g_random_int ());
+			boot_id = nm_ref_string_new (content);
+			g_return_val_if_reached (boot_id);
+		}
+
+		boot_id = nm_ref_string_new (content);
+		g_free (content);
+	}
+
+	return boot_id;
+}
+
