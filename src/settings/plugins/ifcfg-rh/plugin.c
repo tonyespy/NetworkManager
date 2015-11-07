@@ -87,6 +87,8 @@ G_DEFINE_TYPE_EXTENDED (SettingsPluginIfcfg, settings_plugin_ifcfg, G_TYPE_OBJEC
 
 
 typedef struct {
+	NMConfig *config;
+
 	struct {
 		GDBusConnection *connection;
 		GDBusInterfaceSkeleton *interface;
@@ -895,6 +897,52 @@ _dbus_create_done (GObject *source_object,
 	                        self);
 }
 
+static void
+_dbus_setup (SettingsPluginIfcfg *self)
+{
+	SettingsPluginIfcfgPrivate *priv = SETTINGS_PLUGIN_IFCFG_GET_PRIVATE (self);
+	gs_free char *address = NULL;
+	gs_free_error GError *error = NULL;
+
+	g_return_if_fail (!priv->dbus.connection);
+
+	address = g_dbus_address_get_for_bus_sync (G_BUS_TYPE_SYSTEM, NULL, &error);
+	if (address == NULL) {
+		_LOGW ("dbus: failed getting address for system bus: %s", error->message);
+		return;
+	}
+
+	priv->dbus.cancellable = g_cancellable_new ();
+
+	g_dbus_connection_new_for_address (address,
+	                                   G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT
+	                                   | G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION,
+	                                   NULL,
+	                                   priv->dbus.cancellable,
+	                                   _dbus_create_done,
+	                                   self);
+}
+
+static void
+config_changed_cb (NMConfig *config,
+                   NMConfigData *config_data,
+                   NMConfigChangeFlags changes,
+                   NMConfigData *old_data,
+                   SettingsPluginIfcfg *self)
+{
+	/* If the dbus connection for some reason is borked the D-Bus service
+	 * won't be offered.
+	 *
+	 * On SIGHUP and SIGUSR1 try to re-connect to D-Bus. So in the unlikely
+	 * event that the D-Bus conneciton is broken, that allows for recovery
+	 * without need for restarting NetworkManager. */
+	if (   NM_FLAGS_HAS (changes, NM_CONFIG_CHANGE_SIGHUP)
+	    || NM_FLAGS_HAS (changes, NM_CONFIG_CHANGE_SIGUSR1)) {
+		if (!SETTINGS_PLUGIN_IFCFG_GET_PRIVATE (self)->dbus.connection)
+			_dbus_setup (self);
+	}
+}
+
 /*****************************************************************************/
 
 static void
@@ -915,35 +963,32 @@ constructed (GObject *object)
 {
 	SettingsPluginIfcfg *self = SETTINGS_PLUGIN_IFCFG (object);
 	SettingsPluginIfcfgPrivate *priv = SETTINGS_PLUGIN_IFCFG_GET_PRIVATE (self);
-	gs_free_error GError *error = NULL;
-	gs_free char *address = NULL;
 
 	G_OBJECT_CLASS (settings_plugin_ifcfg_parent_class)->constructed (object);
 
-	address = g_dbus_address_get_for_bus_sync (G_BUS_TYPE_SYSTEM, NULL, &error);
-	if (address == NULL) {
-		_LOGW ("dbus: failed getting address for system bus: %s", error->message);
-		return;
-	}
+	priv->config = nm_config_get ();
+	g_object_add_weak_pointer ((GObject *) priv->config, (gpointer *) &priv->config);
+	g_signal_connect (priv->config,
+	                  NM_CONFIG_SIGNAL_CONFIG_CHANGED,
+	                  G_CALLBACK (config_changed_cb),
+	                  self);
 
-	priv->dbus.cancellable = g_cancellable_new ();
-
-	g_dbus_connection_new_for_address (address,
-	                                   G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT
-	                                   | G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION,
-	                                   NULL,
-	                                   priv->dbus.cancellable,
-	                                   _dbus_create_done,
-	                                   self);
+	_dbus_setup (self);
 }
 
 static void
 dispose (GObject *object)
 {
-	SettingsPluginIfcfg *plugin = SETTINGS_PLUGIN_IFCFG (object);
-	SettingsPluginIfcfgPrivate *priv = SETTINGS_PLUGIN_IFCFG_GET_PRIVATE (plugin);
+	SettingsPluginIfcfg *self = SETTINGS_PLUGIN_IFCFG (object);
+	SettingsPluginIfcfgPrivate *priv = SETTINGS_PLUGIN_IFCFG_GET_PRIVATE (self);
 
-	_dbus_clear (plugin);
+	if (priv->config) {
+		g_object_remove_weak_pointer ((GObject *) priv->config, (gpointer *) &priv->config);
+		g_signal_handlers_disconnect_by_func (priv->config, config_changed_cb, self);
+		priv->config = NULL;
+	}
+
+	_dbus_clear (self);
 
 	if (priv->connections) {
 		g_hash_table_destroy (priv->connections);
