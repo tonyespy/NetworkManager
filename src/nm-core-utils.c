@@ -280,34 +280,31 @@ nm_utils_ip6_address_clear_host_address (struct in6_addr *dst, const struct in6_
 }
 
 void
-nm_utils_array_remove_at_indexes (GArray *array, const guint *indexes_to_delete, gsize len)
+nm_utils_carray_remove_at_indexes (gpointer carray, gsize elt_size, gsize *array_len, const guint *indexes_to_delete, gsize len)
 {
-	gsize elt_size;
 	guint index_to_delete;
 	guint i_src;
 	guint mm_src, mm_dst, mm_len;
 	gsize i_itd;
 	guint res_length;
+	char *array = carray;
 
-	g_return_if_fail (array);
 	if (!len)
 		return;
 	g_return_if_fail (indexes_to_delete);
 
-	elt_size = g_array_get_element_size (array);
-
 	i_itd = 0;
 	index_to_delete = indexes_to_delete[0];
-	if (index_to_delete >= array->len)
+	if (index_to_delete >= *array_len)
 		g_return_if_reached ();
 
-	res_length = array->len - 1;
+	res_length = *array_len - 1;
 
 	mm_dst = index_to_delete;
 	mm_src = index_to_delete;
 	mm_len = 0;
 
-	for (i_src = index_to_delete; i_src < array->len; i_src++) {
+	for (i_src = index_to_delete; i_src < *array_len; i_src++) {
 		if (i_src < index_to_delete)
 			mm_len++;
 		else {
@@ -323,7 +320,7 @@ nm_utils_array_remove_at_indexes (GArray *array, const guint *indexes_to_delete,
 
 				dd = indexes_to_delete[++i_itd];
 				if (dd > index_to_delete) {
-					if (dd >= array->len)
+					if (dd >= *array_len)
 						g_warn_if_reached ();
 					else {
 						g_assert (res_length > 0);
@@ -336,8 +333,8 @@ nm_utils_array_remove_at_indexes (GArray *array, const guint *indexes_to_delete,
 			}
 
 			if (mm_len) {
-				memmove (&array->data[mm_dst * elt_size],
-				         &array->data[mm_src * elt_size],
+				memmove (&array[mm_dst * elt_size],
+				         &array[mm_src * elt_size],
 				         mm_len * elt_size);
 				mm_dst += mm_len;
 				mm_src += mm_len + 1;
@@ -347,11 +344,25 @@ nm_utils_array_remove_at_indexes (GArray *array, const guint *indexes_to_delete,
 		}
 	}
 	if (mm_len) {
-		memmove (&array->data[mm_dst * elt_size],
-		         &array->data[mm_src * elt_size],
+		memmove (&array[mm_dst * elt_size],
+		         &array[mm_src * elt_size],
 		         mm_len * elt_size);
 	}
-	g_array_set_size (array, res_length);
+
+	*array_len = res_length;
+}
+
+void
+nm_utils_array_remove_at_indexes (GArray *array, const guint *indexes_to_delete, gsize len)
+{
+	gsize array_len;
+
+	/* We cannot invoke the clear function for the deleted elements. */
+	g_array_set_clear_func (array, NULL);
+
+	array_len = array->len;
+	nm_utils_carray_remove_at_indexes (array->data, g_array_get_element_size (array), &array_len, indexes_to_delete, len);
+	g_array_set_size (array, array_len);
 }
 
 int

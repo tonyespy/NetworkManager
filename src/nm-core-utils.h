@@ -346,6 +346,7 @@ gboolean nm_utils_ipv6_addr_set_stable_privacy (struct in6_addr *addr,
 void nm_utils_ipv6_interface_identfier_get_from_addr (NMUtilsIPv6IfaceId *iid,
                                                       const struct in6_addr *addr);
 
+void nm_utils_carray_remove_at_indexes (gpointer array, gsize elt_size, gsize *array_len, const guint *indexes_to_delete, gsize len);
 void nm_utils_array_remove_at_indexes (GArray *array, const guint *indexes_to_delete, gsize len);
 
 void nm_utils_setpgid (gpointer unused);
