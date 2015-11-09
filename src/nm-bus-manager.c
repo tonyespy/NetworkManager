@@ -35,9 +35,6 @@
 #include "nm-exported-object.h"
 #include "NetworkManagerUtils.h"
 
-#define PRIV_SOCK_PATH NMRUNDIR "/private"
-#define PRIV_SOCK_TAG  "private"
-
 enum {
 	DBUS_CONNECTION_CHANGED = 0,
 	PRIVATE_CONNECTION_NEW,
@@ -61,7 +58,6 @@ typedef struct {
 	gboolean started;
 
 	GSList *private_servers;
-	PrivateServer *priv_server;
 
 	GDBusProxy *proxy;
 
@@ -375,28 +371,6 @@ private_server_get_connection_by_owner (PrivateServer *s, const char *owner)
 	return NULL;
 }
 
-static void
-private_server_register_object (PrivateServer *s, GDBusObjectSkeleton *object)
-{
-	GHashTableIter iter;
-	GDBusObjectManagerServer *manager;
-
-	g_hash_table_iter_init (&iter, s->obj_managers);
-	while (g_hash_table_iter_next (&iter, (gpointer) &manager, NULL))
-		g_dbus_object_manager_server_export (manager, object);
-}
-
-static void
-private_server_unregister_object (PrivateServer *s, const char *path)
-{
-	GHashTableIter iter;
-	GDBusObjectManagerServer *manager;
-
-	g_hash_table_iter_init (&iter, s->obj_managers);
-	while (g_hash_table_iter_next (&iter, (gpointer) &manager, NULL))
-		g_dbus_object_manager_server_unexport (manager, path);
-}
-
 /**************************************************************/
 
 static gboolean
@@ -586,24 +560,6 @@ nm_bus_manager_get_unix_user (NMBusManager *self,
 /**************************************************************/
 
 static void
-manager_private_connection_new (NMBusManager *self,
-                                GDBusConnection *connection,
-                                GDBusObjectManagerServer *manager,
-                                gpointer user_data)
-{
-	NMBusManagerPrivate *priv = NM_BUS_MANAGER_GET_PRIVATE (self);
-	GList *objects, *iter;
-
-	/* Register all exported objects on the new private connection */
-	objects = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (priv->obj_manager));
-	for (iter = objects; iter; iter = iter->next) {
-		g_dbus_object_manager_server_export (manager, iter->data);
-		g_object_unref (iter->data);
-	}
-	g_list_free (objects);
-}
-
-static void
 nm_bus_manager_init (NMBusManager *self)
 {
 	NMBusManagerPrivate *priv = NM_BUS_MANAGER_GET_PRIVATE (self);
@@ -619,14 +575,6 @@ nm_bus_manager_init (NMBusManager *self)
 		if (errno != EEXIST)
 			nm_log_warn (LOGD_CORE, "Error creating directory \"%s\": %d (%s)", NMRUNDIR, errno, g_strerror (errno));
 	}
-	priv->priv_server = private_server_new (PRIV_SOCK_PATH, PRIV_SOCK_TAG, self);
-	if (priv->priv_server) {
-		priv->private_servers = g_slist_append (priv->private_servers, priv->priv_server);
-		g_signal_connect (self,
-		                  NM_BUS_MANAGER_PRIVATE_CONNECTION_NEW "::" PRIV_SOCK_TAG,
-		                  (GCallback) manager_private_connection_new,
-		                  NULL);
-	}
 }
 
 static void
@@ -638,7 +586,6 @@ nm_bus_manager_dispose (GObject *object)
 
 	g_slist_free_full (priv->private_servers, private_server_free);
 	priv->private_servers = NULL;
-	priv->priv_server = NULL;
 
 	nm_bus_manager_cleanup (self);
 
@@ -895,8 +842,6 @@ nm_bus_manager_register_object (NMBusManager *self,
 #endif
 
 	g_dbus_object_manager_server_export (priv->obj_manager, object);
-	if (priv->priv_server)
-		private_server_register_object (priv->priv_server, object);
 }
 
 GDBusObjectSkeleton *
@@ -931,8 +876,6 @@ nm_bus_manager_unregister_object (NMBusManager *self,
 	g_return_if_fail (path != NULL);
 
 	g_dbus_object_manager_server_unexport (priv->obj_manager, path);
-	if (priv->priv_server)
-		private_server_unregister_object (priv->priv_server, path);
 }
 
 const char *
