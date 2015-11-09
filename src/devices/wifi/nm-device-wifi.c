@@ -2360,7 +2360,6 @@ act_stage1_prepare (NMDevice *device, NMDeviceStateReason *reason)
 	ap_add_remove (self, ACCESS_POINT_ADDED, ap, TRUE);
 	g_object_thaw_notify (G_OBJECT (self));
 	set_current_ap (self, ap, FALSE, FALSE);
-	nm_active_connection_set_specific_object (NM_ACTIVE_CONNECTION (req), ap_path);
 	return NM_ACT_STAGE_RETURN_SUCCESS;
 
 done:
