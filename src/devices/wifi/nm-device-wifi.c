@@ -109,7 +109,6 @@ struct _NMDeviceWifiPrivate {
 	NMSupplicantInterface *sup_iface;
 	guint                  sup_timeout_id; /* supplicant association timeout */
 
-	gboolean          ssid_found;
 	NM80211Mode       mode;
 
 	guint32           failed_link_count;
@@ -334,7 +333,7 @@ update_seen_bssids_cache (NMDeviceWifi *self, NMAccessPoint *ap)
 }
 
 static void
-set_current_ap (NMDeviceWifi *self, NMAccessPoint *new_ap, gboolean recheck_available_connections, gboolean force_remove_old_ap)
+set_current_ap (NMDeviceWifi *self, NMAccessPoint *new_ap, gboolean recheck_available_connections)
 {
 	NMDeviceWifiPrivate *priv;
 	NMAccessPoint *old_ap;
@@ -358,7 +357,8 @@ set_current_ap (NMDeviceWifi *self, NMAccessPoint *new_ap, gboolean recheck_avai
 	if (old_ap) {
 		NM80211Mode mode = nm_ap_get_mode (old_ap);
 
-		if (force_remove_old_ap || mode == NM_802_11_MODE_ADHOC || mode == NM_802_11_MODE_AP || nm_ap_get_fake (old_ap))
+		/* Remove any AP from the internal list if it was created by NM or isn't known to the supplicant */
+		if (mode == NM_802_11_MODE_ADHOC || mode == NM_802_11_MODE_AP || nm_ap_get_fake (old_ap))
 			ap_add_remove (self, ACCESS_POINT_REMOVED, old_ap, recheck_available_connections);
 		g_object_unref (old_ap);
 	}
@@ -477,7 +477,7 @@ remove_all_aps (NMDeviceWifi *self)
 	if (!g_hash_table_size (priv->aps))
 		return;
 
-	set_current_ap (self, NULL, FALSE, FALSE);
+	set_current_ap (self, NULL, FALSE);
 
 again:
 	g_hash_table_iter_init (&iter, priv->aps);
@@ -506,12 +506,7 @@ deactivate (NMDevice *device)
 
 	priv->rate = 0;
 
-	/* If the AP is 'fake', i.e. it wasn't actually found from
-	 * a scan but the user tried to connect to it manually (maybe it
-	 * was non-broadcasting or something) get rid of it, because 'fake'
-	 * APs should only live for as long as we're connected to them.
-	 **/
-	set_current_ap (self, NULL, TRUE, FALSE);
+	set_current_ap (self, NULL, TRUE);
 
 	/* Clear any critical protocol notification in the Wi-Fi stack */
 	nm_platform_wifi_indicate_addressing_running (NM_PLATFORM_GET, ifindex, FALSE);
@@ -1713,6 +1708,7 @@ link_timeout_cb (gpointer user_data)
 	NMDevice *device = NM_DEVICE (user_data);
 	NMDeviceWifi *self = NM_DEVICE_WIFI (device);
 	NMDeviceWifiPrivate *priv = NM_DEVICE_WIFI_GET_PRIVATE (self);
+	NMDeviceStateReason reason = NM_DEVICE_STATE_REASON_SUPPLICANT_TIMEOUT;
 
 	_LOGW (LOGD_WIFI, "link timed out.");
 
@@ -1725,18 +1721,17 @@ link_timeout_cb (gpointer user_data)
 	if (nm_device_get_state (device) != NM_DEVICE_STATE_ACTIVATED)
 		return FALSE;
 
-	/* If the access point failed, and wasn't found by the supplicant when it
-	 * attempted to reconnect, then it's probably out of range or turned off.
-	 * Remove it from the list and if it's actually still present, it'll be
-	 * found in the next scan.
+	/* If the thing we're connecting to is an external one and it couldn't
+	 * be found, then use a more descriptive failure reason.
 	 */
-	if (priv->ssid_found == FALSE && priv->current_ap)
-		set_current_ap (self, NULL, TRUE, TRUE);
+	if (   priv->current_ap
+	    && nm_ap_get_fake (priv->current_ap)
+	    && nm_ap_get_mode (priv->current_ap) == NM_802_11_MODE_INFRA) {
+		reason = NM_DEVICE_STATE_REASON_SSID_NOT_FOUND;
+	}
+	set_current_ap (self, NULL, TRUE);
 
-	nm_device_state_changed (device,
-	                         NM_DEVICE_STATE_FAILED,
-	                         priv->ssid_found ? NM_DEVICE_STATE_REASON_SUPPLICANT_TIMEOUT :
-	                                            NM_DEVICE_STATE_REASON_SSID_NOT_FOUND);
+	nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, reason);
 	return FALSE;
 }
 
@@ -1889,11 +1884,6 @@ supplicant_iface_state_cb (NMSupplicantInterface *iface,
 	devstate = nm_device_get_state (device);
 	scanning = nm_supplicant_interface_get_scanning (iface);
 
-	/* In these states we know the supplicant is actually talking to something */
-	if (   new_state >= NM_SUPPLICANT_INTERFACE_STATE_ASSOCIATING
-	    && new_state <= NM_SUPPLICANT_INTERFACE_STATE_COMPLETED)
-		priv->ssid_found = TRUE;
-
 	switch (new_state) {
 	case NM_SUPPLICANT_INTERFACE_STATE_READY:
 		_LOGD (LOGD_WIFI_SCAN, "supplicant ready");
@@ -1951,10 +1941,8 @@ supplicant_iface_state_cb (NMSupplicantInterface *iface,
 		 * the scan but will be re-established when the scan is done.
 		 */
 		if (devstate == NM_DEVICE_STATE_ACTIVATED) {
-			if (priv->link_timeout_id == 0) {
+			if (priv->link_timeout_id == 0)
 				priv->link_timeout_id = g_timeout_add_seconds (scanning ? 30 : 15, link_timeout_cb, self);
-				priv->ssid_found = FALSE;
-			}
 		}
 		break;
 	case NM_SUPPLICANT_INTERFACE_STATE_DOWN:
@@ -2079,7 +2067,7 @@ supplicant_iface_notify_current_bss (NMSupplicantInterface *iface,
 		       new_bssid ? new_bssid : "(none)",
 		       new_ssid ? nm_utils_escape_ssid (new_ssid->data, new_ssid->len) : "(none)");
 
-		set_current_ap (self, new_ap, TRUE, FALSE);
+		set_current_ap (self, new_ap, TRUE);
 	}
 }
 
@@ -2139,6 +2127,7 @@ supplicant_connection_timeout_cb (gpointer user_data)
 	NMDeviceWifiPrivate *priv = NM_DEVICE_WIFI_GET_PRIVATE (self);
 	NMActRequest *req;
 	NMConnection *connection;
+	gboolean ssid_found = TRUE;
 
 	cleanup_association_attempt (self, TRUE);
 
@@ -2173,7 +2162,10 @@ supplicant_connection_timeout_cb (gpointer user_data)
 
 	g_assert (priv->mode == NM_802_11_MODE_INFRA);
 
-	if (priv->ssid_found && nm_connection_get_setting_wireless_security (connection)) {
+	if (priv->current_ap && nm_ap_get_fake (priv->current_ap))
+		ssid_found = FALSE;
+
+	if (ssid_found && nm_connection_get_setting_wireless_security (connection)) {
 		guint64 timestamp = 0;
 		gboolean new_secrets = TRUE;
 
@@ -2201,8 +2193,8 @@ supplicant_connection_timeout_cb (gpointer user_data)
 		_LOGW (LOGD_DEVICE | LOGD_WIFI,
 		       "Activation: (wifi) association took too long, failing activation");
 		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED,
-		                         priv->ssid_found ? NM_DEVICE_STATE_REASON_SUPPLICANT_TIMEOUT :
-		                                            NM_DEVICE_STATE_REASON_SSID_NOT_FOUND);
+		                         ssid_found ? NM_DEVICE_STATE_REASON_SUPPLICANT_TIMEOUT :
+		                                      NM_DEVICE_STATE_REASON_SSID_NOT_FOUND);
 	}
 
 	return FALSE;
@@ -2359,13 +2351,13 @@ act_stage1_prepare (NMDevice *device, NMDeviceStateReason *reason)
 	g_object_freeze_notify (G_OBJECT (self));
 	ap_add_remove (self, ACCESS_POINT_ADDED, ap, TRUE);
 	g_object_thaw_notify (G_OBJECT (self));
-	set_current_ap (self, ap, FALSE, FALSE);
+	set_current_ap (self, ap, FALSE);
 	nm_active_connection_set_specific_object (NM_ACTIVE_CONNECTION (req),
 	                                          nm_exported_object_get_path (NM_EXPORTED_OBJECT (ap)));
 	return NM_ACT_STAGE_RETURN_SUCCESS;
 
 done:
-	set_current_ap (self, ap, TRUE, FALSE);
+	set_current_ap (self, ap, TRUE);
 	return NM_ACT_STAGE_RETURN_SUCCESS;
 }
 
@@ -2450,8 +2442,6 @@ act_stage2_config (NMDevice *device, NMDeviceStateReason *reason)
 		       "Activation: (wifi) connection '%s' requires no security.  No secrets needed.",
 		       nm_connection_get_id (connection));
 	}
-
-	priv->ssid_found = FALSE;
 
 	/* Supplicant requires an initial frequency for Ad-Hoc and Hotspot; if the user
 	 * didn't specify one and we didn't find an AP that matched the connection,
