@@ -684,7 +684,7 @@ class NetworkManager(ExportedObj):
 
     @dbus.service.method(dbus_interface=IFACE_NM, in_signature='', out_signature='ao')
     def GetAllDevices(self):
-        return self._get_dbus_properties(IFACE_NM)[PM_ALL_DEVICES]
+        return to_path_array(self.devices)
 
     @dbus.service.method(dbus_interface=IFACE_NM, in_signature='s', out_signature='o')
     def GetDeviceByIpIface(self, ip_iface):

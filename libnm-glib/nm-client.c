@@ -2155,7 +2155,7 @@ get_property (GObject *object,
 		g_value_set_boxed (value, nm_client_get_devices (self));
 		break;
 	case PROP_ALL_DEVICES:
-		g_value_take_boxed (value, nm_client_get_all_devices (self));
+		g_value_set_boxed (value, nm_client_get_all_devices (self));
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
