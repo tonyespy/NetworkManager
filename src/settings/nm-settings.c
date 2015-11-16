@@ -1922,6 +1922,10 @@ nm_settings_device_removed (NMSettings *self, NMDevice *device, gboolean quittin
 {
 	NMSettingsConnection *connection;
 
+	g_signal_handlers_disconnect_by_func (device,
+	                                      G_CALLBACK (device_realized),
+	                                      self);
+
 	connection = g_object_get_data (G_OBJECT (device), DEFAULT_WIRED_CONNECTION_TAG);
 	if (connection) {
 		default_wired_clear_tag (self, device, connection, FALSE);
