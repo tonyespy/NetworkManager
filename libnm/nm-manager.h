@@ -124,6 +124,7 @@ NMConnectivityState nm_manager_check_connectivity_finish (NMManager *manager,
 /* Devices */
 
 const GPtrArray *nm_manager_get_devices    (NMManager *manager);
+NM_AVAILABLE_IN_1_2
 const GPtrArray *nm_manager_get_all_devices(NMManager *manager);
 NMDevice *nm_manager_get_device_by_path    (NMManager *manager, const char *object_path);
 NMDevice *nm_manager_get_device_by_iface   (NMManager *manager, const char *iface);

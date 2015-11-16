@@ -176,7 +176,7 @@ typedef struct {
 	void (*connection_removed) (NMClient *client, NMRemoteConnection *connection);
 
 	/*< private >*/
-	gpointer padding[8];
+	gpointer padding[6];
 } NMClientClass;
 
 GType nm_client_get_type (void);
