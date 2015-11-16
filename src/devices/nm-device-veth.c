@@ -153,7 +153,7 @@ nm_device_veth_class_init (NMDeviceVethClass *klass)
 
 	g_type_class_add_private (klass, sizeof (NMDeviceVethPrivate));
 
-	NM_DEVICE_CLASS_DECLARE_TYPES(klass, NULL, NM_LINK_TYPE_VETH)
+	NM_DEVICE_CLASS_DECLARE_TYPES (klass, NULL, NM_LINK_TYPE_VETH)
 
 	object_class->get_property = get_property;
 	object_class->dispose = dispose;
