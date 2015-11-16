@@ -63,13 +63,13 @@ typedef struct {
 	/* Signals */
 	void (*device_added) (NMManager *manager, NMDevice *device);
 	void (*device_removed) (NMManager *manager, NMDevice *device);
-	void (*any_device_added) (NMManager *manager, NMDevice *device);
-	void (*any_device_removed) (NMManager *manager, NMDevice *device);
 	void (*active_connection_added) (NMManager *manager, NMActiveConnection *ac);
 	void (*active_connection_removed) (NMManager *manager, NMActiveConnection *ac);
 	void (*permission_changed) (NMManager *manager,
 	                            NMClientPermission permission,
 	                            NMClientPermissionResult result);
+
+	/* Beware: no more slots. Cannot extend struct without breaking ABI. */
 } NMManagerClass;
 
 GType nm_manager_get_type (void);

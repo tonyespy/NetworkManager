@@ -1745,7 +1745,7 @@ nm_manager_class_init (NMManagerClass *manager_class)
 		g_signal_new ("any-device-added",
 		              G_OBJECT_CLASS_TYPE (object_class),
 		              G_SIGNAL_RUN_FIRST,
-		              G_STRUCT_OFFSET (NMManagerClass, any_device_added),
+		              0,
 		              NULL, NULL, NULL,
 		              G_TYPE_NONE, 1,
 		              G_TYPE_OBJECT);
@@ -1753,7 +1753,7 @@ nm_manager_class_init (NMManagerClass *manager_class)
 		g_signal_new ("any-device-removed",
 		              G_OBJECT_CLASS_TYPE (object_class),
 		              G_SIGNAL_RUN_FIRST,
-		              G_STRUCT_OFFSET (NMManagerClass, any_device_removed),
+		              0,
 		              NULL, NULL, NULL,
 		              G_TYPE_NONE, 1,
 		              G_TYPE_OBJECT);
