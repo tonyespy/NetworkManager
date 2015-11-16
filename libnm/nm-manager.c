@@ -1200,7 +1200,7 @@ free_devices (NMManager *manager, gboolean in_dispose)
 	int i;
 
 	real_devices = priv->devices;
-	all_devices = priv->devices;
+	all_devices = priv->all_devices;
 
 	if (in_dispose) {
 		priv->devices = NULL;

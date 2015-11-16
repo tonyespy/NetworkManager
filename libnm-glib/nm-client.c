@@ -1324,36 +1324,39 @@ nm_client_get_activating_connection (NMClient *client)
 /****************************************************************/
 
 static void
-free_devices (NMClient *client, gboolean emit_signals)
+free_devices (NMClient *client, gboolean in_dispose)
 {
 	NMClientPrivate *priv = NM_CLIENT_GET_PRIVATE (client);
-	GPtrArray *devices;
+	gs_unref_ptrarray GPtrArray *real_devices = NULL;
+	gs_unref_ptrarray GPtrArray *all_devices = NULL;
+	GPtrArray *devices = NULL;
 	int i;
 
-	if (priv->devices) {
-		devices = priv->devices;
+	real_devices = priv->devices;
+	all_devices = priv->all_devices;
+
+	if (in_dispose) {
 		priv->devices = NULL;
-		for (i = 0; i < devices->len; i++)
-			g_object_unref (G_OBJECT (devices->pdata[i]));
-		g_ptr_array_free (devices, TRUE);
+		priv->all_devices = NULL;
+	} else {
+		priv->devices = g_ptr_array_new ();
+		priv->all_devices = g_ptr_array_new ();
 	}
 
-	if (priv->all_devices) {
-		devices = priv->all_devices;
-		priv->all_devices = NULL;
+	/* "all_devices" is a superset of "devices", so we signalling
+	 * REMOVED for "all_devices" ensures we signal for anything in
+	 * "devices" too.
+	 *
+	 * But just in case if @all_devices is empty, fallback to @real_devices.
+	 */
+	if (all_devices && all_devices->len > 0)
+		devices = all_devices;
+	else if (devices && devices->len > 0)
+		devices = real_devices;
 
-		/* "all_devices" is a superset of "devices", so we signalling
-		 * REMOVED for "all_devices" ensures we signal for anything in
-		 * "devices" too.
-		 */
-		for (i = 0; i < devices->len; i++) {
-			NMDevice *device = devices->pdata[i];
-
-			if (emit_signals)
-				g_signal_emit (client, signals[DEVICE_REMOVED], 0, device);
-			g_object_unref (device);
-		}
-		g_ptr_array_free (devices, TRUE);
+	if (devices) {
+		for (i = 0; i < devices->len; i++)
+			g_signal_emit (client, signals[DEVICE_REMOVED], 0, devices->pdata[i]);
 	}
 }
 
@@ -1427,7 +1430,7 @@ proxy_name_owner_changed (DBusGProxy *proxy,
 		_nm_object_queue_notify (NM_OBJECT (client), NM_CLIENT_MANAGER_RUNNING);
 		_nm_object_suppress_property_updates (NM_OBJECT (client), TRUE);
 		poke_wireless_devices_with_rf_status (client);
-		free_devices (client, TRUE);
+		free_devices (client, FALSE);
 		free_active_connections (client, TRUE);
 		update_permissions (client, NULL);
 		priv->wireless_enabled = FALSE;
@@ -2025,7 +2028,7 @@ dispose (GObject *object)
 	g_clear_object (&priv->client_proxy);
 	g_clear_object (&priv->bus_proxy);
 
-	free_devices (client, FALSE);
+	free_devices (client, TRUE);
 	free_active_connections (client, FALSE);
 	g_clear_object (&priv->primary_connection);
 	g_clear_object (&priv->activating_connection);
