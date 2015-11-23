@@ -1205,10 +1205,11 @@ free_devices (NMManager *manager, gboolean in_dispose)
 	if (in_dispose) {
 		priv->devices = NULL;
 		priv->all_devices = NULL;
-	} else {
-		priv->devices = g_ptr_array_new_with_free_func (g_object_unref);
-		priv->all_devices = g_ptr_array_new_with_free_func (g_object_unref);
+		return;
 	}
+
+	priv->devices = g_ptr_array_new_with_free_func (g_object_unref);
+	priv->all_devices = g_ptr_array_new_with_free_func (g_object_unref);
 
 	if (all_devices && all_devices->len > 0)
 		devices = all_devices;

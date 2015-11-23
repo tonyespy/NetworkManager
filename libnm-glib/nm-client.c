@@ -1339,8 +1339,8 @@ free_devices (NMClient *client, gboolean in_dispose)
 		priv->devices = NULL;
 		priv->all_devices = NULL;
 	} else {
-		priv->devices = g_ptr_array_new_with_free_func (g_object_unref);
-		priv->all_devices = g_ptr_array_new_with_free_func (g_object_unref);
+		priv->devices = g_ptr_array_new ();
+		priv->all_devices = g_ptr_array_new ();
 	}
 
 	if (all_devices && all_devices->len > 0)
@@ -1358,7 +1358,8 @@ free_devices (NMClient *client, gboolean in_dispose)
 						goto next;
 				}
 			}
-			g_signal_emit (client, signals[DEVICE_REMOVED], 0, d);
+			if (!in_dispose)
+				g_signal_emit (client, signals[DEVICE_REMOVED], 0, d);
 next:
 			g_object_unref (d);
 		}
@@ -1367,7 +1368,8 @@ next:
 		for (i = 0; i < devices->len; i++) {
 			NMDevice *d = devices->pdata[i];
 
-			g_signal_emit (client, signals[DEVICE_REMOVED], 0, d);
+			if (!in_dispose)
+				g_signal_emit (client, signals[DEVICE_REMOVED], 0, d);
 			g_object_unref (d);
 		}
 	}
