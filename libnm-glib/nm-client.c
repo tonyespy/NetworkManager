@@ -1330,7 +1330,7 @@ free_devices (NMClient *client, gboolean in_dispose)
 	gs_unref_ptrarray GPtrArray *real_devices = NULL;
 	gs_unref_ptrarray GPtrArray *all_devices = NULL;
 	GPtrArray *devices = NULL;
-	int i;
+	guint i, j;
 
 	real_devices = priv->devices;
 	all_devices = priv->all_devices;
@@ -1339,24 +1339,37 @@ free_devices (NMClient *client, gboolean in_dispose)
 		priv->devices = NULL;
 		priv->all_devices = NULL;
 	} else {
-		priv->devices = g_ptr_array_new ();
-		priv->all_devices = g_ptr_array_new ();
+		priv->devices = g_ptr_array_new_with_free_func (g_object_unref);
+		priv->all_devices = g_ptr_array_new_with_free_func (g_object_unref);
 	}
 
-	/* "all_devices" is a superset of "devices", so we signalling
-	 * REMOVED for "all_devices" ensures we signal for anything in
-	 * "devices" too.
-	 *
-	 * But just in case if @all_devices is empty, fallback to @real_devices.
-	 */
 	if (all_devices && all_devices->len > 0)
 		devices = all_devices;
 	else if (devices && devices->len > 0)
 		devices = real_devices;
 
+	if (real_devices && devices != real_devices) {
+		for (i = 0; i < real_devices->len; i++) {
+			NMDevice *d = real_devices->pdata[i];
+
+			if (all_devices) {
+				for (j = 0; j < all_devices->len; j++) {
+					if (d == all_devices->pdata[j])
+						goto next;
+				}
+			}
+			g_signal_emit (client, signals[DEVICE_REMOVED], 0, d);
+next:
+			g_object_unref (d);
+		}
+	}
 	if (devices) {
-		for (i = 0; i < devices->len; i++)
-			g_signal_emit (client, signals[DEVICE_REMOVED], 0, devices->pdata[i]);
+		for (i = 0; i < devices->len; i++) {
+			NMDevice *d = devices->pdata[i];
+
+			g_signal_emit (client, signals[DEVICE_REMOVED], 0, d);
+			g_object_unref (d);
+		}
 	}
 }
 
