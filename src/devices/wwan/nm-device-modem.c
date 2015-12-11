@@ -75,9 +75,8 @@ ppp_failed (NMModem *modem, NMDeviceStateReason reason, gpointer user_data)
 		if (nm_device_activate_ip4_state_in_conf (device))
 			nm_device_activate_schedule_ip4_config_timeout (device);
 		else {
-			nm_device_state_changed (device,
-			                         NM_DEVICE_STATE_FAILED,
-			                         NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
+			nm_device_ip_method_failed (device, AF_INET,
+			                            NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
 		}
 		break;
 	default:
@@ -161,7 +160,8 @@ modem_ip4_config_result (NMModem *modem,
 		_LOGW (LOGD_MB | LOGD_IP4, "retrieving IPv4 configuration failed: (%d) %s",
 		       error->code, error->message ? error->message : "(unknown)");
 
-		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
+		nm_device_ip_method_failed (device, AF_INET,
+		                            NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
 	} else {
 		nm_device_set_wwan_ip4_config (device, config);
 		nm_device_activate_schedule_ip4_config_result (device, NULL);
@@ -188,7 +188,8 @@ modem_ip6_config_result (NMModem *modem,
 		_LOGW (LOGD_MB | LOGD_IP6, "retrieving IPv6 configuration failed: (%d) %s",
 		       error->code, error->message ? error->message : "(unknown)");
 
-		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
+		nm_device_ip_method_failed (device, AF_INET6,
+		                            NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
 		return;
 	}
 
@@ -203,7 +204,8 @@ modem_ip6_config_result (NMModem *modem,
 			nm_device_activate_schedule_ip6_config_result (device);
 		else {
 			_LOGW (LOGD_MB | LOGD_IP6, "retrieving IPv6 configuration failed: SLAAC not requested and no addresses");
-			nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
+			nm_device_ip_method_failed (device, AF_INET6,
+			                            NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
 		}
 		return;
 	}
@@ -213,7 +215,8 @@ modem_ip6_config_result (NMModem *modem,
 	g_assert (ignored == NULL);
 	switch (ret) {
 	case NM_ACT_STAGE_RETURN_FAILURE:
-		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, reason);
+		nm_device_ip_method_failed (device, AF_INET6,
+		                            NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
 		break;
 	case NM_ACT_STAGE_RETURN_STOP:
 		/* all done */

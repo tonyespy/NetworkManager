@@ -3153,7 +3153,7 @@ dnsmasq_state_changed_cb (NMDnsMasqManager *manager, guint32 status, gpointer us
 
 	switch (status) {
 	case NM_DNSMASQ_STATUS_DEAD:
-		nm_device_state_changed (self, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_SHARED_START_FAILED);
+		nm_device_ip_method_failed (self, AF_INET, NM_DEVICE_STATE_REASON_SHARED_START_FAILED);
 		break;
 	default:
 		break;
@@ -3609,6 +3609,26 @@ nm_device_check_ip_failed (NMDevice *self, gboolean may_fail)
 	                         NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
 }
 
+void
+nm_device_ip_method_failed (NMDevice *self, int family, NMDeviceStateReason reason)
+{
+	NMDevicePrivate *priv;
+
+	g_return_if_fail (NM_IS_DEVICE (self));
+	g_return_if_fail (family == AF_INET || family == AF_INET6);
+	priv = NM_DEVICE_GET_PRIVATE (self);
+
+	if (family == AF_INET)
+		priv->ip4_state = IP_FAIL;
+	else
+		priv->ip6_state = IP_FAIL;
+
+	if (get_ip_config_may_fail (self, family))
+		nm_device_check_ip_failed (self, FALSE);
+	else
+		nm_device_state_changed (self, NM_DEVICE_STATE_FAILED, reason);
+}
+
 /*********************************************/
 /* IPv4LL stuff */
 
@@ -3682,23 +3702,20 @@ nm_device_handle_ipv4ll_event (sd_ipv4ll *ll, int event, void *data)
 		r = sd_ipv4ll_get_address (ll, &address);
 		if (r < 0) {
 			_LOGE (LOGD_AUTOIP4, "invalid IPv4 link-local address received, error %d.", r);
-			priv->ip4_state = IP_FAIL;
-			nm_device_check_ip_failed (self, FALSE);
+			nm_device_ip_method_failed (self, AF_INET, NM_DEVICE_STATE_REASON_AUTOIP_START_FAILED);
 			return;
 		}
 
 		if ((address.s_addr & IPV4LL_NETMASK) != IPV4LL_NETWORK) {
 			_LOGE (LOGD_AUTOIP4, "invalid address %08x received (not link-local).", address.s_addr);
-			priv->ip4_state = IP_FAIL;
-			nm_device_check_ip_failed (self, FALSE);
+			nm_device_ip_method_failed (self, AF_INET, NM_DEVICE_STATE_REASON_AUTOIP_ERROR);
 			return;
 		}
 
 		config = ipv4ll_get_ip4_config (self, address.s_addr);
 		if (config == NULL) {
 			_LOGE (LOGD_AUTOIP4, "failed to get IPv4LL config");
-			priv->ip4_state = IP_FAIL;
-			nm_device_check_ip_failed (self, FALSE);
+			nm_device_ip_method_failed (self, AF_INET, NM_DEVICE_STATE_REASON_AUTOIP_FAILED);
 			return;
 		}
 
@@ -3708,8 +3725,7 @@ nm_device_handle_ipv4ll_event (sd_ipv4ll *ll, int event, void *data)
 		} else if (priv->ip4_state == IP_DONE) {
 			if (!ip4_config_merge_and_apply (self, config, TRUE, NULL)) {
 				_LOGE (LOGD_AUTOIP4, "failed to update IP4 config for autoip change.");
-				priv->ip4_state = IP_FAIL;
-				nm_device_check_ip_failed (self, FALSE);
+				nm_device_ip_method_failed (self, AF_INET, NM_DEVICE_STATE_REASON_AUTOIP_FAILED);
 			}
 		} else
 			g_assert_not_reached ();
@@ -3718,8 +3734,7 @@ nm_device_handle_ipv4ll_event (sd_ipv4ll *ll, int event, void *data)
 		break;
 	default:
 		_LOGW (LOGD_AUTOIP4, "IPv4LL address no longer valid after event %d.", event);
-		priv->ip4_state = IP_FAIL;
-		nm_device_check_ip_failed (self, FALSE);
+		nm_device_ip_method_failed (self, AF_INET, NM_DEVICE_STATE_REASON_AUTOIP_FAILED);
 	}
 }
 
@@ -4122,26 +4137,28 @@ END_ADD_DEFAULT_ROUTE:
 	return success;
 }
 
-static void
+static gboolean
 dhcp4_lease_change (NMDevice *self, NMIP4Config *config)
 {
 	NMDeviceStateReason reason = NM_DEVICE_STATE_REASON_NONE;
 
-	g_return_if_fail (config != NULL);
+	g_return_val_if_fail (config != NULL, FALSE);
 
 	if (!ip4_config_merge_and_apply (self, config, TRUE, &reason)) {
 		_LOGW (LOGD_DHCP4, "failed to update IPv4 config for DHCP change.");
-		nm_device_state_changed (self, NM_DEVICE_STATE_FAILED, reason);
-	} else {
-		/* Notify dispatcher scripts of new DHCP4 config */
-		nm_dispatcher_call (DISPATCHER_ACTION_DHCP4_CHANGE,
-		                    nm_device_get_settings_connection (self),
-		                    nm_device_get_applied_connection (self),
-		                    self,
-		                    NULL,
-		                    NULL,
-		                    NULL);
+		return FALSE;
 	}
+
+	/* Notify dispatcher scripts of new DHCP4 config */
+	nm_dispatcher_call (DISPATCHER_ACTION_DHCP4_CHANGE,
+	                    nm_device_get_settings_connection (self),
+	                    nm_device_get_applied_connection (self),
+	                    self,
+	                    NULL,
+	                    NULL,
+	                    NULL);
+
+	return TRUE;
 }
 
 static gboolean
@@ -4220,9 +4237,7 @@ dhcp4_state_changed (NMDhcpClient *client,
 	case NM_DHCP_STATE_BOUND:
 		if (!ip4_config) {
 			_LOGW (LOGD_DHCP4, "failed to get IPv4 config in response to DHCP event.");
-			nm_device_state_changed (self,
-			                         NM_DEVICE_STATE_FAILED,
-			                         NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
+			dhcp4_fail (self, FALSE);
 			break;
 		}
 
@@ -4232,8 +4247,10 @@ dhcp4_state_changed (NMDhcpClient *client,
 		if (priv->ip4_state == IP_CONF)
 			nm_device_activate_schedule_ip4_config_result (self, ip4_config);
 		else if (priv->ip4_state == IP_DONE) {
-			dhcp4_lease_change (self, ip4_config);
-			nm_device_update_metered (self);
+			if (dhcp4_lease_change (self, ip4_config))
+				nm_device_update_metered (self);
+			else
+				dhcp4_fail (self, FALSE);
 		}
 		break;
 	case NM_DHCP_STATE_TIMEOUT:
@@ -4818,7 +4835,7 @@ END_ADD_DEFAULT_ROUTE:
 	return success;
 }
 
-static void
+static gboolean
 dhcp6_lease_change (NMDevice *self)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
@@ -4827,8 +4844,7 @@ dhcp6_lease_change (NMDevice *self)
 
 	if (priv->dhcp6_ip6_config == NULL) {
 		_LOGW (LOGD_DHCP6, "failed to get DHCPv6 config for rebind");
-		nm_device_state_changed (self, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_IP_CONFIG_EXPIRED);
-		return;
+		return FALSE;
 	}
 
 	g_assert (priv->dhcp6_client);  /* sanity check */
@@ -4837,16 +4853,18 @@ dhcp6_lease_change (NMDevice *self)
 	g_assert (settings_connection);
 
 	/* Apply the updated config */
-	if (ip6_config_merge_and_apply (self, TRUE, &reason) == FALSE) {
+	if (!ip6_config_merge_and_apply (self, TRUE, &reason)) {
 		_LOGW (LOGD_DHCP6, "failed to update IPv6 config in response to DHCP event.");
-		nm_device_state_changed (self, NM_DEVICE_STATE_FAILED, reason);
-	} else {
-		/* Notify dispatcher scripts of new DHCPv6 config */
-		nm_dispatcher_call (DISPATCHER_ACTION_DHCP6_CHANGE,
-		                    settings_connection,
-		                    nm_device_get_applied_connection (self),
-		                    self, NULL, NULL, NULL);
+		return FALSE;
 	}
+
+	/* Notify dispatcher scripts of new DHCPv6 config */
+	nm_dispatcher_call (DISPATCHER_ACTION_DHCP6_CHANGE,
+	                    settings_connection,
+	                    nm_device_get_applied_connection (self),
+	                    self, NULL, NULL, NULL);
+
+	return TRUE;
 }
 
 static gboolean
@@ -4899,7 +4917,7 @@ dhcp6_fail (NMDevice *self, gboolean timeout)
 		if (timeout || (priv->ip6_state == IP_CONF))
 			nm_device_activate_schedule_ip6_config_timeout (self);
 		else if (priv->ip6_state == IP_DONE)
-			nm_device_state_changed (self, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_IP_CONFIG_EXPIRED);
+			nm_device_ip_method_failed (self, AF_INET6, NM_DEVICE_STATE_REASON_IP_CONFIG_EXPIRED);
 		else
 			g_warn_if_reached ();
 	} else {
@@ -4968,13 +4986,14 @@ dhcp6_state_changed (NMDhcpClient *client,
 
 		if (priv->ip6_state == IP_CONF) {
 			if (priv->dhcp6_ip6_config == NULL) {
-				/* FIXME: Initial DHCP failed; should we fail IPv6 entirely then? */
-				nm_device_state_changed (self, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_DHCP_FAILED);
+				nm_device_ip_method_failed (self, AF_INET6, NM_DEVICE_STATE_REASON_DHCP_FAILED);
 				break;
 			}
 			nm_device_activate_schedule_ip6_config_result (self);
-		} else if (priv->ip6_state == IP_DONE)
-			dhcp6_lease_change (self);
+		} else if (priv->ip6_state == IP_DONE) {
+			if (!dhcp6_lease_change (self))
+				dhcp6_fail (self, FALSE);
+		}
 		break;
 	case NM_DHCP_STATE_TIMEOUT:
 		dhcp6_timeout (self, client);
@@ -6196,7 +6215,6 @@ act_stage4_ip4_config_timeout (NMDevice *self, NMDeviceStateReason *reason)
 static void
 activate_stage4_ip4_config_timeout (NMDevice *self)
 {
-	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 	NMActStageReturn ret = NM_ACT_STAGE_RETURN_FAILURE;
 	NMDeviceStateReason reason = NM_DEVICE_STATE_REASON_NONE;
 
@@ -6209,9 +6227,7 @@ activate_stage4_ip4_config_timeout (NMDevice *self)
 	}
 	g_assert (ret == NM_ACT_STAGE_RETURN_SUCCESS);
 
-	priv->ip4_state = IP_FAIL;
-
-	nm_device_check_ip_failed (self, FALSE);
+	nm_device_ip_method_failed (self, AF_INET, reason);
 }
 
 
@@ -6256,7 +6272,6 @@ act_stage4_ip6_config_timeout (NMDevice *self, NMDeviceStateReason *reason)
 static void
 activate_stage4_ip6_config_timeout (NMDevice *self)
 {
-	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 	NMActStageReturn ret = NM_ACT_STAGE_RETURN_FAILURE;
 	NMDeviceStateReason reason = NM_DEVICE_STATE_REASON_NONE;
 
@@ -6269,9 +6284,7 @@ activate_stage4_ip6_config_timeout (NMDevice *self)
 	}
 	g_assert (ret == NM_ACT_STAGE_RETURN_SUCCESS);
 
-	priv->ip6_state = IP_FAIL;
-
-	nm_device_check_ip_failed (self, FALSE);
+	nm_device_ip_method_failed (self, AF_INET6, reason);
 }
 
 
@@ -6527,7 +6540,7 @@ activate_stage5_ip4_config_commit (NMDevice *self)
 	/* NULL to use the existing priv->dev_ip4_config */
 	if (!ip4_config_merge_and_apply (self, NULL, TRUE, &reason)) {
 		_LOGD (LOGD_DEVICE | LOGD_IP4, "Activation: Stage 5 of 5 (IPv4 Commit) failed");
-		nm_device_state_changed (self, NM_DEVICE_STATE_FAILED, reason);
+		nm_device_ip_method_failed (self, AF_INET, reason);
 		return;
 	}
 
@@ -6537,7 +6550,7 @@ activate_stage5_ip4_config_commit (NMDevice *self)
 	if (strcmp (method, NM_SETTING_IP4_CONFIG_METHOD_SHARED) == 0) {
 		if (!start_sharing (self, priv->ip4_config)) {
 			_LOGW (LOGD_SHARING, "Activation: Stage 5 of 5 (IPv4 Commit) start sharing failed.");
-			nm_device_state_changed (self, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_SHARED_START_FAILED);
+			nm_device_ip_method_failed (self, AF_INET, NM_DEVICE_STATE_REASON_SHARED_START_FAILED);
 			return;
 		}
 	}
@@ -6665,7 +6678,7 @@ activate_stage5_ip6_config_commit (NMDevice *self)
 			nm_device_state_changed (self, NM_DEVICE_STATE_IP_CHECK, NM_DEVICE_STATE_REASON_NONE);
 	} else {
 		_LOGW (LOGD_DEVICE | LOGD_IP6, "Activation: Stage 5 of 5 (IPv6 Commit) failed");
-		nm_device_state_changed (self, NM_DEVICE_STATE_FAILED, reason);
+		nm_device_ip_method_failed (self, AF_INET6, reason);
 	}
 }
 

@@ -374,9 +374,8 @@ ppp_failed (NMModem *modem, NMDeviceStateReason reason, gpointer user_data)
 		if (nm_device_activate_ip4_state_in_conf (device))
 			nm_device_activate_schedule_ip4_config_timeout (device);
 		else {
-			nm_device_state_changed (device,
-			                         NM_DEVICE_STATE_FAILED,
-			                         NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
+			nm_device_ip_method_failed (device, AF_INET,
+			                            NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
 		}
 		break;
 	default:
@@ -501,7 +500,8 @@ modem_ip4_config_result (NMModem *modem,
 		       "retrieving IP4 configuration failed: (%d) %s",
 		       error->code, error->message ? error->message : "(unknown)");
 
-		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
+		nm_device_ip_method_failed (device, AF_INET,
+		                            NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
 	} else
 		nm_device_activate_schedule_ip4_config_result (device, config);
 }
