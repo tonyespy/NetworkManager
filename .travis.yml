@@ -13,9 +13,11 @@ before_install:
   - sudo apt-get install libnl-3-dev libndp-dev automake
 
 script:
-  - sh autogen.sh --with-systemd-logind=no --enable-more-warnings=no
-  - make -j4
-  - make -k check
+  - true
+
+#  - sh autogen.sh --with-systemd-logind=no --enable-more-warnings=no
+#  - make -j4
+#  - make -k check
 
 addons:
   coverity_scan:
@@ -23,7 +25,7 @@ addons:
       name: NetworkManager/NetworkManager
     build_command_prepend: sh autogen.sh --with-systemd-logind=no --enable-more-warnings=no
     build_command: make -j4
-    branch_pattern: coverity
+    branch_pattern: .*
     notification_email: lkundrak@v3.sk
 
 env:
