@@ -832,13 +832,14 @@ fi
 AC_DEFINE_UNQUOTED(KERNEL_FIRMWARE_DIR, "$KERNEL_FIRMWARE_DIR", [Define to path of the kernel firmware directory])
 AC_SUBST(KERNEL_FIRMWARE_DIR)
 
-PKG_CHECK_MODULES(LIBSOUP, [libsoup-2.4 >= 2.40], [have_libsoup=yes],[have_libsoup=no])
+PKG_CHECK_MODULES(LIBSOUP, [libsoup-2.4 >= 2.40], [have_libsoup=yes], [have_libsoup=no])
 AC_ARG_WITH(libsoup, AS_HELP_STRING([--with-libsoup=yes|no], [Link against libsoup]), [], [with_libsoup=${have_libsoup}])
 if test "$with_libsoup" != "no"; then
 	if test "$have_libsoup" != "yes"; then
 		AC_MSG_ERROR(libsoup library not found)
 	fi
 	with_libsoup='yes'
+	concheck_lib='(libsoup)'
 	AC_DEFINE(WITH_LIBSOUP, 1, [Define if you have libsoup])
 else
 	AC_DEFINE(WITH_LIBSOUP, 0, [Define if you have libsoup])
@@ -846,11 +847,27 @@ fi
 AM_CONDITIONAL(WITH_LIBSOUP, test "$with_libsoup" != "no")
 LIBSOUP_CFLAGS="$LIBSOUP_CFLAGS -DSOUP_VERSION_MIN_REQUIRED=SOUP_VERSION_2_40 -DSOUP_VERSION_MAX_ALLOWED=SOUP_VERSION_2_40"
 
+PKG_CHECK_MODULES(LIBCURL, [libcurl], [have_libcurl=yes], [have_libcurl=no])
+AC_ARG_WITH(libcurl, AS_HELP_STRING([--with-libcurl=yes|no], [Link against libcurl]), [],
+	[if test "$with_libsoup" != "yes"; then with_libcurl=${have_libcurl}; else with_libcurl="no"; fi] )
+
+if test "$with_libcurl" != "no"; then
+	if test "$have_libcurl" != "yes"; then
+		AC_MSG_ERROR(libcurl library not found)
+	fi
+	with_libcurl='yes'
+	concheck_lib='(libcurl)'
+	AC_DEFINE(WITH_LIBCURL, 1, [Define if you have libcurl])
+else
+	AC_DEFINE(WITH_LIBCURL, 0, [Define if you have libcurl])
+fi
+AM_CONDITIONAL(WITH_LIBCURL, test "$with_libcurl" != "no")
+
 AC_ARG_ENABLE(concheck, AS_HELP_STRING([--enable-concheck], [enable connectivity checking support]),
-                     [enable_concheck=${enableval}], [enable_concheck=${with_libsoup}])
+                     [enable_concheck=${enableval}], [if test "$with_libsoup" = "yes" || test "$with_libcurl" = "yes"; then enable_concheck="yes"; else enable_concheck="no"; fi])
 if (test "${enable_concheck}" = "yes"); then
-	if test x"$with_libsoup" = x"no"; then
-		AC_MSG_ERROR(Connectivity checking requires libsoup)
+	if test x"$with_libsoup" = x"no" && test x"$with_libcurl" = x"no"; then
+		AC_MSG_ERROR(Connectivity checking requires libsoup or libcurl)
 	fi
 	AC_DEFINE(WITH_CONCHECK, 1, [Define if you want connectivity checking support])
 else
@@ -1144,7 +1161,7 @@ echo "  wext: $ac_with_wext"
 echo "  wifi: $enable_wifi"
 echo "  ppp: $enable_ppp"
 echo "  modemmanager-1: $with_modem_manager_1"
-echo "  concheck: $enable_concheck"
+echo "  concheck: $enable_concheck $concheck_lib"
 echo "  libteamdctl: $enable_teamdctl"
 echo "  libnm-glib: $with_libnm_glib"
 echo "  nmcli: $build_nmcli"
