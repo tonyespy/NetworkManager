@@ -1582,6 +1582,7 @@ get_existing_connection (NMManager *manager, NMDevice *device, gboolean *out_gen
 	matched = NM_SETTINGS_CONNECTION (nm_utils_match_connection (connections,
 	                                                             connection,
 	                                                             nm_device_has_carrier (device),
+	                                                             nm_device_get_priority (device),
 	                                                             match_connection_filter,
 	                                                             device));
 	if (matched) {

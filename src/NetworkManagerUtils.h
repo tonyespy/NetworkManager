@@ -328,6 +328,7 @@ typedef gboolean (NMUtilsMatchFilterFunc) (NMConnection *connection, gpointer us
 NMConnection *nm_utils_match_connection (GSList *connections,
                                          NMConnection *original,
                                          gboolean device_has_carrier,
+                                         gint64 default_metric,
                                          NMUtilsMatchFilterFunc match_filter_func,
                                          gpointer match_filter_data);
 
