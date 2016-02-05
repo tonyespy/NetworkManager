@@ -6477,7 +6477,7 @@ nmc_properties_init (void)
 	                    NULL);
 	nmc_add_prop_funcs (GLUE_IP (4, DHCP_TIMEOUT),
 	                    nmc_property_ipv4_get_dhcp_timeout,
-	                    nmc_property_set_uint,
+	                    nmc_property_set_int,
 	                    NULL,
 	                    NULL,
 	                    NULL,
@@ -6626,7 +6626,7 @@ nmc_properties_init (void)
 	                    NULL);
 	nmc_add_prop_funcs (GLUE_IP (6, DHCP_TIMEOUT),
 	                    nmc_property_ipv6_get_dhcp_timeout,
-	                    nmc_property_set_uint,
+	                    nmc_property_set_int,
 	                    NULL,
 	                    NULL,
 	                    NULL,
