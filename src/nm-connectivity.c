@@ -23,7 +23,11 @@
 
 #include <string.h>
 #if WITH_CONCHECK
+#if WITH_LIBCURL
+#include <curl/curl.h>
+#else
 #include <libsoup/soup.h>
+#endif
 #endif
 
 #include "nm-connectivity.h"
@@ -50,7 +54,12 @@ typedef struct {
 	gboolean online; /* whether periodic connectivity checking is enabled. */
 
 #if WITH_CONCHECK
+#if WITH_LIBCURL
+	CURLM *curl_mhandle;
+	guint curl_timer;
+#else
 	SoupSession *soup_session;
+#endif
 	gboolean initial_check_obsoleted;
 	guint check_id;
 #endif
@@ -105,8 +114,211 @@ typedef struct {
 	char *uri;
 	char *response;
 	guint check_id_when_scheduled;
+#if WITH_LIBCURL
+	CURL *curl_ehandle;
+	size_t msg_size;
+	char *msg;
+	curl_socket_t sock;
+	GIOChannel *ch;
+	guint ev;
+#endif
 } ConCheckCbData;
 
+#if WITH_LIBCURL
+typedef struct {
+	curl_socket_t sockfd;
+	CURL *easy;
+	int action;
+	long timeout;
+	GIOChannel *ch;
+	guint ev;
+} CurlSockData;
+
+size_t
+easy_write_callback (void *buffer, size_t size, size_t nmemb, void *userp)
+{
+	ConCheckCbData *cb_data = userp;
+
+	cb_data->msg = g_realloc (cb_data->msg, cb_data->msg_size + size*nmemb);
+	memcpy (cb_data->msg + cb_data->msg_size, buffer, nmemb*size);
+	cb_data->msg_size += size * nmemb;
+
+	_LOGD ("Received %d bytes from CURL\n", size * nmemb);
+
+	return size * nmemb;
+}
+
+static NMConnectivityState
+curl_check_connectivity (CURLM *mhandle, CURLMcode ret)
+{
+	NMConnectivity *self;
+	NMConnectivityPrivate *priv;
+	NMConnectivityState new_state = NM_CONNECTIVITY_UNKNOWN;
+	ConCheckCbData *cb_data;
+	CURLMsg *msg;
+	CURLcode eret;
+	gint m_left;
+
+	_LOGT ("curl_multi check for easy messages");
+	if (ret != CURLM_OK) {
+		_LOGE ("Connectivity check failed");
+		return NM_CONNECTIVITY_UNKNOWN;
+	}
+
+	while ((msg = curl_multi_info_read(mhandle, &m_left))) {
+		_LOGT ("curl MSG received - ehandle:%p, type:%d", msg->easy_handle, msg->msg);
+		if (msg->msg != CURLMSG_DONE)
+			continue;
+
+		/* Here we have completed a session. Check easy session result. */
+		eret = curl_easy_getinfo (msg->easy_handle, CURLINFO_PRIVATE, &cb_data);
+		if (eret != CURLE_OK) {
+			_LOGE ("curl cannot extract cb_data for easy handle %p, skipping msg", msg->easy_handle);
+			continue;
+		}
+		self = NM_CONNECTIVITY (g_async_result_get_source_object (G_ASYNC_RESULT (cb_data->simple)));
+		priv = NM_CONNECTIVITY_GET_PRIVATE (self);
+
+		if (msg->data.result != CURLE_OK) {
+			_LOGD ("Check for uri '%s' failed", cb_data->uri);
+			new_state = NM_CONNECTIVITY_LIMITED;
+			goto cleanup;
+		}
+		/* TODO --> Check NM specific HTML headers */
+
+		/* Check response */
+		if (cb_data->msg && g_str_has_prefix (cb_data->msg, cb_data->response)) {
+			_LOGD ("Check for uri '%s' successful.", cb_data->uri);
+			new_state = NM_CONNECTIVITY_FULL;
+			goto cleanup;
+		}
+
+		_LOGI ("Check for uri '%s' did not match expected response '%s'; assuming captive portal.",
+			cb_data->uri, cb_data->response);
+		new_state = NM_CONNECTIVITY_PORTAL;
+cleanup:
+		/* Only update the state, if the call was done from external, or if the periodic check
+		 * is still the one that called this async check. */
+		if (!cb_data->check_id_when_scheduled || cb_data->check_id_when_scheduled == priv->check_id) {
+			/* Only update the state, if the URI and response parameters did not change
+			 * since invocation.
+			 * The interval does not matter for exernal calls, and for internal calls
+			 * we don't reach this line if the interval changed. */
+			if (   !g_strcmp0 (cb_data->uri, priv->uri)
+			    && !g_strcmp0 (cb_data->response, priv->response)) {
+				_LOGT ("Update to new connectivity state %d", new_state);
+				update_state (self, new_state);
+			}
+		}
+		g_simple_async_result_set_op_res_gssize (cb_data->simple, new_state);
+		g_simple_async_result_complete (cb_data->simple);
+		g_object_unref (cb_data->simple);
+
+		curl_multi_remove_handle (mhandle, cb_data->curl_ehandle);
+		curl_easy_cleanup (cb_data->curl_ehandle);
+		g_free (cb_data->uri);
+		g_free (cb_data->response);
+		g_slice_free (ConCheckCbData, cb_data);
+	}
+
+	return new_state;
+}
+
+static gboolean
+curl_timeout_cb (gpointer user_data)
+{
+	NMConnectivityPrivate *priv = user_data;
+	NMConnectivityState new_state;
+	CURLMcode ret;
+	int pending_conn;
+
+	ret = curl_multi_socket_action (priv->curl_mhandle, CURL_SOCKET_TIMEOUT, 0, &pending_conn);
+	_LOGT ("timeout elapsed - multi_socket_action (%d conn remaining)");
+
+	new_state = curl_check_connectivity (priv->curl_mhandle, ret);
+
+	return FALSE;
+}
+
+static int
+curl_timer_cb (CURLM *multi, long timeout_ms, void *userp)
+{
+	NMConnectivityPrivate *priv = userp;
+
+	_LOGT ("curl_multi timer invocation --> timeout ms: %d", timeout_ms);
+	switch (timeout_ms) {
+	case -1:
+		/* TODO?: should we cancel current timer ? */
+		break;
+	case 0:
+		/*
+		 * Do we really need special management of this case?
+		 */
+	default:
+		priv->curl_timer = g_timeout_add (timeout_ms * 1000, curl_timeout_cb, priv);
+		break;
+	}
+	return 0;
+}
+
+static gboolean
+curl_socketevent_cb (GIOChannel *ch, GIOCondition condition, gpointer data)
+{
+	NMConnectivityPrivate *priv = data;
+	NMConnectivityState new_state;
+	CURLMcode ret;
+	int pending_conn = 0;
+	gboolean bret = TRUE;
+	int fd = g_io_channel_unix_get_fd (ch);
+
+	ret = curl_multi_socket_action (priv->curl_mhandle, fd, 0, &pending_conn);
+	_LOGT ("activity on monitored fd %d - multi_socket_action (%d conn remaining)", fd, pending_conn);
+
+	new_state = curl_check_connectivity (priv->curl_mhandle, ret);
+
+	if (pending_conn == 0) {
+		if (priv->curl_timer)
+			g_source_remove (priv->curl_timer);
+		bret = FALSE;
+	}
+	return bret;
+}
+
+static int
+curl_socket_cb (CURL *e_handle, curl_socket_t s, int what, void *userp, void *socketp)
+{
+	NMConnectivityPrivate *priv = (NMConnectivityPrivate*) userp;
+	CurlSockData *fdp = (CurlSockData*) socketp;
+	_LOGT ("curl_multi socket callback --> socket %d", s);
+
+	switch (what) {
+	case CURL_POLL_NONE:
+	case CURL_POLL_IN:
+	case CURL_POLL_OUT:
+	case CURL_POLL_INOUT:
+		if (!fdp) {
+			_LOGT ("register new socket s=%d", s);
+			fdp = g_malloc0 (sizeof (CurlSockData));
+			fdp->ch = g_io_channel_unix_new (s);
+			fdp->sockfd = s;
+			fdp->action = what;
+			fdp->easy = e_handle;
+			fdp->ev = g_io_add_watch (fdp->ch, G_IO_IN|G_IO_OUT, curl_socketevent_cb, priv);
+			curl_multi_assign (priv->curl_mhandle, s, fdp);
+		}
+		break;
+	case CURL_POLL_REMOVE:
+		_LOGD ("remove socket s=%d", s);
+		if ((fdp) && (fdp->ev)) {
+			g_source_remove (fdp->ev);
+			g_free (fdp);
+		}
+		break;
+	}
+	return 0;
+}
+
+#else
 static void
 nm_connectivity_check_cb (SoupSession *session, SoupMessage *msg, gpointer user_data)
 {
@@ -156,7 +368,6 @@ nm_connectivity_check_cb (SoupSession *session, SoupMessage *msg, gpointer user_
 			new_state = NM_CONNECTIVITY_PORTAL;
 		}
 	}
-
  done:
 	/* Only update the state, if the call was done from external, or if the periodic check
 	 * is still the one that called this async check. */
@@ -178,6 +389,7 @@ nm_connectivity_check_cb (SoupSession *session, SoupMessage *msg, gpointer user_
 	g_free (cb_data->response);
 	g_slice_free (ConCheckCbData, cb_data);
 }
+#endif
 
 #define IS_PERIODIC_CHECK(callback)  (callback == run_check_complete)
 
@@ -274,6 +486,34 @@ nm_connectivity_check_async (NMConnectivity      *self,
 	                                    nm_connectivity_check_async);
 
 #if WITH_CONCHECK
+#if WITH_LIBCURL
+	if (priv->uri && priv->interval) {
+		ConCheckCbData *cb_data = g_slice_new (ConCheckCbData);
+
+		cb_data->curl_ehandle = curl_easy_init ();
+		curl_easy_setopt (cb_data->curl_ehandle, CURLOPT_URL, priv->uri);
+		curl_easy_setopt (cb_data->curl_ehandle, CURLOPT_WRITEFUNCTION, easy_write_callback);
+		curl_easy_setopt (cb_data->curl_ehandle, CURLOPT_WRITEDATA, cb_data);
+		curl_easy_setopt (cb_data->curl_ehandle, CURLOPT_PRIVATE, cb_data);
+		/*
+		 * TODO --> disable keepalive
+		 * curl http redirection is disabled by default but not connection presistence
+		 */
+
+		cb_data->simple = simple;
+		cb_data->uri = g_strdup (priv->uri);
+		if (priv->response)
+			cb_data->response = g_strdup (priv->response);
+		else
+			cb_data->response = g_strdup (NM_CONFIG_DEFAULT_CONNECTIVITY_RESPONSE);
+		cb_data->msg_size = 0;
+		cb_data->msg = NULL;
+
+		/* For internal calls (periodic), remember the check-id at time of scheduling. */
+		cb_data->check_id_when_scheduled = IS_PERIODIC_CHECK (callback) ? priv->check_id : 0;
+
+		curl_multi_add_handle (priv->curl_mhandle, cb_data->curl_ehandle);
+#else
 	if (priv->uri && priv->interval) {
 		SoupMessage *msg;
 		ConCheckCbData *cb_data = g_slice_new (ConCheckCbData);
@@ -293,8 +533,8 @@ nm_connectivity_check_async (NMConnectivity      *self,
 		                            msg,
 		                            nm_connectivity_check_cb,
 		                            cb_data);
+#endif
 		priv->initial_check_obsoleted = TRUE;
-
 		_LOGD ("check: send %srequest to '%s'", IS_PERIODIC_CHECK (callback) ? "periodic " : "", priv->uri);
 		return;
 	} else {
@@ -307,7 +547,9 @@ nm_connectivity_check_async (NMConnectivity      *self,
 
 	g_simple_async_result_set_op_res_gssize (simple, priv->state);
 	g_simple_async_result_complete_in_idle (simple);
+#ifndef WITH_LIBCURL
 	g_object_unref (simple);
+#endif
 }
 
 NMConnectivityState
@@ -356,6 +598,11 @@ set_property (GObject *object, guint property_id,
 			uri = NULL;
 		changed = g_strcmp0 (uri, priv->uri) != 0;
 #if WITH_CONCHECK
+/*
+ * TODO --> check uri without LIBSOUP
+ */
+#if WITH_LIBCURL
+#else
 		if (uri) {
 			SoupURI *soup_uri = soup_uri_new (uri);
 
@@ -369,6 +616,7 @@ set_property (GObject *object, guint property_id,
 			if (soup_uri)
 				soup_uri_free (soup_uri);
 		}
+#endif
 #endif
 		if (changed) {
 			g_free (priv->uri);
@@ -435,7 +683,20 @@ nm_connectivity_init (NMConnectivity *self)
 	NMConnectivityPrivate *priv = NM_CONNECTIVITY_GET_PRIVATE (self);
 
 #if WITH_CONCHECK
+#if WITH_LIBCURL
+	CURLcode retv;
+	retv = curl_global_init (CURL_GLOBAL_ALL);
+	if (retv != CURLE_OK)
+		_LOGI ("Unable to init CURL, connectivity check will be affected");
+
+	priv->curl_mhandle = curl_multi_init ();
+	curl_multi_setopt (priv->curl_mhandle, CURLMOPT_SOCKETFUNCTION, curl_socket_cb);
+	curl_multi_setopt (priv->curl_mhandle, CURLMOPT_SOCKETDATA, priv);
+	curl_multi_setopt (priv->curl_mhandle, CURLMOPT_TIMERFUNCTION, curl_timer_cb);
+	curl_multi_setopt (priv->curl_mhandle, CURLMOPT_TIMERDATA, priv);
+#else
 	priv->soup_session = soup_session_async_new_with_options (SOUP_SESSION_TIMEOUT, 15, NULL);
+#endif
 #endif
 	priv->state = NM_CONNECTIVITY_NONE;
 }
@@ -451,6 +712,11 @@ dispose (GObject *object)
 	g_clear_pointer (&priv->response, g_free);
 
 #if WITH_CONCHECK
+#if WITH_LIBCURL
+	/* TODO?: should we check here if there is some pending easy handle? */
+	curl_multi_cleanup (priv->curl_mhandle);
+	curl_global_cleanup ();  // not thread safe
+#else
 	if (priv->soup_session) {
 		soup_session_abort (priv->soup_session);
 		g_clear_object (&priv->soup_session);
@@ -458,7 +724,7 @@ dispose (GObject *object)
 
 	nm_clear_g_source (&priv->check_id);
 #endif
-
+#endif
 	G_OBJECT_CLASS (nm_connectivity_parent_class)->dispose (object);
 }
 
