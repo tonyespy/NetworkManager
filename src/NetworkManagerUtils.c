@@ -2306,7 +2306,7 @@ check_ip6_method (NMConnection *orig,
 }
 
 static int
-route_compare (NMIPRoute *route1, NMIPRoute *route2, int default_metric)
+route_compare (NMIPRoute *route1, NMIPRoute *route2, gint64 default_metric)
 {
 	gint64 r, metric1, metric2;
 
@@ -2347,7 +2347,7 @@ check_ip_routes (NMConnection *orig,
                  NMConnection *candidate,
                  GHashTable *settings,
                  gint64 default_metric,
-                 gboolean v6)
+                 gboolean v4)
 {
 	gs_free NMIPRoute **routes1 = NULL, **routes2 = NULL;
 	NMSettingIPConfig *s_ip1, *s_ip2;
@@ -2355,8 +2355,8 @@ check_ip_routes (NMConnection *orig,
 	GHashTable *props;
 	guint i, num;
 
-	s_name = v6 ? NM_SETTING_IP6_CONFIG_SETTING_NAME :
-	              NM_SETTING_IP4_CONFIG_SETTING_NAME;
+	s_name = v4 ? NM_SETTING_IP4_CONFIG_SETTING_NAME :
+	              NM_SETTING_IP6_CONFIG_SETTING_NAME;
 
 	props = check_property_in_hash (settings,
 	                                s_name,
@@ -2578,7 +2578,8 @@ check_possible_match (NMConnection *orig,
                       NMConnection *candidate,
                       GHashTable *settings,
                       gboolean device_has_carrier,
-                      gint64 default_metric)
+                      gint64 default_v4_metric,
+                      gint64 default_v6_metric)
 {
 	g_return_val_if_fail (settings != NULL, NULL);
 
@@ -2588,10 +2589,10 @@ check_possible_match (NMConnection *orig,
 	if (!check_ip4_method (orig, candidate, settings, device_has_carrier))
 		return NULL;
 
-	if (!check_ip_routes (orig, candidate, settings, default_metric, FALSE))
+	if (!check_ip_routes (orig, candidate, settings, default_v4_metric, TRUE))
 		return NULL;
 
-	if (!check_ip_routes (orig, candidate, settings, default_metric, TRUE))
+	if (!check_ip_routes (orig, candidate, settings, default_v6_metric, FALSE))
 		return NULL;
 
 	if (!check_connection_interface_name (orig, candidate, settings))
@@ -2637,7 +2638,8 @@ NMConnection *
 nm_utils_match_connection (GSList *connections,
                            NMConnection *original,
                            gboolean device_has_carrier,
-                           gint64 default_metric,
+                           gint64 default_v4_metric,
+                           gint64 default_v6_metric,
                            NMUtilsMatchFilterFunc match_filter_func,
                            gpointer match_filter_data)
 {
@@ -2654,8 +2656,10 @@ nm_utils_match_connection (GSList *connections,
 		}
 
 		if (!nm_connection_diff (original, candidate, NM_SETTING_COMPARE_FLAG_INFERRABLE, &diffs)) {
-			if (!best_match)
-				best_match = check_possible_match (original, candidate, diffs, device_has_carrier, default_metric);
+			if (!best_match) {
+				best_match = check_possible_match (original, candidate, diffs, device_has_carrier,
+				                                   default_v4_metric, default_v6_metric);
+			}
 
 			if (!best_match && nm_logging_enabled (LOGL_DEBUG, LOGD_CORE)) {
 				GString *diff_string;
