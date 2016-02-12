@@ -510,6 +510,14 @@ nm_setting_ip6_config_class_init (NMSettingIP6ConfigClass *ip6_class)
 	 */
 
 	/* ---ifcfg-rh---
+	 * property: dhcp-timeout
+	 * variable: IPV6_DHCP_TIMEOUT(+)
+	 * description: A timeout after which the DHCP transaction fails in case of no response.
+	 * example: IPV6_DHCP_TIMEOUT=10
+	 * ---end---
+	 */
+
+	/* ---ifcfg-rh---
 	 * property: never-default
 	 * variable: IPV6_DEFROUTE(+), (and IPV6_DEFAULTGW, IPV6_DEFAULTDEV in /etc/sysconfig/network)
 	 * default: IPV6_DEFROUTE=yes (when no variable specified)

@@ -1458,6 +1458,11 @@ make_ip6_setting (shvarFile *ifcfg,
 		if (value && value[0])
 			g_object_set (s_ip6, NM_SETTING_IP_CONFIG_DHCP_HOSTNAME, value, NULL);
 		g_free (value);
+
+		g_object_set (s_ip6,
+		              NM_SETTING_IP_CONFIG_DHCP_TIMEOUT,
+		              svGetValueInt64 (ifcfg, "IPV6_DHCP_TIMEOUT", 10, 0, G_MAXINT32, 0),
+		              NULL);
 	}
 
 	/* Read static IP addresses.

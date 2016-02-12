@@ -4526,21 +4526,23 @@ dhcp4_state_changed (NMDhcpClient *client,
 }
 
 static int
-dhcp4_get_timeout (NMDevice *self, NMSettingIP4Config *s_ip4)
+dhcp_get_timeout (NMDevice *self, NMSettingIPConfig *s_ip)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 	gs_free char *value = NULL;
+	char *prop_name;
 	int timeout;
 
-	timeout = nm_setting_ip_config_get_dhcp_timeout (NM_SETTING_IP_CONFIG (s_ip4));
+	timeout = nm_setting_ip_config_get_dhcp_timeout (s_ip);
 	if (timeout)
 		return timeout;
 
+	prop_name = NM_IS_SETTING_IP4_CONFIG (s_ip) ? "ipv4.dhcp-timeout" :
+	                                              "ipv6.dhcp-timeout";
 	value = nm_config_data_get_connection_default (NM_CONFIG_GET_DATA,
-	                                               "ipv4.dhcp-timeout",
+	                                               prop_name,
 	                                               self);
-	timeout = _nm_utils_ascii_str_to_int64 (value, 10,
-	                                        0, G_MAXINT32, 0);
+	timeout = _nm_utils_ascii_str_to_int64 (value, 10, 0, G_MAXINT32, 0);
 	if (timeout)
 		return timeout;
 
@@ -4582,7 +4584,7 @@ dhcp4_start (NMDevice *self,
 	                                                nm_setting_ip_config_get_dhcp_hostname (s_ip4),
 	                                                nm_setting_ip4_config_get_dhcp_fqdn (NM_SETTING_IP4_CONFIG (s_ip4)),
 	                                                nm_setting_ip4_config_get_dhcp_client_id (NM_SETTING_IP4_CONFIG (s_ip4)),
-	                                                dhcp4_get_timeout (self, NM_SETTING_IP4_CONFIG (s_ip4)),
+	                                                dhcp_get_timeout (self, s_ip4),
 	                                                priv->dhcp_anycast_address,
 	                                                NULL);
 
@@ -5310,7 +5312,7 @@ dhcp6_start_with_link_ready (NMDevice *self, NMConnection *connection)
 	                                                nm_device_get_ip6_route_metric (self),
 	                                                nm_setting_ip_config_get_dhcp_send_hostname (s_ip6),
 	                                                nm_setting_ip_config_get_dhcp_hostname (s_ip6),
-	                                                priv->dhcp_timeout,
+	                                                dhcp_get_timeout (self, s_ip6),
 	                                                priv->dhcp_anycast_address,
 	                                                (priv->dhcp6_mode == NM_RDISC_DHCP_LEVEL_OTHERCONF) ? TRUE : FALSE,
 	                                                nm_setting_ip6_config_get_ip6_privacy (NM_SETTING_IP6_CONFIG (s_ip6)));

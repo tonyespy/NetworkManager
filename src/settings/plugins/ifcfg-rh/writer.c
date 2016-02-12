@@ -2418,6 +2418,7 @@ write_ip6_setting (NMConnection *connection, shvarFile *ifcfg, GError **error)
 	GString *ip_str1, *ip_str2, *ip_ptr;
 	char *route6_path;
 	NMSettingIP6ConfigAddrGenMode addr_gen_mode;
+	int timeout;
 
 	s_ip6 = nm_connection_get_setting_ip6_config (connection);
 	if (!s_ip6) {
@@ -2567,6 +2568,10 @@ write_ip6_setting (NMConnection *connection, shvarFile *ifcfg, GError **error)
 	default:
 	break;
 	}
+
+	timeout = nm_setting_ip_config_get_dhcp_timeout (s_ip6);
+	tmp = timeout ? g_strdup_printf ("%d", timeout) : NULL;
+	svSetValue (ifcfg, "IPV6_DHCP_TIMEOUT", tmp, FALSE);
 
 	/* IPv6 Address generation mode */
 	addr_gen_mode = nm_setting_ip6_config_get_addr_gen_mode (NM_SETTING_IP6_CONFIG (s_ip6));
