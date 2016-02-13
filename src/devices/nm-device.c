@@ -4530,7 +4530,7 @@ dhcp_get_timeout (NMDevice *self, NMSettingIPConfig *s_ip)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
 	gs_free char *value = NULL;
-	char *prop_name;
+	const char *prop_name;
 	int timeout;
 
 	timeout = nm_setting_ip_config_get_dhcp_timeout (s_ip);
