@@ -4033,7 +4033,7 @@ ipv4ll_start (NMDevice *self, NMDeviceStateReason *reason)
 	/* Start a timeout to bound the address attempt */
 	priv->ipv4ll_timeout = g_timeout_add_seconds (20, ipv4ll_timeout_cb, self);
 
-	return NM_ACT_STAGE_RETURN_POSTPONE;
+	return NM_ACT_STAGE_RETURN_WAIT;
 fail:
 	*reason = NM_DEVICE_STATE_REASON_AUTOIP_START_FAILED;
 	return NM_ACT_STAGE_RETURN_FAILURE;
