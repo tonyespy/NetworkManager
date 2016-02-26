@@ -4722,8 +4722,7 @@ make_vlan_setting (shvarFile *ifcfg,
 	g_object_set (s_vlan, NM_SETTING_VLAN_PARENT, parent, NULL);
 	g_clear_pointer (&parent, g_free);
 
-	if (svGetValueBoolean (ifcfg, "REORDER_HDR", FALSE))
-		vlan_flags |= NM_VLAN_FLAG_REORDER_HEADERS;
+	vlan_flags |= NM_VLAN_FLAG_REORDER_HEADERS;
 
 	gvrp = svGetValueBoolean (ifcfg, "GVRP", -1);
 	if (gvrp > 0)
@@ -4731,11 +4730,19 @@ make_vlan_setting (shvarFile *ifcfg,
 
 	value = svGetValue (ifcfg, "VLAN_FLAGS", FALSE);
 	if (value) {
-		/* Prefer GVRP variable; only take VLAN_FLAG=GVRP when GVRP is not specified */
-		if (g_strstr_len (value, -1, "GVRP") && gvrp == -1)
-			vlan_flags |= NM_VLAN_FLAG_GVRP;
-		if (g_strstr_len (value, -1, "LOOSE_BINDING"))
-			vlan_flags |= NM_VLAN_FLAG_LOOSE_BINDING;
+		gs_strfreev char **strv = NULL;
+		char **ptr;
+
+		strv = g_strsplit_set (value, ", ", 0);
+
+		for (ptr = strv; ptr && *ptr; ptr++) {
+			if (nm_streq (*ptr, "GVRP") && gvrp == -1)
+				vlan_flags |= NM_VLAN_FLAG_GVRP;
+			if (nm_streq (*ptr, "LOOSE_BINDING"))
+				vlan_flags |=  NM_VLAN_FLAG_LOOSE_BINDING;
+			if (nm_streq (*ptr, "NO_REORDER_HDR"))
+				vlan_flags &= ~NM_VLAN_FLAG_REORDER_HEADERS;
+		}
 	}
 
 	if (svGetValueBoolean (ifcfg, "MVRP", FALSE))
