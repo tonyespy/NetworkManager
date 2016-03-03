@@ -37,15 +37,10 @@
 #define _NMLOG_PREFIX_NAME    "audit"
 #define _NMLOG(level, domain, ...) \
     G_STMT_START { \
-        const NMLogLevel __level = (level); \
-        const NMLogDomain __domain = (domain); \
-        \
-        if (nm_logging_enabled (__level, __domain)) { \
-            _nm_log (__level, __domain, 0, \
-                     "%s: " _NM_UTILS_MACRO_FIRST (__VA_ARGS__), \
-                     _NMLOG_PREFIX_NAME \
-                     _NM_UTILS_MACRO_REST (__VA_ARGS__)); \
-        } \
+        nm_log ((level), (domain), \
+                "%s" _NM_UTILS_MACRO_FIRST (__VA_ARGS__), \
+                _NMLOG_PREFIX_NAME": " \
+                _NM_UTILS_MACRO_REST (__VA_ARGS__)); \
     } G_STMT_END
 
 typedef enum {
