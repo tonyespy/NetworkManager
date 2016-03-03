@@ -39,8 +39,8 @@ G_DEFINE_TYPE (NMSupplicantManager, nm_supplicant_manager, G_TYPE_OBJECT)
 #define _NMLOG(level, ...) \
     G_STMT_START { \
         nm_log ((level), _NMLOG_DOMAIN, \
-                "%s: " _NM_UTILS_MACRO_FIRST(__VA_ARGS__), \
-                _NMLOG_PREFIX_NAME \
+                "%s" _NM_UTILS_MACRO_FIRST(__VA_ARGS__), \
+                _NMLOG_PREFIX_NAME": " \
                 _NM_UTILS_MACRO_REST(__VA_ARGS__)); \
     } G_STMT_END
 
