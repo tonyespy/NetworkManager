@@ -119,7 +119,7 @@ typedef enum  { /*< skip >*/
 
 
 #define _nm_log_ptr(level, domain, self, prefix, ...) \
-   nm_log ((level), (domain), "%s[%p] " _NM_UTILS_MACRO_FIRST(__VA_ARGS__), prefix, self _NM_UTILS_MACRO_REST(__VA_ARGS__))
+   nm_log ((level), (domain), "%s[%p] " _NM_UTILS_MACRO_FIRST(__VA_ARGS__), (prefix) ?: "", self _NM_UTILS_MACRO_REST(__VA_ARGS__))
 
 /* log a message for an object (with providing a generic @self pointer) */
 #define nm_log_ptr(level, domain, self, prefix, ...) \
@@ -128,7 +128,9 @@ typedef enum  { /*< skip >*/
         if ((level) <= LOGL_DEBUG) { \
             _nm_log_ptr ((level), (domain), (self), (prefix), __VA_ARGS__); \
         } else { \
-            nm_log ((level), (domain), "" prefix " " __VA_ARGS__); \
+            const char *__prefix = (prefix); \
+            \
+            nm_log ((level), (domain), "%s%s" _NM_UTILS_MACRO_FIRST(__VA_ARGS__), __prefix ?: "", __prefix ? " " : "" _NM_UTILS_MACRO_REST(__VA_ARGS__)); \
         } \
         NM_PRAGMA_WARNING_REENABLE \
     } G_STMT_END
