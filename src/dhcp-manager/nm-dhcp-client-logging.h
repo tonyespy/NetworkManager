@@ -27,15 +27,16 @@
 #define _NMLOG_PREFIX_NAME    "dhcp"
 #define _NMLOG(level, ...) \
     G_STMT_START { \
-        NMDhcpClient *_self = NM_IS_DHCP_CLIENT(self) ? ((NMDhcpClient *) self) : NULL; \
         const NMLogLevel _level = (level); \
-        const NMLogDomain _domain = !_self ? LOGD_DHCP : \
-                                        nm_dhcp_client_get_ipv6 (_self) ? LOGD_DHCP6 : LOGD_DHCP4; \
         \
-        if (nm_logging_enabled (_level, _domain)) { \
+        if (nm_logging_enabled (_level, LOGD_DHCP)) { \
+            NMDhcpClient *_self = (NMDhcpClient *) (self); \
             const char *__ifname = _self ? nm_dhcp_client_get_iface (_self) : NULL; \
+            const NMLogDomain _domain = !_self \
+                                            ? LOGD_DHCP \
+                                            : (nm_dhcp_client_get_ipv6 (_self) ? LOGD_DHCP6 : LOGD_DHCP4); \
             \
-            _nm_log (_level, _domain, 0, \
+            nm_log (_level, _domain, \
                     "%s%s%s%s%s: " _NM_UTILS_MACRO_FIRST (__VA_ARGS__), \
                     _NMLOG_PREFIX_NAME, \
                     (_domain == LOGD_DHCP4 ? "4" : (_domain == LOGD_DHCP6 ? "6" : "")), \
