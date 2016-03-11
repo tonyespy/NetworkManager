@@ -553,6 +553,8 @@ else
 fi
 AM_CONDITIONAL(WITH_TEAMDCTL, test "${enable_teamdctl}" = "yes")
 
+PKG_CHECK_MODULES(JANSSON, jansson)
+
 # we usually compile with polkit support. --enable-polkit=yes|no only sets the
 # default configuration for main.auth-polkit. User can always enable/disable polkit
 # autorization via config. Only when specifying --enable-polkit=disabled, we do
