@@ -3376,7 +3376,7 @@ nm_setting_802_1x_class_init (NMSetting8021xClass *setting_class)
 	 * by the authentication server. When unset, no verification of the
 	 * authentication server certificate's subject is performed.  This property
 	 * provides little security, if any, and its use is deprecated in favor of
-	 * domain-suffix-match.
+	 * NMSetting8021x:domain-suffix-match.
 	 **/
 	/* ---ifcfg-rh---
 	 * property: subject-match
@@ -3638,7 +3638,8 @@ nm_setting_802_1x_class_init (NMSetting8021xClass *setting_class)
 	 * by the authentication server during the inner "phase 2"
 	 * authentication. When unset, no verification of the authentication server
 	 * certificate's subject is performed.  This property provides little security,
-	 * if any, and its use is deprecated in favor of domain-suffix-match.
+	 * if any, and its use is deprecated in favor of
+	 * NMSetting8021x:phase2-domain-suffix-match.
 	 **/
 	/* ---ifcfg-rh---
 	 * property: phase2-subject-match
