@@ -271,15 +271,12 @@ dnsmasq_update_done (GObject *source, GAsyncResult *res, gpointer user_data)
 {
 	NMDnsDnsmasq *self = NM_DNS_DNSMASQ (user_data);
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
-	GError *error = NULL;
-	GVariant *response;
+	gs_free_error GError *error = NULL;
+	gs_unref_variant GVariant *response = NULL;
 
 	response = g_dbus_proxy_call_finish (priv->dnsmasq, res, &error);
-	if (error)
+	if (!response)
 		_LOGW ("dnsmasq update failed: %s", error->message);
-
-	if (response)
-		g_variant_unref (response);
 }
 
 static gboolean
@@ -338,7 +335,7 @@ dnsmasq_proxy_cb (GObject *source, GAsyncResult *res, gpointer user_data)
 {
 	NMDnsDnsmasq *self = NM_DNS_DNSMASQ (user_data);
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
-	GError *error = NULL;
+	gs_free_error GError *error = NULL;
 	gs_free char *owner = NULL;
 
 	_LOGD ("dnsmasq proxy creation returned");
