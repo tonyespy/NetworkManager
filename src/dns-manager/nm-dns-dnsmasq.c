@@ -47,7 +47,6 @@ G_DEFINE_TYPE (NMDnsDnsmasq, nm_dns_dnsmasq, NM_TYPE_DNS_PLUGIN)
 #define DNSMASQ_DBUS_PATH "/uk/org/thekelleys/dnsmasq"
 
 typedef struct {
-	NMBusManager *dbus_mgr;
 	GDBusProxy *dnsmasq;
 	gboolean running;
 
@@ -361,14 +360,19 @@ static void
 get_dnsmasq_proxy (NMDnsDnsmasq *self)
 {
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
+	NMBusManager *dbus_mgr;
 	GDBusConnection *connection;
 
 	g_return_if_fail (!priv->dnsmasq);
 
 	_LOGD ("retrieving dnsmasq proxy");
 
-	connection = nm_bus_manager_get_connection (priv->dbus_mgr);
+	dbus_mgr = nm_bus_manager_get ();
+	g_return_if_fail (dbus_mgr);
+
+	connection = nm_bus_manager_get_connection (dbus_mgr);
 	g_return_if_fail (connection);
+
 	g_dbus_proxy_new (connection,
 	                  G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
 	                  NULL,
@@ -591,11 +595,6 @@ nm_dns_dnsmasq_init (NMDnsDnsmasq *self)
 {
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
 
-	priv->dbus_mgr = nm_bus_manager_get ();
-	g_assert (priv->dbus_mgr);
-
-	g_object_ref (priv->dbus_mgr);
-
 	priv->running = FALSE;
 
 	get_dnsmasq_proxy (self);
@@ -607,8 +606,6 @@ dispose (GObject *object)
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (object);
 
 	unlink (CONFFILE);
-
-	g_clear_object (&priv->dbus_mgr);
 
 	g_clear_pointer (&priv->set_server_ex_args, g_variant_unref);
 
