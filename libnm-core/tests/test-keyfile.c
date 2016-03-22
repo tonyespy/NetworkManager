@@ -25,6 +25,7 @@
 #include "nm-keyfile-internal.h"
 #include "nm-simple-connection.h"
 #include "nm-setting-connection.h"
+#include "nm-setting-ip-config.h"
 #include "nm-setting-wired.h"
 #include "nm-setting-8021x.h"
 
@@ -520,6 +521,58 @@ test_8021x_cert_read (void)
 
 /******************************************************************************/
 
+static void
+test_ipv4_gateway_never_default (void)
+{
+	gs_unref_object NMConnection *con = NULL;
+	NMSettingIPConfig *s_ip;
+
+	con = nmtst_create_connection_from_keyfile (
+	      "[connection]\n"
+	      "type=ethernet\n"
+	      "interface-name=eth0\n"
+	      "[ipv4]\n"
+	      "method=manual\n"
+	      "address1=192.168.10.150/24,192.168.10.1\n"
+	      "never-default=true\n"
+	      "",
+	      "/test_ipv4/test0", NULL);
+
+	s_ip = nm_connection_get_setting_ip4_config (con);
+	g_assert (s_ip);
+
+	g_assert_cmpint (nm_setting_ip_config_get_num_addresses (s_ip), ==, 1);
+	g_assert (nm_setting_ip_config_get_never_default (s_ip));
+	g_assert (nm_setting_ip_config_get_gateway (s_ip) == NULL);
+}
+
+static void
+test_ipv6_gateway_never_default (void)
+{
+	gs_unref_object NMConnection *con = NULL;
+	NMSettingIPConfig *s_ip;
+
+	con = nmtst_create_connection_from_keyfile (
+	      "[connection]\n"
+	      "type=ethernet\n"
+	      "interface-name=eth0\n"
+	      "[ipv6]\n"
+	      "method=manual\n"
+	      "address1=fd01::2/64,fd01::1\n"
+	      "never-default=true\n"
+	      "",
+	      "/test_ipv6/test0", NULL);
+
+	s_ip = nm_connection_get_setting_ip6_config (con);
+	g_assert (s_ip);
+
+	g_assert_cmpint (nm_setting_ip_config_get_num_addresses (s_ip), ==, 1);
+	g_assert (nm_setting_ip_config_get_never_default (s_ip));
+	g_assert (nm_setting_ip_config_get_gateway (s_ip) == NULL);
+}
+
+/******************************************************************************/
+
 NMTST_DEFINE ();
 
 int main (int argc, char **argv)
@@ -528,6 +581,8 @@ int main (int argc, char **argv)
 
 	g_test_add_func ("/core/keyfile/test_8021x_cert", test_8021x_cert);
 	g_test_add_func ("/core/keyfile/test_8021x_cert_read", test_8021x_cert_read);
+	g_test_add_func ("/core/keyfile/test_ipv4_gateway_never_default", test_ipv4_gateway_never_default);
+	g_test_add_func ("/core/keyfile/test_ipv6_gateway_never_default", test_ipv6_gateway_never_default);
 
 	return g_test_run ();
 }

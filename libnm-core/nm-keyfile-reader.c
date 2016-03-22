@@ -1500,6 +1500,18 @@ out_error:
 	return;
 }
 
+static void
+fix_setting (NMSetting *setting)
+{
+	if (NM_IS_SETTING_IP_CONFIG (setting)) {
+		NMSettingIPConfig *s_ip = (NMSettingIPConfig *) setting;
+
+		if (   nm_setting_ip_config_get_never_default (s_ip)
+		    && nm_setting_ip_config_get_gateway (s_ip))
+			g_object_set (setting, NM_SETTING_IP_CONFIG_GATEWAY, NULL, NULL);
+	}
+}
+
 static NMSetting *
 read_setting (KeyfileReaderInfo *info)
 {
@@ -1517,8 +1529,10 @@ read_setting (KeyfileReaderInfo *info)
 		info->setting = setting;
 		nm_setting_enumerate_values (setting, read_one_setting_value, info);
 		info->setting = NULL;
-		if (!info->error)
+		if (!info->error) {
+			fix_setting (setting);
 			return setting;
+		}
 
 		g_object_unref (setting);
 	} else {
