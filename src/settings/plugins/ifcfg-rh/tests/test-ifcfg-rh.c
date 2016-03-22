@@ -907,6 +907,78 @@ test_read_wired_defroute_no (void)
 }
 
 static void
+test_read_wired_gateway_defroute_no (void)
+{
+	NMConnection *connection;
+	NMSettingConnection *s_con;
+	NMSettingIPConfig *s_ip4;
+	NMSettingIPConfig *s_ip6;
+	char *unmanaged = NULL;
+
+	g_test_expect_message ("NetworkManager", G_LOG_LEVEL_MESSAGE,
+	                       "*ignoring GATEWAY*");
+	connection = _connection_from_file (TEST_IFCFG_DIR"/network-scripts/ifcfg-test-wired-gateway-defroute-no",
+	                                    NULL, TYPE_ETHERNET, &unmanaged);
+	g_test_assert_expected_messages ();
+	g_assert (unmanaged == NULL);
+
+	s_con = nm_connection_get_setting_connection (connection);
+	g_assert (s_con);
+	g_assert_cmpstr (nm_setting_connection_get_id (s_con), ==, "System test-wired-gateway-defroute-no");
+
+	g_assert (nm_connection_get_setting_wired (connection));
+
+	s_ip4 = nm_connection_get_setting_ip4_config (connection);
+	g_assert (s_ip4);
+	g_assert_cmpstr (nm_setting_ip_config_get_method (s_ip4), ==, NM_SETTING_IP4_CONFIG_METHOD_MANUAL);
+	g_assert (nm_setting_ip_config_get_never_default (s_ip4));
+	g_assert (nm_setting_ip_config_get_gateway (s_ip4) == NULL);
+
+	s_ip6 = nm_connection_get_setting_ip6_config (connection);
+	g_assert (s_ip6);
+	g_assert_cmpstr (nm_setting_ip_config_get_method (s_ip6), ==, NM_SETTING_IP6_CONFIG_METHOD_AUTO);
+	g_assert (nm_setting_ip_config_get_never_default (s_ip6));
+
+	g_object_unref (connection);
+}
+
+static void
+test_read_wired_gateway_defroute_no_ipv6 (void)
+{
+	NMConnection *connection;
+	NMSettingConnection *s_con;
+	NMSettingIPConfig *s_ip4;
+	NMSettingIPConfig *s_ip6;
+	char *unmanaged = NULL;
+
+	g_test_expect_message ("NetworkManager", G_LOG_LEVEL_MESSAGE,
+	                       "*ignoring IPV6_DEFAULTGW*");
+	connection = _connection_from_file (TEST_IFCFG_DIR"/network-scripts/ifcfg-test-wired-gateway-defroute-no-ipv6",
+	                                    NULL, TYPE_ETHERNET, &unmanaged);
+	g_test_assert_expected_messages ();
+	g_assert (unmanaged == NULL);
+
+	s_con = nm_connection_get_setting_connection (connection);
+	g_assert (s_con);
+	g_assert_cmpstr (nm_setting_connection_get_id (s_con), ==, "System test-wired-gateway-defroute-no-ipv6");
+
+	g_assert (nm_connection_get_setting_wired (connection));
+
+	s_ip4 = nm_connection_get_setting_ip4_config (connection);
+	g_assert (s_ip4);
+	g_assert_cmpstr (nm_setting_ip_config_get_method (s_ip4), ==, NM_SETTING_IP4_CONFIG_METHOD_AUTO);
+	g_assert (nm_setting_ip_config_get_never_default (s_ip4));
+
+	s_ip6 = nm_connection_get_setting_ip6_config (connection);
+	g_assert (s_ip6);
+	g_assert_cmpstr (nm_setting_ip_config_get_method (s_ip6), ==, NM_SETTING_IP6_CONFIG_METHOD_MANUAL);
+	g_assert (nm_setting_ip_config_get_gateway (s_ip6) == NULL);
+	g_assert (nm_setting_ip_config_get_never_default (s_ip6));
+
+	g_object_unref (connection);
+}
+
+static void
 test_read_wired_defroute_no_gatewaydev_yes (void)
 {
 	NMConnection *connection;
@@ -8795,6 +8867,8 @@ int main (int argc, char **argv)
 	g_test_add_func (TPATH "read-never-default", test_read_wired_never_default);
 	g_test_add_func (TPATH "read-defroute-no", test_read_wired_defroute_no);
 	g_test_add_func (TPATH "read-defroute-no-gatewaydev-yes", test_read_wired_defroute_no_gatewaydev_yes);
+	g_test_add_func (TPATH "read-gateway-defroute-no", test_read_wired_gateway_defroute_no);
+	g_test_add_func (TPATH "read-gateway-defroute-no-ipv6", test_read_wired_gateway_defroute_no_ipv6);
 	g_test_add_func (TPATH "routes/read-static", test_read_wired_static_routes);
 	g_test_add_func (TPATH "routes/read-static-legacy", test_read_wired_static_routes_legacy);
 

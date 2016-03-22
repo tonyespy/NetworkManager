@@ -992,7 +992,10 @@ make_ip4_setting (shvarFile *ifcfg,
 				goto done;
 			(void) nm_setting_ip_config_add_address (s_ip4, addr);
 			nm_ip_address_unref (addr);
-			g_object_set (s_ip4, NM_SETTING_IP_CONFIG_GATEWAY, gateway, NULL);
+			if (never_default)
+				PARSE_WARNING ("ignoring GATEWAY because DEFROUTE is disabled");
+			else
+				g_object_set (s_ip4, NM_SETTING_IP_CONFIG_GATEWAY, gateway, NULL);
 		}
 		return NM_SETTING (s_ip4);
 	} else {
@@ -1088,6 +1091,12 @@ make_ip4_setting (shvarFile *ifcfg,
 			}
 		}
 	}
+
+	if (gateway && never_default) {
+		PARSE_WARNING ("ignoring GATEWAY because DEFROUTE is disabled");
+		g_clear_pointer (&gateway, g_free);
+	}
+
 	g_object_set (s_ip4, NM_SETTING_IP_CONFIG_GATEWAY, gateway, NULL);
 
 	/* DNS servers
@@ -1507,7 +1516,10 @@ make_ip6_setting (shvarFile *ifcfg,
 				goto error;
 			}
 
-			g_object_set (s_ip6, NM_SETTING_IP_CONFIG_GATEWAY, value, NULL);
+			if (never_default)
+				PARSE_WARNING ("ignoring IPV6_DEFAULTGW because IPV6_DEFROUTE is disabled");
+			else
+				g_object_set (s_ip6, NM_SETTING_IP_CONFIG_GATEWAY, value, NULL);
 			g_free (value);
 		}
 	}
