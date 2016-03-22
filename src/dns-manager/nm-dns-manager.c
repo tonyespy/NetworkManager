@@ -1077,9 +1077,7 @@ plugin_appeared (NMDnsPlugin *plugin, gpointer user_data)
 	/* Try to update DNS again; since it's now available on the bus this
 	 * might work. */
 	if (!update_dns (self, FALSE, &error)) {
-		nm_log_warn (LOGD_DNS, "could not commit DNS changes: (%d) %s",
-		             error ? error->code : -1,
-		             error && error->message ? error->message : "(unknown)");
+		_LOGW ("could not commit DNS changes: %s", error->message);
 		g_clear_error (&error);
 	}
 }
