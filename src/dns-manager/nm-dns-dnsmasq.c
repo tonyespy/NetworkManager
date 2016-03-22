@@ -48,7 +48,6 @@ G_DEFINE_TYPE (NMDnsDnsmasq, nm_dns_dnsmasq, NM_TYPE_DNS_PLUGIN)
 
 typedef struct {
 	NMBusManager *dbus_mgr;
-	GDBusConnection *connection;
 	GDBusProxy *dnsmasq;
 	gboolean running;
 
@@ -362,22 +361,23 @@ static void
 get_dnsmasq_proxy (NMDnsDnsmasq *self)
 {
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
+	GDBusConnection *connection;
 
 	g_return_if_fail (!priv->dnsmasq);
 
 	_LOGD ("retrieving dnsmasq proxy");
 
-	if (!priv->dnsmasq) {
-		g_dbus_proxy_new (priv->connection,
-		                  G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-		                  NULL,
-		                  DNSMASQ_DBUS_SERVICE,
-		                  DNSMASQ_DBUS_PATH,
-		                  DNSMASQ_DBUS_SERVICE,
-		                  NULL,
-		                  dnsmasq_proxy_cb,
-		                  self);
-	}
+	connection = nm_bus_manager_get_connection (priv->dbus_mgr);
+	g_return_if_fail (connection);
+	g_dbus_proxy_new (connection,
+	                  G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+	                  NULL,
+	                  DNSMASQ_DBUS_SERVICE,
+	                  DNSMASQ_DBUS_PATH,
+	                  DNSMASQ_DBUS_SERVICE,
+	                  NULL,
+	                  dnsmasq_proxy_cb,
+	                  self);
 }
 
 static gboolean
@@ -598,11 +598,7 @@ nm_dns_dnsmasq_init (NMDnsDnsmasq *self)
 
 	priv->running = FALSE;
 
-	priv->connection = nm_bus_manager_get_connection (priv->dbus_mgr);
-	if (!priv->connection)
-		_LOGW ("could not get the system bus to speak to dnsmasq");
-	else
-		get_dnsmasq_proxy (self);
+	get_dnsmasq_proxy (self);
 }
 
 static void
