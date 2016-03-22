@@ -40,7 +40,6 @@ G_DEFINE_TYPE (NMDnsDnsmasq, nm_dns_dnsmasq, NM_TYPE_DNS_PLUGIN)
 #define NM_DNS_DNSMASQ_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_DNS_DNSMASQ, NMDnsDnsmasqPrivate))
 
 #define PIDFILE NMRUNDIR "/dnsmasq.pid"
-#define CONFFILE NMRUNDIR "/dnsmasq.conf"
 #define CONFDIR NMCONFDIR "/dnsmasq.d"
 
 #define DNSMASQ_DBUS_SERVICE "org.freedesktop.NetworkManager.dnsmasq"
@@ -390,11 +389,8 @@ start_dnsmasq (NMDnsDnsmasq *self)
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
 	const char *dm_binary;
 	const char *argv[15];
-	GError *error = NULL;
-	int ignored;
 	GPid pid = 0;
 	guint idx = 0;
-	GString *conf;
 
 	/* dnsmasq is probably already started; if it's the case, don't do
 	 * anything more.
@@ -412,22 +408,6 @@ start_dnsmasq (NMDnsDnsmasq *self)
 		return FALSE;
 	}
 
-	/* Build up the new dnsmasq config file */
-	conf = g_string_sized_new (150);
-
-	/* Write out the config file */
-	if (!g_file_set_contents (CONFFILE, conf->str, -1, &error)) {
-		_LOGW ("failed to write dnsmasq config file %s: %s",
-		       CONFFILE,
-		       error->message);
-		g_clear_error (&error);
-		goto out;
-	}
-	ignored = chmod (CONFFILE, 0644);
-
-	_LOGD ("dnsmasq local caching DNS configuration:");
-	_LOGD ("%s", conf->str);
-
 	argv[idx++] = dm_binary;
 	argv[idx++] = "--no-resolv";  /* Use only commandline */
 	argv[idx++] = "--keep-in-foreground";
@@ -435,7 +415,6 @@ start_dnsmasq (NMDnsDnsmasq *self)
 	argv[idx++] = "--bind-interfaces";
 	argv[idx++] = "--pid-file=" PIDFILE;
 	argv[idx++] = "--listen-address=127.0.0.1"; /* Should work for both 4 and 6 */
-	argv[idx++] = "--conf-file=" CONFFILE;
 	argv[idx++] = "--cache-size=400";
 	argv[idx++] = "--proxy-dnssec"; /* Allow DNSSEC to pass through */
 	argv[idx++] = "--enable-dbus=" DNSMASQ_DBUS_SERVICE;
@@ -452,8 +431,7 @@ start_dnsmasq (NMDnsDnsmasq *self)
 
 	if (pid && !priv->dnsmasq)
 		get_dnsmasq_proxy (self);
-out:
-	g_string_free (conf, TRUE);
+
 	return pid ? TRUE : FALSE;
 }
 
@@ -562,7 +540,6 @@ child_quit (NMDnsPlugin *plugin, gint status)
 		_LOGW ("dnsmasq died with signal %d", WTERMSIG (status));
 	else
 		_LOGW ("dnsmasq died from an unknown cause");
-	unlink (CONFFILE);
 
 	if (failed)
 		g_signal_emit_by_name (self, NM_DNS_PLUGIN_FAILED);
@@ -604,8 +581,6 @@ static void
 dispose (GObject *object)
 {
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (object);
-
-	unlink (CONFFILE);
 
 	g_clear_pointer (&priv->set_server_ex_args, g_variant_unref);
 
