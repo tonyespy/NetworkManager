@@ -76,10 +76,10 @@ add_dnsmasq_nameserver (NMDnsDnsmasq *self,
                         const char *ip,
                         const char *domain)
 {
+	g_return_if_fail (ip);
+
 	_LOGD ("adding nameserver '%s' for domain '%s'",
 	       ip, domain);
-
-	g_return_if_fail (ip);
 
 	g_variant_builder_open (servers, G_VARIANT_TYPE ("as"));
 
