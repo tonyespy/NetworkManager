@@ -473,7 +473,6 @@ update (NMDnsPlugin *plugin,
 	NMDnsDnsmasq *self = NM_DNS_DNSMASQ (plugin);
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
 	GSList *iter;
-	GError *error = NULL;
 	gboolean ret = FALSE;
 
 	if (!priv->running)
@@ -522,7 +521,6 @@ update (NMDnsPlugin *plugin,
 	    ((other_configs && g_slist_length ((GSList *) other_configs) < 1) || !other_configs))
 		ret = FALSE;
 
-out:
 	return ret;
 }
 

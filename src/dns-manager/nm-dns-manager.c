@@ -1068,7 +1068,6 @@ static void
 plugin_appeared (NMDnsPlugin *plugin, gpointer user_data)
 {
 	NMDnsManager *self = NM_DNS_MANAGER (user_data);
-	NMDnsManagerPrivate *priv = NM_DNS_MANAGER_GET_PRIVATE (self);
 	GError *error = NULL;
 
 	/* Not applicable to non-caching plugins */
