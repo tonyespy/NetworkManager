@@ -441,7 +441,7 @@ start_dnsmasq (NMDnsDnsmasq *self)
 		argv[idx++] = "--conf-dir=" CONFDIR;
 
 	argv[idx++] = NULL;
-	g_warn_if_fail (idx <= G_N_ELEMENTS (argv));
+	nm_assert (idx <= G_N_ELEMENTS (argv));
 
 	/* And finally spawn dnsmasq */
 	pid = nm_dns_plugin_child_spawn (NM_DNS_PLUGIN (self), argv, PIDFILE, "bin/dnsmasq");
@@ -610,10 +610,7 @@ dispose (GObject *object)
 
 	unlink (CONFFILE);
 
-	if (priv->dbus_mgr) {
-		g_object_unref (priv->dbus_mgr);
-		priv->dbus_mgr = NULL;
-	}
+	g_clear_object (&priv->dbus_mgr);
 
 	g_clear_pointer (&priv->set_server_ex_args, g_variant_unref);
 
