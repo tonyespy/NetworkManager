@@ -284,14 +284,11 @@ send_dnsmasq_update (NMDnsDnsmasq *self)
 {
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
 
-	_LOGD ("trying to update dnsmasq nameservers");
-
-	if (!priv->servers) {
-		_LOGW ("no nameservers list to send update");
-		return FALSE;
-	}
+	g_return_val_if_fail (priv->servers, FALSE);
 
 	if (priv->running) {
+		_LOGD ("trying to update dnsmasq nameservers");
+
 		g_dbus_proxy_call (priv->dnsmasq,
 		                   "SetServersEx",
 		                   g_variant_new ("(aas)",
