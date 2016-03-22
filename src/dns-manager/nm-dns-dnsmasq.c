@@ -352,17 +352,18 @@ dnsmasq_proxy_cb (GObject *source, GAsyncResult *res, gpointer user_data)
 	priv->dnsmasq = g_dbus_proxy_new_finish (res, &error);
 	if (!priv->dnsmasq) {
 		_LOGW ("failed to connect to dnsmasq via DBus: %s", error->message);
-	} else {
-		_LOGD ("dnsmasq proxy creation successful");
-
-		g_signal_connect (priv->dnsmasq, "notify::g-name-owner",
-				  G_CALLBACK (name_owner_changed), self);
-		owner = g_dbus_proxy_get_name_owner (priv->dnsmasq);
-		priv->running = (owner != NULL);
-
-		if (priv->running && priv->servers)
-			send_dnsmasq_update (self);
+		return;
 	}
+
+	_LOGD ("dnsmasq proxy creation successful");
+
+	g_signal_connect (priv->dnsmasq, "notify::g-name-owner",
+	                  G_CALLBACK (name_owner_changed), self);
+	owner = g_dbus_proxy_get_name_owner (priv->dnsmasq);
+	priv->running = (owner != NULL);
+
+	if (priv->running && priv->servers)
+		send_dnsmasq_update (self);
 }
 
 static void
