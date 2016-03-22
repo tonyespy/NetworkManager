@@ -52,7 +52,7 @@ typedef struct {
 	GDBusProxy *dnsmasq;
 	gboolean running;
 
-	GVariantBuilder *servers;
+	GVariant *set_server_ex_args;
 } NMDnsDnsmasqPrivate;
 
 /*****************************************************************************/
@@ -284,22 +284,20 @@ send_dnsmasq_update (NMDnsDnsmasq *self)
 {
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
 
-	g_return_val_if_fail (priv->servers, FALSE);
+	g_return_val_if_fail (priv->set_server_ex_args, FALSE);
 
 	if (priv->running) {
 		_LOGD ("trying to update dnsmasq nameservers");
 
 		g_dbus_proxy_call (priv->dnsmasq,
 		                   "SetServersEx",
-		                   g_variant_new ("(aas)",
-		                                  priv->servers),
+		                   priv->set_server_ex_args,
 		                   G_DBUS_CALL_FLAGS_NONE,
 		                   -1,
 		                   NULL,
 		                   (GAsyncReadyCallback) dnsmasq_update_done,
 		                   self);
-		g_variant_builder_unref (priv->servers);
-		priv->servers = NULL;
+		g_clear_pointer (&priv->set_server_ex_args, g_variant_unref);
 	} else
 		_LOGW ("dnsmasq not found on the bus. The nameserver update will be sent when dnsmasq appears");
 
@@ -356,7 +354,7 @@ dnsmasq_proxy_cb (GObject *source, GAsyncResult *res, gpointer user_data)
 	owner = g_dbus_proxy_get_name_owner (priv->dnsmasq);
 	priv->running = (owner != NULL);
 
-	if (priv->running && priv->servers)
+	if (priv->running && priv->set_server_ex_args)
 		send_dnsmasq_update (self);
 }
 
@@ -467,41 +465,43 @@ update (NMDnsPlugin *plugin,
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
 	GSList *iter;
 	gboolean ret = FALSE;
+	GVariantBuilder servers;
 
 	if (!priv->running)
 		start_dnsmasq (self);
 
-	if (priv->servers)
-		g_variant_builder_unref (priv->servers);
-	priv->servers = g_variant_builder_new (G_VARIANT_TYPE ("aas"));
+	g_variant_builder_init (&servers, G_VARIANT_TYPE ("aas"));
 
 	if (global_config)
-		add_global_config (self, priv->servers, global_config);
+		add_global_config (self, &servers, global_config);
 	else {
 		/* Use split DNS for VPN configs */
 		for (iter = (GSList *) vpn_configs; iter; iter = g_slist_next (iter)) {
 			if (NM_IS_IP4_CONFIG (iter->data))
-				add_ip4_config (self, priv->servers, iter->data, TRUE);
+				add_ip4_config (self, &servers, iter->data, TRUE);
 			else if (NM_IS_IP6_CONFIG (iter->data))
-				add_ip6_config (self, priv->servers, iter->data, TRUE);
+				add_ip6_config (self, &servers, iter->data, TRUE);
 		}
 
 		/* Now add interface configs without split DNS */
 		for (iter = (GSList *) dev_configs; iter; iter = g_slist_next (iter)) {
 			if (NM_IS_IP4_CONFIG (iter->data))
-				add_ip4_config (self, priv->servers, iter->data, FALSE);
+				add_ip4_config (self, &servers, iter->data, FALSE);
 			else if (NM_IS_IP6_CONFIG (iter->data))
-				add_ip6_config (self, priv->servers, iter->data, FALSE);
+				add_ip6_config (self, &servers, iter->data, FALSE);
 		}
 
 		/* And any other random configs */
 		for (iter = (GSList *) other_configs; iter; iter = g_slist_next (iter)) {
 			if (NM_IS_IP4_CONFIG (iter->data))
-				add_ip4_config (self, priv->servers, iter->data, FALSE);
+				add_ip4_config (self, &servers, iter->data, FALSE);
 			else if (NM_IS_IP6_CONFIG (iter->data))
-				add_ip6_config (self, priv->servers, iter->data, FALSE);
+				add_ip6_config (self, &servers, iter->data, FALSE);
 		}
 	}
+
+	g_clear_pointer (&priv->set_server_ex_args, g_variant_unref);
+	priv->set_server_ex_args = g_variant_ref_sink (g_variant_new ("(aas)", &servers));
 
 	ret = send_dnsmasq_update (self);
 
@@ -615,7 +615,7 @@ dispose (GObject *object)
 		priv->dbus_mgr = NULL;
 	}
 
-	g_clear_pointer (&priv->servers, g_variant_builder_unref);
+	g_clear_pointer (&priv->set_server_ex_args, g_variant_unref);
 
 	G_OBJECT_CLASS (nm_dns_dnsmasq_parent_class)->dispose (object);
 }
