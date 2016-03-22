@@ -615,6 +615,8 @@ dispose (GObject *object)
 		priv->dbus_mgr = NULL;
 	}
 
+	g_clear_pointer (&priv->servers, g_variant_builder_unref);
+
 	G_OBJECT_CLASS (nm_dns_dnsmasq_parent_class)->dispose (object);
 }
 
