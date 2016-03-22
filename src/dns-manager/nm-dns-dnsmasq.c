@@ -486,25 +486,25 @@ update (NMDnsPlugin *plugin,
 		/* Use split DNS for VPN configs */
 		for (iter = (GSList *) vpn_configs; iter; iter = g_slist_next (iter)) {
 			if (NM_IS_IP4_CONFIG (iter->data))
-				add_ip4_config (self, priv->servers, NM_IP4_CONFIG (iter->data), TRUE);
+				add_ip4_config (self, priv->servers, iter->data, TRUE);
 			else if (NM_IS_IP6_CONFIG (iter->data))
-				add_ip6_config (self, priv->servers, NM_IP6_CONFIG (iter->data), TRUE);
+				add_ip6_config (self, priv->servers, iter->data, TRUE);
 		}
 
 		/* Now add interface configs without split DNS */
 		for (iter = (GSList *) dev_configs; iter; iter = g_slist_next (iter)) {
 			if (NM_IS_IP4_CONFIG (iter->data))
-				add_ip4_config (self, priv->servers, NM_IP4_CONFIG (iter->data), FALSE);
+				add_ip4_config (self, priv->servers, iter->data, FALSE);
 			else if (NM_IS_IP6_CONFIG (iter->data))
-				add_ip6_config (self, priv->servers, NM_IP6_CONFIG (iter->data), FALSE);
+				add_ip6_config (self, priv->servers, iter->data, FALSE);
 		}
 
 		/* And any other random configs */
 		for (iter = (GSList *) other_configs; iter; iter = g_slist_next (iter)) {
 			if (NM_IS_IP4_CONFIG (iter->data))
-				add_ip4_config (self, priv->servers, NM_IP4_CONFIG (iter->data), FALSE);
+				add_ip4_config (self, priv->servers, iter->data, FALSE);
 			else if (NM_IS_IP6_CONFIG (iter->data))
-				add_ip6_config (self, priv->servers, NM_IP6_CONFIG (iter->data), FALSE);
+				add_ip6_config (self, priv->servers, iter->data, FALSE);
 		}
 	}
 
