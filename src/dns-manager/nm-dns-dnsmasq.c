@@ -47,6 +47,7 @@ G_DEFINE_TYPE (NMDnsDnsmasq, nm_dns_dnsmasq, NM_TYPE_DNS_PLUGIN)
 
 typedef struct {
 	GDBusProxy *dnsmasq;
+	GCancellable *dnsmasq_cancellable;
 	gboolean running;
 
 	GVariant *set_server_ex_args;
@@ -325,24 +326,29 @@ name_owner_changed (GObject    *object,
 static void
 dnsmasq_proxy_cb (GObject *source, GAsyncResult *res, gpointer user_data)
 {
-	NMDnsDnsmasq *self = NM_DNS_DNSMASQ (user_data);
-	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
+	NMDnsDnsmasq *self;
+	NMDnsDnsmasqPrivate *priv;
 	gs_free_error GError *error = NULL;
 	gs_free char *owner = NULL;
+	GDBusProxy *proxy;
 
-	_LOGD ("dnsmasq proxy creation returned");
+	proxy = g_dbus_proxy_new_finish (res, &error);
+	if (   !proxy
+	    && g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+		return;
 
-	if (priv->dnsmasq) {
-		_LOGD ("already have an old proxy; replacing.");
-		g_object_unref (priv->dnsmasq);
-		priv->dnsmasq = NULL;
-	}
+	self = NM_DNS_DNSMASQ (user_data);
 
-	priv->dnsmasq = g_dbus_proxy_new_finish (res, &error);
-	if (!priv->dnsmasq) {
+	if (!proxy) {
 		_LOGW ("failed to connect to dnsmasq via DBus: %s", error->message);
+		g_signal_emit_by_name (self, NM_DNS_PLUGIN_FAILED);
 		return;
 	}
+
+	priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
+
+	priv->dnsmasq = proxy;
+	nm_clear_g_cancellable (&priv->dnsmasq_cancellable);
 
 	_LOGD ("dnsmasq proxy creation successful");
 
@@ -353,34 +359,6 @@ dnsmasq_proxy_cb (GObject *source, GAsyncResult *res, gpointer user_data)
 
 	if (priv->running && priv->set_server_ex_args)
 		send_dnsmasq_update (self);
-}
-
-static void
-get_dnsmasq_proxy (NMDnsDnsmasq *self)
-{
-	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
-	NMBusManager *dbus_mgr;
-	GDBusConnection *connection;
-
-	g_return_if_fail (!priv->dnsmasq);
-
-	_LOGD ("retrieving dnsmasq proxy");
-
-	dbus_mgr = nm_bus_manager_get ();
-	g_return_if_fail (dbus_mgr);
-
-	connection = nm_bus_manager_get_connection (dbus_mgr);
-	g_return_if_fail (connection);
-
-	g_dbus_proxy_new (connection,
-	                  G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
-	                  NULL,
-	                  DNSMASQ_DBUS_SERVICE,
-	                  DNSMASQ_DBUS_PATH,
-	                  DNSMASQ_DBUS_SERVICE,
-	                  NULL,
-	                  dnsmasq_proxy_cb,
-	                  self);
 }
 
 static gboolean
@@ -428,11 +406,32 @@ start_dnsmasq (NMDnsDnsmasq *self)
 
 	/* And finally spawn dnsmasq */
 	pid = nm_dns_plugin_child_spawn (NM_DNS_PLUGIN (self), argv, PIDFILE, "bin/dnsmasq");
+	if (!pid)
+		return FALSE;
 
-	if (pid && !priv->dnsmasq)
-		get_dnsmasq_proxy (self);
+	if (!priv->dnsmasq && !priv->dnsmasq_cancellable) {
+		NMBusManager *dbus_mgr;
+		GDBusConnection *connection;
 
-	return pid ? TRUE : FALSE;
+		dbus_mgr = nm_bus_manager_get ();
+		g_return_val_if_fail (dbus_mgr, FALSE);
+
+		connection = nm_bus_manager_get_connection (dbus_mgr);
+		g_return_val_if_fail (connection, FALSE);
+
+		priv->dnsmasq_cancellable = g_cancellable_new ();
+		g_dbus_proxy_new (connection,
+		                  G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+		                  NULL,
+		                  DNSMASQ_DBUS_SERVICE,
+		                  DNSMASQ_DBUS_PATH,
+		                  DNSMASQ_DBUS_SERVICE,
+		                  priv->dnsmasq_cancellable,
+		                  dnsmasq_proxy_cb,
+		                  self);
+	}
+
+	return TRUE;
 }
 
 static gboolean
@@ -570,17 +569,16 @@ nm_dns_dnsmasq_new (void)
 static void
 nm_dns_dnsmasq_init (NMDnsDnsmasq *self)
 {
-	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
-
-	priv->running = FALSE;
-
-	get_dnsmasq_proxy (self);
 }
 
 static void
 dispose (GObject *object)
 {
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (object);
+
+	nm_clear_g_cancellable (&priv->dnsmasq_cancellable);
+
+	g_clear_object (&priv->dnsmasq);
 
 	g_clear_pointer (&priv->set_server_ex_args, g_variant_unref);
 
