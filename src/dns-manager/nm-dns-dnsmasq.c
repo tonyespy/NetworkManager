@@ -592,9 +592,11 @@ nm_dns_dnsmasq_init (NMDnsDnsmasq *self)
 	NMDnsDnsmasqPrivate *priv = NM_DNS_DNSMASQ_GET_PRIVATE (self);
 
 	priv->dbus_mgr = nm_bus_manager_get ();
-	priv->running = FALSE;
-
 	g_assert (priv->dbus_mgr);
+
+	g_object_ref (priv->dbus_mgr);
+
+	priv->running = FALSE;
 
 	priv->connection = nm_bus_manager_get_connection (priv->dbus_mgr);
 	if (!priv->connection)
