@@ -59,6 +59,8 @@ typedef struct {
 	NMActiveConnection *master;
 	gboolean master_ready;
 
+	NMActiveConnection *parent;
+
 	gboolean assumed;
 
 	NMAuthChain *chain;
@@ -98,6 +100,7 @@ enum {
 enum {
 	DEVICE_CHANGED,
 	DEVICE_METERED_CHANGED,
+	PARENT_ACTIVE,
 	LAST_SIGNAL
 };
 static guint signals[LAST_SIGNAL] = { 0 };
@@ -676,6 +679,50 @@ nm_active_connection_get_assumed (NMActiveConnection *self)
 	return NM_ACTIVE_CONNECTION_GET_PRIVATE (self)->assumed;
 }
 
+static void
+parent_state_cb (NMActiveConnection *parent_ac,
+                 GParamSpec *pspec,
+                 gpointer user_data)
+{
+	NMActiveConnection *self = user_data;
+	NMActiveConnectionState parent_state = nm_active_connection_get_state (parent_ac);
+	NMActiveConnectionPrivate *priv = NM_ACTIVE_CONNECTION_GET_PRIVATE (self);
+
+	if (parent_state < NM_ACTIVE_CONNECTION_STATE_ACTIVATED)
+		return;
+
+	g_signal_emit (self, signals[PARENT_ACTIVE], 0, parent_ac);
+	g_signal_handlers_disconnect_by_func (parent_ac,
+	                                      (GCallback) parent_state_cb,
+	                                      user_data);
+
+	/* The parent can go away now and we don't own a reference.
+	 * Not a problem, we don't need it any more. */
+	priv->parent = NULL;
+}
+
+/**
+ * nm_active_connection_set_parent:
+ * @self: the #NMActiveConnection
+ * @parent: The #NMActiveConnection that must be active before the manager
+ * can proceed progressing the device to disconnected state for us.
+ *
+ * Sets the parent connection of @self. A "parent-active" signal will be
+ * emitted when the parent connection becomes active.
+ */
+void
+nm_active_connection_set_parent (NMActiveConnection *self, NMActiveConnection *parent)
+{
+	NMActiveConnectionPrivate *priv = NM_ACTIVE_CONNECTION_GET_PRIVATE (self);
+
+	priv->parent = parent;
+	g_signal_connect (priv->parent,
+	                  "notify::" NM_ACTIVE_CONNECTION_STATE,
+	                  (GCallback) parent_state_cb,
+	                  self);
+}
+
+
 /****************************************************************/
 
 static void
@@ -1028,6 +1075,13 @@ dispose (GObject *object)
 		                                      self);
 	}
 	g_clear_object (&priv->master);
+
+	if (priv->parent) {
+		g_signal_handlers_disconnect_by_func (priv->parent,
+		                                      (GCallback) parent_state_cb,
+		                                      self);
+	}
+
 	g_clear_object (&priv->subject);
 
 	G_OBJECT_CLASS (nm_active_connection_parent_class)->dispose (object);
@@ -1207,6 +1261,14 @@ nm_active_connection_class_init (NMActiveConnectionClass *ac_class)
 		              G_STRUCT_OFFSET (NMActiveConnectionClass, device_metered_changed),
 		              NULL, NULL, NULL,
 		              G_TYPE_NONE, 1, G_TYPE_UINT);
+
+	signals[PARENT_ACTIVE] =
+		g_signal_new (NM_ACTIVE_CONNECTION_PARENT_ACTIVE,
+		              G_OBJECT_CLASS_TYPE (object_class),
+		              G_SIGNAL_RUN_FIRST,
+		              G_STRUCT_OFFSET (NMActiveConnectionClass, parent_active),
+		              NULL, NULL, NULL,
+		              G_TYPE_NONE, 1, NM_TYPE_ACTIVE_CONNECTION);
 
 	nm_exported_object_class_add_interface (NM_EXPORTED_OBJECT_CLASS (ac_class),
 	                                        NMDBUS_TYPE_ACTIVE_CONNECTION_SKELETON,
