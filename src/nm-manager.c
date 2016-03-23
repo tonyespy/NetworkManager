@@ -2227,6 +2227,43 @@ nm_manager_get_best_device_for_connection (NMManager *self,
 	return NULL;
 }
 
+static NMSettingsConnection *
+best_connection_for_device (NMDevice *device,
+                            const char *specific_object_path,
+                            GError **error)
+{
+	NMSettingsConnection *connection = NULL;
+	GPtrArray *available;
+	guint64 best_timestamp = 0;
+	guint i;
+
+	available = nm_device_get_available_connections (device, specific_object_path);
+	if (!available)
+		goto out;
+
+	for (i = 0; available && i < available->len; i++) {
+		NMSettingsConnection *candidate = g_ptr_array_index (available, i);
+		guint64 candidate_timestamp = 0;
+
+		nm_settings_connection_get_timestamp (candidate, &candidate_timestamp);
+		if (!connection || (candidate_timestamp > best_timestamp)) {
+			connection = candidate;
+			best_timestamp = candidate_timestamp;
+		}
+	}
+	g_ptr_array_free (available, TRUE);
+
+out:
+	if (!connection) {
+		g_set_error (error, NM_MANAGER_ERROR, NM_MANAGER_ERROR_UNKNOWN_CONNECTION,
+		             "The device '%s' has no connections available.",
+                             nm_device_get_iface (device));
+	}
+
+	return connection;
+}
+
+
 static void
 _get_devices (NMManager *self,
               GDBusMethodInvocation *context,
@@ -3325,11 +3362,15 @@ impl_manager_activate_connection (NMManager *self,
 	 * regardless of whether that connection is autoconnect-enabled or not
 	 * (since this is an explicit request, not an auto-activation request).
 	 */
-	if (!connection_path) {
-		GPtrArray *available;
-		guint64 best_timestamp = 0;
-		guint i;
-
+	if (connection_path) {
+		connection = nm_settings_get_connection_by_path (priv->settings, connection_path);
+		if (!connection) {
+			error = g_error_new_literal (NM_MANAGER_ERROR,
+						     NM_MANAGER_ERROR_UNKNOWN_CONNECTION,
+						     "Connection could not be found.");
+			goto error;
+		}
+	} else {
 		/* If no connection is given, find a suitable connection for the given device path */
 		if (!device_path) {
 			error = g_error_new_literal (NM_MANAGER_ERROR, NM_MANAGER_ERROR_UNKNOWN_DEVICE,
@@ -3343,36 +3384,9 @@ impl_manager_activate_connection (NMManager *self,
 			goto error;
 		}
 
-		available = nm_device_get_available_connections (device, specific_object_path);
-		for (i = 0; available && i < available->len; i++) {
-			NMSettingsConnection *candidate = g_ptr_array_index (available, i);
-			guint64 candidate_timestamp = 0;
-
-			nm_settings_connection_get_timestamp (candidate, &candidate_timestamp);
-			if (!connection_path || (candidate_timestamp > best_timestamp)) {
-				connection_path = nm_connection_get_path (NM_CONNECTION (candidate));
-				best_timestamp = candidate_timestamp;
-			}
-		}
-
-		if (available)
-			g_ptr_array_free (available, TRUE);
-
-		if (!connection_path) {
-			error = g_error_new_literal (NM_MANAGER_ERROR,
-			                             NM_MANAGER_ERROR_UNKNOWN_CONNECTION,
-			                             "The device has no connections available.");
+		connection = best_connection_for_device (device, specific_object_path, &error);
+		if (!connection)
 			goto error;
-		}
-	}
-
-	g_assert (connection_path);
-	connection = nm_settings_get_connection_by_path (priv->settings, connection_path);
-	if (!connection) {
-		error = g_error_new_literal (NM_MANAGER_ERROR,
-		                             NM_MANAGER_ERROR_UNKNOWN_CONNECTION,
-		                             "Connection could not be found.");
-		goto error;
 	}
 
 	subject = validate_activation_request (self,
