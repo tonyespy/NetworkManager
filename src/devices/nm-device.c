@@ -1243,8 +1243,7 @@ update_dynamic_ip_setup (NMDevice *self)
 		nm_lldp_listener_stop (priv->lldp_listener);
 		addr = nm_platform_link_get_address (nm_device_get_platform(self), priv->ifindex, &addr_length);
 
-		if (!nm_lldp_listener_start (priv->lldp_listener, nm_device_get_ifindex (self),
-		                             nm_device_get_iface (self), addr, addr_length, &error)) {
+		if (!nm_lldp_listener_start (priv->lldp_listener, nm_device_get_ifindex (self), &error)) {
 			_LOGD (LOGD_DEVICE, "LLDP listener %p could not be restarted: %s",
 			       priv->lldp_listener, error->message);
 			g_clear_error (&error);
@@ -3572,8 +3571,7 @@ activate_stage2_device_config (NMDevice *self)
 
 		addr = nm_platform_link_get_address (nm_device_get_platform(self), priv->ifindex, &addr_length);
 
-		if (nm_lldp_listener_start (priv->lldp_listener, nm_device_get_ifindex (self),
-		                            nm_device_get_iface (self), addr, addr_length, &error))
+		if (nm_lldp_listener_start (priv->lldp_listener, nm_device_get_ifindex (self), &error))
 			_LOGD (LOGD_DEVICE, "LLDP listener %p started", priv->lldp_listener);
 		else {
 			_LOGD (LOGD_DEVICE, "LLDP listener %p could not be started: %s",
@@ -4682,10 +4680,7 @@ reserve_shared_ip (NMDevice *self, NMSettingIPConfig *s_ip4, NMPlatformIP4Addres
 			}
 		}
 		nm_platform_ip4_address_set_addr (address, start + count, 24);
-
-		g_hash_table_insert (shared_ips,
-		                     GUINT_TO_POINTER (address->address),
-		                     GUINT_TO_POINTER (TRUE));
+		g_hash_table_add (shared_ips, GUINT_TO_POINTER (address->address));
 	}
 
 	return TRUE;
@@ -5859,7 +5854,7 @@ addrconf6_start (NMDevice *self, NMSettingIP6ConfigPrivacy use_tempaddr)
 	s_ip6 = NM_SETTING_IP6_CONFIG (nm_connection_get_setting_ip6_config (connection));
 	g_assert (s_ip6);
 
-	priv->rdisc = nm_lndp_rdisc_new (priv->netns,
+	priv->rdisc = nm_lndp_rdisc_new (nm_netns_get_platform (priv->netns),
 	                                 nm_device_get_ip_ifindex (self),
 	                                 nm_device_get_ip_iface (self),
 	                                 nm_connection_get_uuid (connection),
@@ -7749,7 +7744,7 @@ nm_device_queue_activation (NMDevice *self, NMActRequest *req)
 
 	must_queue = _carrier_wait_check_act_request_must_queue (self, req);
 
-	if (!priv->act_request && !must_queue) {
+	if (!priv->act_request && !must_queue && nm_device_is_real (self)) {
 		/* Just activate immediately */
 		if (!_device_activate (self, req))
 			g_assert_not_reached ();
@@ -9676,14 +9671,13 @@ nm_device_recheck_available_connections (NMDevice *self)
 			connection = NM_CONNECTION (iter->data);
 
 			if (nm_device_check_connection_available (self,
-				                                  connection,
-				                                  NM_DEVICE_CHECK_CON_AVAILABLE_NONE,
-				                                  NULL)) {
+			                                          connection,
+			                                          NM_DEVICE_CHECK_CON_AVAILABLE_NONE,
+			                                          NULL)) {
 				if (available_connections_add (self, connection))
 					changed = TRUE;
-			} else {
-				if (prune_list && g_hash_table_remove (prune_list, connection))
-					changed = TRUE;
+				if (prune_list)
+					g_hash_table_remove (prune_list, connection);
 			}
 		}
 
@@ -9705,39 +9699,55 @@ nm_device_recheck_available_connections (NMDevice *self)
 }
 
 /**
- * nm_device_get_available_connections:
+ * nm_device_get_best_connection:
  * @self: the #NMDevice
  * @specific_object: a specific object path if any
+ * @error: reason why no connection was returned
  *
- * Returns a list of connections available to activate on the device, taking
- * into account any device-specific details given by @specific_object (like
- * WiFi access point path).
+ * Returns a connection that's most suitable for user-initiated activation
+ * of a device, optionally with a given specific object.
  *
- * Returns: caller-owned #GPtrArray of #NMConnections
+ * Returns: the #NMSettingsConnection or %NULL (setting an @error)
  */
-GPtrArray *
-nm_device_get_available_connections (NMDevice *self, const char *specific_object)
+NMSettingsConnection *
+nm_device_get_best_connection (NMDevice *self,
+                               const char *specific_object,
+                               GError **error)
 {
 	NMDevicePrivate *priv = NM_DEVICE_GET_PRIVATE (self);
+	NMSettingsConnection *connection = NULL;
+	NMSettingsConnection *candidate;
+	guint64 best_timestamp = 0;
 	GHashTableIter iter;
-	guint num_available;
-	NMConnection *connection = NULL;
-	GPtrArray *array = NULL;
 
-	num_available = g_hash_table_size (priv->available_connections);
-	if (num_available > 0) {
-		array = g_ptr_array_sized_new (num_available);
-		g_hash_table_iter_init (&iter, priv->available_connections);
-		while (g_hash_table_iter_next (&iter, (gpointer) &connection, NULL)) {
-			/* If a specific object is given, only include connections that are
-			 * compatible with it.
-			 */
-			if (   !specific_object /* << Optimization: we know that the connection is available without @specific_object.  */
-			    || nm_device_check_connection_available (self, connection, _NM_DEVICE_CHECK_CON_AVAILABLE_FOR_USER_REQUEST, specific_object))
-				g_ptr_array_add (array, connection);
+	g_hash_table_iter_init (&iter, priv->available_connections);
+	while (g_hash_table_iter_next (&iter, (gpointer) &candidate, NULL)) {
+		guint64 candidate_timestamp = 0;
+
+		/* If a specific object is given, only include connections that are
+		 * compatible with it.
+		 */
+		if (    specific_object /* << Optimization: we know that the connection is available without @specific_object.  */
+		    && !nm_device_check_connection_available (self,
+		                                              NM_CONNECTION (candidate),
+		                                              _NM_DEVICE_CHECK_CON_AVAILABLE_FOR_USER_REQUEST,
+		                                              specific_object))
+			continue;
+
+		nm_settings_connection_get_timestamp (candidate, &candidate_timestamp);
+		if (!connection || (candidate_timestamp > best_timestamp)) {
+			connection = candidate;
+			best_timestamp = candidate_timestamp;
 		}
 	}
-	return array;
+
+	if (!connection) {
+		g_set_error (error, NM_MANAGER_ERROR, NM_MANAGER_ERROR_UNKNOWN_CONNECTION,
+		             "The device '%s' has no connections available for activation.",
+		              nm_device_get_iface (self));
+	}
+
+	return connection;
 }
 
 static void
@@ -10400,7 +10410,8 @@ _set_state_full (NMDevice *self,
 	if (state <= NM_DEVICE_STATE_UNAVAILABLE) {
 		if (available_connections_del_all (self))
 			available_connections_notify (self);
-		_clear_queued_act_request (priv);
+		if (old_state > NM_DEVICE_STATE_UNAVAILABLE)
+			_clear_queued_act_request (priv);
 	}
 
 	/* Update the available connections list when a device first becomes available */

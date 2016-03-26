@@ -1009,7 +1009,6 @@ nm_utils_kill_process_sync (pid_t pid, guint64 start_time, int sig, NMLogDomain 
 
 	g_return_if_fail (pid > 0);
 	g_return_if_fail (log_name != NULL);
-	g_return_if_fail (wait_before_kill_msec > 0);
 
 	start_time0 = nm_utils_get_start_time_for_pid (pid, &p_state, NULL);
 	if (start_time0 == 0) {
@@ -1047,12 +1046,12 @@ nm_utils_kill_process_sync (pid_t pid, guint64 start_time, int sig, NMLogDomain 
 		return;
 	}
 
-	/* wait for the process to terminated... */
+	/* wait for the process to terminate... */
 
 	wait_start_us = nm_utils_get_monotonic_timestamp_us ();
 
 	sleep_duration_usec = _sleep_duration_convert_ms_to_us (sleep_duration_msec);
-	if (sig != SIGKILL)
+	if (sig != SIGKILL && wait_before_kill_msec)
 		wait_until_sigkill = wait_start_us + (((gint64) wait_before_kill_msec) * 1000L);
 	else
 		wait_until_sigkill = 0;
@@ -2976,10 +2975,11 @@ nm_utils_ip4_address_is_link_local (in_addr_t addr)
 guint32
 nm_utils_lifetime_rebase_relative_time_on_now (guint32 timestamp,
                                                guint32 duration,
-                                               guint32 now,
-                                               guint32 padding)
+                                               gint32 now)
 {
 	gint64 t;
+
+	nm_assert (now >= 0);
 
 	if (duration == NM_PLATFORM_LIFETIME_PERMANENT)
 		return NM_PLATFORM_LIFETIME_PERMANENT;
@@ -2998,9 +2998,6 @@ nm_utils_lifetime_rebase_relative_time_on_now (guint32 timestamp,
 	/* For timestamp > now, just accept it and calculate the expected(?) result. */
 	t = (gint64) timestamp + (gint64) duration - (gint64) now;
 
-	/* Optional padding to avoid potential races. */
-	t += (gint64) padding;
-
 	if (t <= 0)
 		return 0;
 	if (t >= NM_PLATFORM_LIFETIME_PERMANENT)
@@ -3012,12 +3009,13 @@ gboolean
 nm_utils_lifetime_get (guint32 timestamp,
                        guint32 lifetime,
                        guint32 preferred,
-                       guint32 now,
-                       guint32 padding,
+                       gint32 now,
                        guint32 *out_lifetime,
                        guint32 *out_preferred)
 {
 	guint32 t_lifetime, t_preferred;
+
+	nm_assert (now >= 0);
 
 	if (lifetime == 0) {
 		*out_lifetime = NM_PLATFORM_LIFETIME_PERMANENT;
@@ -3028,15 +3026,15 @@ nm_utils_lifetime_get (guint32 timestamp,
 		 * In that case we also expect that the other fields (timestamp and preferred) are left unset. */
 		g_return_val_if_fail (timestamp == 0 && preferred == 0, TRUE);
 	} else {
-		if (!now)
+		if (now <= 0)
 			now = nm_utils_get_monotonic_timestamp_s ();
-		t_lifetime = nm_utils_lifetime_rebase_relative_time_on_now (timestamp, lifetime, now, padding);
+		t_lifetime = nm_utils_lifetime_rebase_relative_time_on_now (timestamp, lifetime, now);
 		if (!t_lifetime) {
 			*out_lifetime = 0;
 			*out_preferred = 0;
 			return FALSE;
 		}
-		t_preferred = nm_utils_lifetime_rebase_relative_time_on_now (timestamp, preferred, now, padding);
+		t_preferred = nm_utils_lifetime_rebase_relative_time_on_now (timestamp, preferred, now);
 
 		*out_lifetime = t_lifetime;
 		*out_preferred = MIN (t_preferred, t_lifetime);

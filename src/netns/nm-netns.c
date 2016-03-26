@@ -1010,8 +1010,8 @@ nm_netns_setup(NMNetns *self, gboolean isroot)
 	 * anything about it.
 	 */
 
-	priv->default_route_manager = nm_default_route_manager_new();
-	priv->route_manager = nm_route_manager_new();
+	priv->default_route_manager = nm_default_route_manager_new (priv->platform);
+	priv->route_manager = nm_route_manager_new (priv->platform);
 
 	priv->isroot = isroot;
 
@@ -2636,9 +2636,7 @@ impl_netns_activate_connection (NMNetns *self,
 	 * (since this is an explicit request, not an auto-activation request).
 	 */
 	if (!connection_path) {
-		GPtrArray *available;
-		guint64 best_timestamp = 0;
-		guint i;
+		NMSettingsConnection *con;
 
 		/* If no connection is given, find a suitable connection for the given device path */
 		if (!device_path) {
@@ -2653,27 +2651,10 @@ impl_netns_activate_connection (NMNetns *self,
 			goto error;
 		}
 
-		available = nm_device_get_available_connections (device, specific_object_path);
-		for (i = 0; available && i < available->len; i++) {
-			NMSettingsConnection *candidate = g_ptr_array_index (available, i);
-			guint64 candidate_timestamp = 0;
-
-			nm_settings_connection_get_timestamp (candidate, &candidate_timestamp);
-			if (!connection_path || (candidate_timestamp > best_timestamp)) {
-				connection_path = nm_connection_get_path (NM_CONNECTION (candidate));
-				best_timestamp = candidate_timestamp;
-			}
-		}
-
-		if (available)
-			g_ptr_array_free (available, TRUE);
-
-		if (!connection_path) {
-			error = g_error_new_literal (NM_NETNS_ERROR,
-			                             NM_NETNS_ERROR_UNKNOWN_CONNECTION,
-			                             "The device has no connections available.");
+		con = nm_device_get_best_connection (device, specific_object_path, &error);
+		if (!con)
 			goto error;
-		}
+		connection_path = nm_connection_get_path ((NMConnection *) con);
 	}
 
 	g_assert (connection_path);
