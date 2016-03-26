@@ -33,17 +33,10 @@
 #include "nm-platform.h"
 #include "nmp-netns.h"
 
-#include "nm-utils.h"
-#include "nm-core-internal.h"
-
-#include "nm-netns-controller.h"
-
 #define _NMLOG_PREFIX_NAME                "rdisc-lndp"
 
 typedef struct {
 	struct ndp *ndp;
-
-	NMNetns *netns;
 
 	GIOChannel *event_channel;
 	guint event_id;
@@ -72,9 +65,7 @@ send_rs (NMRDisc *rdisc, GError **error)
 	}
 	ndp_msg_ifindex_set (msg, rdisc->ifindex);
 
-	nm_netns_controller_activate_netns(priv->netns);
 	errsv = ndp_msg_send (priv->ndp, msg);
-	nm_netns_controller_activate_root_netns();
 	ndp_msg_destroy (msg);
 	if (errsv) {
 		errsv = errsv > 0 ? errsv : -errsv;
@@ -297,7 +288,6 @@ event_ready (GIOChannel *source, GIOCondition condition, NMRDisc *rdisc)
 		return G_SOURCE_CONTINUE;
 
 	ndp_callall_eventfd_handler (priv->ndp);
-	nm_netns_controller_activate_root_netns();
 	return G_SOURCE_CONTINUE;
 }
 
@@ -313,9 +303,7 @@ start (NMRDisc *rdisc)
 	/* Flush any pending messages to avoid using obsolete information */
 	event_ready (priv->event_channel, 0, rdisc);
 
-	nm_netns_controller_activate_netns(priv->netns);
 	ndp_msgrcv_handler_register (priv->ndp, receive_ra, NDP_MSG_RA, rdisc->ifindex, rdisc);
-	nm_netns_controller_activate_root_netns();
 }
 
 /******************************************************************/
@@ -364,6 +352,7 @@ nm_lndp_rdisc_new (NMPlatform *platform,
 	priv = NM_LNDP_RDISC_GET_PRIVATE (rdisc);
 
 	errsv = ndp_open (&priv->ndp);
+
 	if (errsv != 0) {
 		errsv = errsv > 0 ? errsv : -errsv;
 		g_set_error (error, NM_UTILS_ERROR, NM_UTILS_ERROR_UNKNOWN,

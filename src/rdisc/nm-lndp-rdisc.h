@@ -22,7 +22,6 @@
 #define __NETWORKMANAGER_LNDP_RDISC_H__
 
 #include "nm-rdisc.h"
-#include "nm-netns.h"
 
 #define NM_TYPE_LNDP_RDISC            (nm_lndp_rdisc_get_type ())
 #define NM_LNDP_RDISC(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_LNDP_RDISC, NMLNDPRDisc))
