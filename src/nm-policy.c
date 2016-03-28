@@ -42,7 +42,6 @@
 #include "nm-utils.h"
 #include "nm-core-internal.h"
 #include "nm-manager.h"
-#include "nm-netns-controller.h"
 #include "nm-settings.h"
 #include "nm-settings-connection.h"
 #include "nm-dhcp4-config.h"
@@ -59,6 +58,7 @@
 
 typedef struct {
 	NMManager *manager;
+	NMDefaultRouteManager *default_route_manager;
 	NMFirewallManager *firewall_manager;
 	guint update_state_id;
 	GSList *pending_activation_checks;
@@ -109,7 +109,7 @@ get_best_ip4_device (NMPolicy *self, gboolean fully_activated)
 {
 	NMPolicyPrivate *priv = NM_POLICY_GET_PRIVATE (self);
 
-	return nm_default_route_manager_ip4_get_best_device (nm_netns_controller_get_default_route_manager (),
+	return nm_default_route_manager_ip4_get_best_device (priv->default_route_manager,
 	                                                     nm_manager_get_devices (priv->manager),
 	                                                     fully_activated,
 	                                                     priv->default_device4);
@@ -120,7 +120,7 @@ get_best_ip6_device (NMPolicy *self, gboolean fully_activated)
 {
 	NMPolicyPrivate *priv = NM_POLICY_GET_PRIVATE (self);
 
-	return nm_default_route_manager_ip6_get_best_device (nm_netns_controller_get_default_route_manager (),
+	return nm_default_route_manager_ip6_get_best_device (priv->default_route_manager,
 	                                                     nm_manager_get_devices (priv->manager),
 	                                                     fully_activated,
 	                                                     priv->default_device6);
@@ -414,7 +414,9 @@ get_best_ip4_config (NMPolicy *self,
                      NMDevice **out_device,
                      NMVpnConnection **out_vpn)
 {
-	return nm_default_route_manager_ip4_get_best_config (nm_netns_controller_get_default_route_manager (),
+	NMPolicyPrivate *priv = NM_POLICY_GET_PRIVATE (self);
+
+	return nm_default_route_manager_ip4_get_best_config (priv->default_route_manager,
 	                                                     ignore_never_default,
 	                                                     out_ip_iface,
 	                                                     out_ac,
@@ -509,7 +511,9 @@ get_best_ip6_config (NMPolicy *self,
                      NMDevice **out_device,
                      NMVpnConnection **out_vpn)
 {
-	return nm_default_route_manager_ip6_get_best_config (nm_netns_controller_get_default_route_manager (),
+	NMPolicyPrivate *priv = NM_POLICY_GET_PRIVATE (self);
+
+	return nm_default_route_manager_ip6_get_best_config (priv->default_route_manager,
 	                                                     ignore_never_default,
 	                                                     out_ip_iface,
 	                                                     out_ac,
@@ -1768,7 +1772,9 @@ _connect_settings_signal (NMPolicy *policy, const char *name, gpointer callback)
 }
 
 NMPolicy *
-nm_policy_new (NMManager *manager, NMSettings *settings)
+nm_policy_new (NMManager *manager,
+               NMSettings *settings,
+               NMDefaultRouteManager *default_route_manager)
 {
 	NMPolicy *policy;
 	NMPolicyPrivate *priv;
@@ -1781,6 +1787,7 @@ nm_policy_new (NMManager *manager, NMSettings *settings)
 	policy = g_object_new (NM_TYPE_POLICY, NULL);
 	priv = NM_POLICY_GET_PRIVATE (policy);
 	priv->manager = manager;
+	priv->default_route_manager = g_object_ref (default_route_manager);
 	priv->settings = g_object_ref (settings);
 	priv->update_state_id = 0;
 
@@ -1942,6 +1949,7 @@ dispose (GObject *object)
 	g_clear_pointer (&priv->cur_hostname, g_free);
 
 	g_clear_object (&priv->settings);
+	g_clear_object (&priv->default_route_manager);
 
 	G_OBJECT_CLASS (nm_policy_parent_class)->dispose (object);
 }

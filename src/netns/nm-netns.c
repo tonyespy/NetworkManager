@@ -19,26 +19,25 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- * (C) Copyright 2007 - 2011 Red Hat, Inc.
- * (C) Copyright 2008 Novell, Inc.
+ * (C) Copyright 2016 Red Hat, Inc.
  */
 
-#include "config.h"
+#include "nm-default.h"
+
+#include "nm-netns.h"
 
 #include <stdio.h>
-
 #include <gmodule.h>
-#include <nm-dbus-interface.h>
+
+#include "nm-dbus-interface.h"
 
 #include "nm-config.h"
-#include "nm-macros-internal.h"
 #include "nm-default-route-manager.h"
 #include "nm-route-manager.h"
 #include "nm-device.h"
 #include "nm-device-generic.h"
 #include "nm-platform.h"
 #include "nm-device-factory.h"
-#include "nm-netns.h"
 #include "nm-netns-controller.h"
 #include "nm-connectivity.h"
 #include "nm-settings.h"
@@ -57,7 +56,8 @@
 #include "nm-activation-request.h"
 #include "nm-core-internal.h"
 #include "nm-policy.h"
-#include "nm-logging.h"
+#include "nmp-netns.h"
+#include "nm-linux-platform.h"
 
 #include "nmdbus-netns.h"
 
@@ -83,12 +83,18 @@ active_connection_state_changed (NMActiveConnection *active,
                                  GParamSpec *pspec,
                                  NMNetns *self);
 
+static void platform_link_cb (NMPlatform *platform,
+                              NMPObjectType obj_type,
+                              int ifindex,
+                              NMPlatformLink *plink,
+                              NMPlatformSignalChangeType change_type,
+                              gpointer user_data);
+
 G_DEFINE_TYPE (NMNetns, nm_netns, NM_TYPE_EXPORTED_OBJECT)
 
 #define NM_NETNS_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_NETNS, NMNetnsPrivate))
 
-enum {
-	PROP_0 = 0,
+NM_GOBJECT_PROPERTIES_DEFINE (NMNetns,
 	PROP_NAME,
 	PROP_DEVICES,
 	PROP_ALL_DEVICES,
@@ -96,7 +102,7 @@ enum {
 	PROP_PRIMARY_CONNECTION,
 	PROP_PRIMARY_CONNECTION_TYPE,
 	PROP_METERED,
-};
+);
 
 enum {
 	DEVICE_ADDED,
@@ -141,24 +147,14 @@ typedef struct {
 typedef struct {
 
 	/*
-	 * Is this root network namespace? For root network namespace
-	 * behavior is special.
-	 */
-	gboolean isroot;
-
-	/*
-	 * file descriptor of file in directory /var/run/netns/
-	 * where network namespace is mounted. It is necessary
-	 * to have it because setns() system call needs it as a
-	 * paramter.
-	 */
-	int fd;
-
-	/*
 	 * Network namespace name, as created in /var/run/netns/
 	 * directory.
 	 */
 	char *name;
+
+	bool bound:1;
+
+	NMPNetns *netns;
 
 	/*
 	 * Platform interaction layer
@@ -241,6 +237,23 @@ typedef struct {
     } G_STMT_END
 
 /************************************************************************/
+
+gboolean
+nm_netns_push (NMNetns *self, NMPNetns **netnsp)
+{
+	NMNetnsPrivate *priv;
+
+	g_return_val_if_fail (NM_IS_NETNS (self), FALSE);
+
+	priv = NM_NETNS_GET_PRIVATE (self);
+	if (   !priv->netns
+	    || !nmp_netns_push (priv->netns)) {
+		NM_SET_OUT (netnsp, NULL);
+		return FALSE;
+	}
+	NM_SET_OUT (netnsp, priv->netns);
+	return TRUE;
+}
 
 /*
  * Functions that manipulate device change callback structure
@@ -365,96 +378,100 @@ nm_netns_device_change_callback_activate_and_remove(NMNetns *self, NMDevice *dev
 
 /**************************************************************/
 
-const char *
-nm_netns_export(NMNetns *self)
+static gboolean
+_is_root (NMNetns *self)
 {
-	const char *path;
+	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
 
-	path = nm_exported_object_export (NM_EXPORTED_OBJECT (self));
-
-	return g_strdup(path);
+	return !priv->netns || priv->netns == nmp_netns_get_initial ();
 }
 
 /**************************************************************/
 
-void
-nm_netns_set_name(NMNetns *self, const char *name)
-{
-	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
-
-	if (priv->name)
-		g_free(priv->name);
-
-	priv->name = g_strdup(name);
-
-	g_object_notify (G_OBJECT (self), NM_NETNS_NAME);
-}
-
 const char *
-nm_netns_get_name(NMNetns *self)
+nm_netns_get_name (NMNetns *self)
 {
-	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
+	g_return_val_if_fail (NM_IS_NETNS (self), NULL);
 
-	return priv->name;
+	return NM_NETNS_GET_PRIVATE (self)->name;
 }
 
-void
-nm_netns_set_id(NMNetns *self, int netns_id)
+NMPNetns *
+nm_netns_get_ns (NMNetns *self)
 {
-	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
+	g_return_val_if_fail (NM_IS_NETNS (self), NULL);
 
-	priv->fd = netns_id;
-}
-
-int
-nm_netns_get_id(NMNetns *self)
-{
-	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
-
-	return priv->fd;
-}
-
-void
-nm_netns_set_platform(NMNetns *self, NMPlatform *platform)
-{
-	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
-
-	if (priv->platform)
-		g_object_unref(priv->platform);
-
-	priv->platform = platform;
-	g_object_ref(priv->platform);
+	return NM_NETNS_GET_PRIVATE (self)->netns;
 }
 
 NMPlatform *
-nm_netns_get_platform(NMNetns *self)
+nm_netns_get_platform (NMNetns *self)
 {
 	NMNetnsPrivate *priv;
 
-	if (self == NULL)
-		return NM_PLATFORM_GET;
+	g_return_val_if_fail (NM_IS_NETNS (self), NULL);
 
 	priv = NM_NETNS_GET_PRIVATE (self);
 
-	if (priv == NULL || priv->platform == NULL)
-		return NM_PLATFORM_GET;
+	if (G_UNLIKELY (!priv->platform)) {
+		if (G_UNLIKELY (!priv->netns))
+			return NULL;
+
+		if (!nmp_netns_push (priv->netns))
+			return NULL;
+		priv->platform = nm_linux_platform_new ();
+		nmp_netns_pop (priv->netns);
+
+		g_signal_connect (priv->platform,
+		                  NM_PLATFORM_SIGNAL_LINK_CHANGED,
+		                  G_CALLBACK (platform_link_cb),
+		                  self);
+	}
 
 	return priv->platform;
 }
 
 NMDefaultRouteManager *
-nm_netns_get_default_route_manager(NMNetns *self)
+nm_netns_get_default_route_manager (NMNetns *self)
 {
 	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
 
+	g_return_val_if_fail (NM_IS_NETNS (self), FALSE);
+
+	priv = NM_NETNS_GET_PRIVATE (self);
+
+	if (G_UNLIKELY (!priv->default_route_manager)) {
+		nm_auto_pop_netns NMPNetns *netnsp = NULL;
+		NMPlatform *platform = nm_netns_get_platform (self);
+
+		if (!platform)
+			return NULL;
+		if (!nm_netns_push (self, &netnsp))
+			return NULL;
+		priv->default_route_manager = nm_default_route_manager_new (platform);
+	}
 	return priv->default_route_manager;
 }
 
 NMRouteManager *
-nm_netns_get_route_manager(NMNetns *self)
+nm_netns_get_route_manager (NMNetns *self)
 {
 	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
 
+	g_return_val_if_fail (NM_IS_NETNS (self), FALSE);
+
+	priv = NM_NETNS_GET_PRIVATE (self);
+
+	if (G_UNLIKELY (!priv->route_manager)) {
+		nm_auto_pop_netns NMPNetns *netnsp = NULL;
+		NMPlatform *platform = nm_netns_get_platform (self);
+
+		if (!platform)
+			return NULL;
+		if (!nm_netns_push (self, &netnsp))
+			return NULL;
+		priv->route_manager = nm_route_manager_new (platform);
+	}
 	return priv->route_manager;
 }
 
@@ -468,13 +485,13 @@ nm_netns_remove_device(NMNetns *self, NMDevice *device)
 	if (nm_device_is_real (device)) {
 		g_signal_emit (self, signals[DEVICE_REMOVED], 0, device);
 		nm_device_removed (device);
-		g_object_notify (G_OBJECT (self), NM_NETNS_DEVICES);
+		_notify (self, PROP_DEVICES);
 	}
 
 	g_signal_emit (self, signals[INTERNAL_DEVICE_REMOVED], 0, device);
 	nm_exported_object_clear_and_unexport (&device);
 
-	g_object_notify (G_OBJECT (self), NM_NETNS_ALL_DEVICES);
+	_notify (self, PROP_ALL_DEVICES);
 }
 
 void
@@ -496,14 +513,14 @@ nm_netns_add_device(NMNetns *self, NMDevice *device)
 	priv->devices = g_slist_append (priv->devices, g_object_ref (device));
 
 	if (nm_device_is_real (device)) {
-		g_object_notify (G_OBJECT (self), NM_NETNS_DEVICES);
+		_notify (self, PROP_DEVICES);
 		nm_device_removed (device);
 	}
-	g_object_notify (G_OBJECT (self), NM_NETNS_ALL_DEVICES);
+	_notify (self, PROP_ALL_DEVICES);
 
 	nm_settings_device_added (nm_settings_get(), device);
 	g_signal_emit (self, signals[INTERNAL_DEVICE_ADDED], 0, device);
-	g_object_notify (G_OBJECT (self), NM_NETNS_ALL_DEVICES);
+	_notify (self, PROP_ALL_DEVICES);
 
 	for (iter = priv->devices; iter; iter = iter->next) {
 		NMDevice *d = iter->data;
@@ -523,28 +540,27 @@ nm_netns_take_device(NMNetns *self,
 	DeviceChangeData *dc;
 
 	nm_log_dbg (LOGD_NETNS, "Moving device %s (%d) from network namespace %s to %s",
-		    nm_device_get_iface (device),
-		    nm_device_get_ifindex (device),
-		    nm_netns_get_name (nm_device_get_netns (device)),
-		    nm_netns_get_name (self));
+	            nm_device_get_iface (device),
+	            nm_device_get_ifindex (device),
+	            nm_netns_get_name (nm_device_get_netns (device)),
+	            nm_netns_get_name (self));
 
 	/*
 	 * Add callback structure and associated timeout
 	 */
-	dc = _device_change_callback_add(self, nm_device_get_ifindex(device), callback, user_data);
+	dc = _device_change_callback_add (self, nm_device_get_ifindex (device), callback, user_data);
 
 	/*
 	 * Initiate change of network namespace for device
 	 */
-	if (!nm_platform_link_set_netns(nm_device_get_platform(device),
-	                                nm_device_get_ifindex(device),
-	                                nm_netns_get_id(self))) {
-
+	if (!nm_platform_link_set_netns (nm_device_get_platform (device),
+	                                 nm_device_get_ifindex (device),
+	                                 nmp_netns_get_fd_net (nm_netns_get_ns (self)))) {
 		nm_log_dbg (LOGD_NETNS, "Error moving device %s (%d) from network namespace %s to %s",
-			    nm_device_get_iface (device),
-			    nm_device_get_ifindex (device),
-			    nm_netns_get_name (nm_device_get_netns (device)),
-			    nm_netns_get_name (self));
+		            nm_device_get_iface (device),
+		            nm_device_get_ifindex (device),
+		            nm_netns_get_name (nm_device_get_netns (device)),
+		            nm_netns_get_name (self));
 
 		/*
 		 * Remove callback structure and associated timeout
@@ -562,14 +578,13 @@ nm_netns_take_device(NMNetns *self,
 NMDevice *
 nm_netns_get_device_by_ifindex (NMNetns *self, int ifindex)
 {
-	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
 	GSList *iter;
 
 	/*
 	 * Root network namespace is handled by NMManager so redirect
 	 * query to it.
 	 */
-	if (priv->isroot)
+	if (_is_root (self))
 		return nm_manager_get_device_by_ifindex (nm_manager_get(), ifindex);
 
 	for (iter = NM_NETNS_GET_PRIVATE (self)->devices; iter; iter = iter->next) {
@@ -592,7 +607,7 @@ nm_netns_get_device_by_path (NMNetns *self, const char *device_path)
 	 * Root network namespace is handled by NMManager so redirect
 	 * qurey to it.
 	 */
-	if (priv->isroot)
+	if (_is_root (self))
 		return nm_manager_get_device_by_path (nm_manager_get(), device_path);
 
 	for (iter = priv->devices; iter; iter = iter->next) {
@@ -654,13 +669,13 @@ remove_device (NMNetns *self,
 	if (nm_device_is_real (device)) {
 		g_signal_emit (self, signals[DEVICE_REMOVED], 0, device);
 		nm_device_removed (device);
-		g_object_notify (G_OBJECT (self), NM_NETNS_DEVICES);
+		_notify (self, PROP_DEVICES);
 	}
 
 	g_signal_emit (self, signals[INTERNAL_DEVICE_REMOVED], 0, device);
 	nm_exported_object_clear_and_unexport (&device);
 
-	g_object_notify (G_OBJECT (self), NM_NETNS_ALL_DEVICES);
+	_notify (self, PROP_ALL_DEVICES);
 }
 
 static void
@@ -785,7 +800,7 @@ add_device (NMNetns *self, NMDevice *device, GError **error)
 
 	nm_settings_device_added (nm_settings_get(), device);
 	g_signal_emit (self, signals[INTERNAL_DEVICE_ADDED], 0, device);
-	g_object_notify (G_OBJECT (self), NM_NETNS_ALL_DEVICES);
+	_notify (self, PROP_ALL_DEVICES);
 
 	for (iter = priv->devices; iter; iter = iter->next) {
 		NMDevice *d = iter->data;
@@ -907,12 +922,11 @@ platform_link_added (NMNetns *self,
 static void
 platform_query_devices (NMNetns *self)
 {
-	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
 	GArray *links_array;
 	NMPlatformLink *links;
 	int i;
 
-	links_array = nm_platform_link_get_all (priv->platform);
+	links_array = nm_platform_link_get_all (nm_netns_get_platform (self));
 	links = (NMPlatformLink *) links_array->data;
 	for (i = 0; i < links_array->len; i++)
 		platform_link_added (self, links[i].ifindex, &links[i]);
@@ -929,7 +943,6 @@ static gboolean
 _platform_link_cb_idle (PlatformLinkCbData *data)
 {
 	NMNetns *self = data->self;
-	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
 	const NMPlatformLink *l;
 
 	if (!self)
@@ -937,7 +950,7 @@ _platform_link_cb_idle (PlatformLinkCbData *data)
 
 	g_object_remove_weak_pointer (G_OBJECT (self), (gpointer *) &data->self);
 
-	l = nm_platform_link_get (priv->platform, data->ifindex);
+	l = nm_platform_link_get (nm_netns_get_platform (self), data->ifindex);
 	if (l) {
 		NMPlatformLink pllink;
 
@@ -972,11 +985,11 @@ out:
 
 static void
 platform_link_cb (NMPlatform *platform,
-		  NMPObjectType obj_type,
-		  int ifindex,
-		  NMPlatformLink *plink,
-		  NMPlatformSignalChangeType change_type,
-		  gpointer user_data)
+                  NMPObjectType obj_type,
+                  int ifindex,
+                  NMPlatformLink *plink,
+                  NMPlatformSignalChangeType change_type,
+                  gpointer user_data)
 {
 	PlatformLinkCbData *data;
 
@@ -990,38 +1003,30 @@ platform_link_cb (NMPlatform *platform,
 		g_idle_add ((GSourceFunc) _platform_link_cb_idle, data);
 		break;
 	default:
-                break;
+		break;
 	}
 }
 
+#define _bind_to_path(path_buf, name) \
+	nm_sprintf_buf (path_buf, "/var/run/netns/%s", name)
+
 gboolean
-nm_netns_setup(NMNetns *self, gboolean isroot)
+nm_netns_setup (NMNetns *self)
 {
-	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
+	NMNetnsPrivate *priv;
+	char path_buf[256];
 
-	/*
-	 * For root network namespace NMManager enumerates devices
-	 * and loopback interface is activated in main function.
-	 * For all other network namespaces we have to do it by our
-	 * selves!
-	 *
-	 * Also, monitoring of network devices in root network
-	 * namespace will be done by NMManager, so we don't do
-	 * anything about it.
-	 */
+	g_return_val_if_fail (NM_IS_NETNS (self), FALSE);
 
-	priv->default_route_manager = nm_default_route_manager_new (priv->platform);
-	priv->route_manager = nm_route_manager_new (priv->platform);
+	priv = NM_NETNS_GET_PRIVATE (self);
 
-	priv->isroot = isroot;
+	g_return_val_if_fail (priv->name && priv->name[0], FALSE);
+	g_return_val_if_fail (!priv->bound, FALSE);
 
-	if (isroot)
-		return TRUE;
+	if (!nmp_netns_bind_to_path (priv->netns, _bind_to_path (path_buf, priv->name), NULL))
+		return FALSE;
 
-	g_signal_connect (priv->platform,
-			  NM_PLATFORM_SIGNAL_LINK_CHANGED,
-			  G_CALLBACK (platform_link_cb),
-			  self);
+	priv->bound = TRUE;
 
 	/*
 	 * Enumerate all existing devices in the network namespace
@@ -1032,7 +1037,7 @@ nm_netns_setup(NMNetns *self, gboolean isroot)
 	platform_query_devices (self);
 
 	/* Activate loopback interface in a new network namespace */
-	nm_platform_link_set_up (priv->platform, 1, NULL);
+	nm_platform_link_set_up (nm_netns_get_platform (self), 1, NULL);
 
 #if 0
 	priv->policy = nm_policy_new (self, nm_settings_get());
@@ -1054,13 +1059,18 @@ nm_netns_stop(NMNetns *self)
 {
 	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
 
-	if (priv->isroot)
+	if (_is_root (self))
 		return;
 
 	while (priv->devices)
 		remove_device (self, NM_DEVICE (priv->devices->data), TRUE, TRUE);
 
-	nm_platform_netns_destroy(priv->platform, priv->name);
+	if (priv->bound) {
+		char path_buf[256];
+
+		nmp_netns_bind_to_path_destroy (priv->netns, _bind_to_path (path_buf, priv->name));
+		priv->bound = FALSE;
+	}
 
 	/*
 	 * TODO/BUG: Maybe this should go to dispose method?
@@ -1078,19 +1088,6 @@ nm_netns_stop(NMNetns *self)
 		g_clear_object (&priv->policy);
 	}
 #endif
-
-	g_clear_object(&priv->platform);
-}
-
-NMNetns *
-nm_netns_new (const char *netns_name)
-{
-	NMNetns *self;
-
-	self = g_object_new (NM_TYPE_NETNS, NULL);
-	nm_netns_set_name(self, netns_name);
-
-	return self;
 }
 
 /******************************************************************/
@@ -2219,8 +2216,9 @@ _active_connection_cleanup (gpointer user_data)
 
 		iter = iter->next;
 		if (nm_active_connection_get_state (ac) == NM_ACTIVE_CONNECTION_STATE_DEACTIVATED) {
-			if (active_connection_remove (self, ac))
-				g_object_notify (G_OBJECT (self), NM_MANAGER_ACTIVE_CONNECTIONS);
+			if (active_connection_remove (self, ac)) {
+				/*FIXME: g_object_notify (G_OBJECT (self), NM_MANAGER_ACTIVE_CONNECTIONS);*/
+			}
 		}
 	}
 	g_object_thaw_notify (G_OBJECT (self));
@@ -2289,7 +2287,7 @@ active_connection_add (NMNetns *self, NMActiveConnection *active)
 
 	/* Only notify D-Bus if the active connection is actually exported */
 	if (nm_exported_object_is_exported (NM_EXPORTED_OBJECT (active)))
-		g_object_notify (G_OBJECT (self), NM_NETNS_ACTIVE_CONNECTIONS);
+		_notify (self, PROP_ACTIVATING_CONNECTION);
 }
 
 #if 0
@@ -2327,7 +2325,7 @@ policy_activating_device_changed (GObject *object, GParamSpec *pspec, gpointer u
 		g_clear_object (&priv->activating_connection);
 		priv->activating_connection = ac ? g_object_ref (ac) : NULL;
 		_LOGD (LOGD_CORE, "ActivatingConnection now %s", ac ? nm_active_connection_get_settings_connection_id (ac) : "(none)");
-		g_object_notify (G_OBJECT (self), NM_NETNS_ACTIVATING_CONNECTION);
+		_notify (self, PROP_ACTIVATING_CONNECTION);
 	}
 }
 #endif
@@ -2352,7 +2350,7 @@ nm_netns_update_metered (NMNetns *self)
 	if (value != priv->metered) {
 		priv->metered = value;
 		_LOGD (LOGD_CORE, "new metered value: %d", (int) priv->metered);
-		g_object_notify (G_OBJECT (self), NM_NETNS_METERED);
+		_notify (self, PROP_METERED);
 	}
 }
 #endif
@@ -2733,7 +2731,7 @@ system_hostname_changed_cb (NMSettings *settings,
 	g_free (priv->hostname);
 	priv->hostname = hostname;
 
-	g_object_notify (G_OBJECT (self), NM_NETNS_HOSTNAME);
+	_notify (self, PROP_HOSTNAME);
 
         nm_dhcp_manager_set_default_hostname (nm_dhcp_manager_get (), priv->hostname);
 }
@@ -3094,48 +3092,6 @@ connectivity_changed (NMConnectivity *connectivity,
 
 /******************************************************************/
 
-static void
-nm_netns_init (NMNetns *self)
-{
-	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
-	NMConfigData *config_data;
-
-#if 0
-	/*
-	 * TODO/BUG: What is this for?
-	 */
-	_set_prop_filter (self, nm_bus_manager_get_connection (priv->dbus_mgr));
-
-	priv->settings = nm_settings_get ();
-	g_signal_connect (priv->settings, "notify::" NM_SETTINGS_HOSTNAME,
-	                  G_CALLBACK (system_hostname_changed_cb), self);
-	g_signal_connect (priv->settings, NM_SETTINGS_SIGNAL_CONNECTION_ADDED,
-	                  G_CALLBACK (connection_changed), self);
-	g_signal_connect (priv->settings, NM_SETTINGS_SIGNAL_CONNECTION_UPDATED_BY_USER,
-	                  G_CALLBACK (connection_changed), self);
-	g_signal_connect (priv->settings, NM_SETTINGS_SIGNAL_CONNECTION_REMOVED,
-	                  G_CALLBACK (connection_removed), self);
-#endif
-
-	priv->config = g_object_ref (nm_config_get ());
-	g_signal_connect (G_OBJECT (priv->config),
-	                  NM_CONFIG_SIGNAL_CONFIG_CHANGED,
-	                  G_CALLBACK (_config_changed_cb),
-	                  self);
-
-	config_data = nm_config_get_data (priv->config);
-#if 0
-	priv->connectivity = nm_connectivity_new (nm_config_data_get_connectivity_uri (config_data),
-	                                          nm_config_data_get_connectivity_interval (config_data),
-	                                          nm_config_data_get_connectivity_response (config_data));
-	g_signal_connect (priv->connectivity, "notify::" NM_CONNECTIVITY_STATE,
-	                  G_CALLBACK (connectivity_changed), self);
-#endif
-
-	/* Load VPN plugins */
-	priv->vpn_manager = g_object_ref (nm_vpn_manager_get ());
-}
-
 static gboolean
 device_is_real (GObject *device, gpointer user_data)
 {
@@ -3188,18 +3144,89 @@ get_property (GObject *object, guint prop_id,
 
 static void
 set_property (GObject *object, guint prop_id,
-	      const GValue *value, GParamSpec *pspec)
+              const GValue *value, GParamSpec *pspec)
 {
 	NMNetns *self = NM_NETNS (object);
+	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
 
 	switch (prop_id) {
 	case PROP_NAME:
-		nm_netns_set_name (self, g_value_get_string (value));
+		/* construct-only */
+		priv->name = g_value_dup_string (value);
+		g_return_if_fail (priv->name && priv->name[0]);
+		g_return_if_fail (NM_IN_STRSET (priv->name, ".", ".."));
+		g_return_if_fail (!strchr (priv->name, '/'));
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 		break;
 	}
+}
+
+NMNetns *
+nm_netns_new (const char *name)
+{
+	return g_object_new (NM_TYPE_NETNS,
+	                     NM_NETNS_NAME, name,
+	                     NULL);
+}
+
+static void
+nm_netns_init (NMNetns *self)
+{
+	NMNetnsPrivate *priv = NM_NETNS_GET_PRIVATE (self);
+	NMConfigData *config_data;
+
+#if 0
+	/*
+	 * TODO/BUG: What is this for?
+	 */
+	_set_prop_filter (self, nm_bus_manager_get_connection (priv->dbus_mgr));
+
+	priv->settings = nm_settings_get ();
+	g_signal_connect (priv->settings, "notify::" NM_SETTINGS_HOSTNAME,
+	                  G_CALLBACK (system_hostname_changed_cb), self);
+	g_signal_connect (priv->settings, NM_SETTINGS_SIGNAL_CONNECTION_ADDED,
+	                  G_CALLBACK (connection_changed), self);
+	g_signal_connect (priv->settings, NM_SETTINGS_SIGNAL_CONNECTION_UPDATED_BY_USER,
+	                  G_CALLBACK (connection_changed), self);
+	g_signal_connect (priv->settings, NM_SETTINGS_SIGNAL_CONNECTION_REMOVED,
+	                  G_CALLBACK (connection_removed), self);
+#endif
+
+	priv->config = g_object_ref (nm_config_get ());
+	g_signal_connect (G_OBJECT (priv->config),
+	                  NM_CONFIG_SIGNAL_CONFIG_CHANGED,
+	                  G_CALLBACK (_config_changed_cb),
+	                  self);
+
+	config_data = nm_config_get_data (priv->config);
+#if 0
+	priv->connectivity = nm_connectivity_new (nm_config_data_get_connectivity_uri (config_data),
+	                                          nm_config_data_get_connectivity_interval (config_data),
+	                                          nm_config_data_get_connectivity_response (config_data));
+	g_signal_connect (priv->connectivity, "notify::" NM_CONNECTIVITY_STATE,
+	                  G_CALLBACK (connectivity_changed), self);
+#endif
+
+	/* Load VPN plugins */
+	priv->vpn_manager = g_object_ref (nm_vpn_manager_get ());
+}
+
+static void
+constructed (GObject *object)
+{
+	G_OBJECT_CLASS (nm_netns_parent_class)->constructed (object);
+}
+
+static void
+dispose (GObject *object)
+{
+	NMNetns *self = NM_NETNS (object);
+
+	nm_netns_stop (self);
+
+	G_OBJECT_CLASS (nm_netns_parent_class)->dispose (object);
 }
 
 static void
@@ -3212,6 +3239,12 @@ finalize (GObject *object)
 		g_signal_handlers_disconnect_by_func (priv->config, _config_changed_cb, netns);
 		g_clear_object (&priv->config);
 	}
+
+	g_free (priv->name);
+
+	g_clear_object (&priv->platform);
+	g_clear_object (&priv->default_route_manager);
+	g_clear_object (&priv->route_manager);
 
 	g_clear_object (&priv->vpn_manager);
 
@@ -3247,55 +3280,52 @@ nm_netns_class_init (NMNetnsClass *klass)
 
 	exported_object_class->export_path = NM_DBUS_PATH_NETNS "/%u";
 
-        /* virtual methods */
-	object_class->set_property = set_property;
 	object_class->get_property = get_property;
+	object_class->set_property = set_property;
+	object_class->constructed = constructed;
+	object_class->dispose = dispose;
 	object_class->finalize = finalize;
 
 	/* Network namespace's name */
-	g_object_class_install_property
-		(object_class, PROP_NAME,
-		 g_param_spec_string (NM_NETNS_NAME, "", "",
-				      NULL,
-				      G_PARAM_READABLE |
-				      G_PARAM_STATIC_STRINGS));
+	obj_properties[PROP_NAME] =
+	    g_param_spec_string (NM_NETNS_NAME, "", "",
+	                         NULL,
+	                         G_PARAM_READABLE |
+	                         G_PARAM_WRITABLE |
+	                         G_PARAM_CONSTRUCT_ONLY |
+	                         G_PARAM_STATIC_STRINGS);
 
 	/* Realized devices in the network namespace */
-	g_object_class_install_property
-		(object_class, PROP_DEVICES,
-		 g_param_spec_boxed (NM_NETNS_DEVICES, "", "",
-				     G_TYPE_STRV,
-				     G_PARAM_READABLE |
-				     G_PARAM_STATIC_STRINGS));
+	obj_properties[PROP_DEVICES] =
+	    g_param_spec_boxed (NM_NETNS_DEVICES, "", "",
+	                        G_TYPE_STRV,
+	                        G_PARAM_READABLE |
+	                        G_PARAM_STATIC_STRINGS);
 
 	/* All devices in the network namespace */
-	g_object_class_install_property
-		(object_class, PROP_ALL_DEVICES,
-		 g_param_spec_boxed (NM_NETNS_ALL_DEVICES, "", "",
-				     G_TYPE_STRV,
-				     G_PARAM_READABLE |
-				     G_PARAM_STATIC_STRINGS));
+	obj_properties[PROP_ALL_DEVICES] =
+	    g_param_spec_boxed (NM_NETNS_ALL_DEVICES, "", "",
+	                        G_TYPE_STRV,
+	                        G_PARAM_READABLE |
+	                        G_PARAM_STATIC_STRINGS);
 
-	g_object_class_install_property
-		(object_class, PROP_PRIMARY_CONNECTION,
-		 g_param_spec_string (NM_NETNS_PRIMARY_CONNECTION, "", "",
-		                      NULL,
-		                      G_PARAM_READABLE |
-		                      G_PARAM_STATIC_STRINGS));
+	obj_properties[PROP_PRIMARY_CONNECTION] =
+	    g_param_spec_string (NM_NETNS_PRIMARY_CONNECTION, "", "",
+	                         NULL,
+	                         G_PARAM_READABLE |
+	                         G_PARAM_STATIC_STRINGS);
 
-	g_object_class_install_property
-		(object_class, PROP_PRIMARY_CONNECTION_TYPE,
-		 g_param_spec_string (NM_NETNS_PRIMARY_CONNECTION_TYPE, "", "",
-		                      NULL,
-		                      G_PARAM_READABLE |
-		                      G_PARAM_STATIC_STRINGS));
+	obj_properties[PROP_PRIMARY_CONNECTION_TYPE] =
+	    g_param_spec_string (NM_NETNS_PRIMARY_CONNECTION_TYPE, "", "",
+	                         NULL,
+	                         G_PARAM_READABLE |
+	                         G_PARAM_STATIC_STRINGS);
 
-	g_object_class_install_property
-		(object_class, PROP_ACTIVATING_CONNECTION,
-		 g_param_spec_string (NM_NETNS_ACTIVATING_CONNECTION, "", "",
-		                      NULL,
-		                      G_PARAM_READABLE |
-		                      G_PARAM_STATIC_STRINGS));
+	obj_properties[PROP_ACTIVATING_CONNECTION] =
+	    g_param_spec_string (NM_NETNS_ACTIVATING_CONNECTION, "", "",
+	                         NULL,
+	                         G_PARAM_READABLE |
+	                         G_PARAM_STATIC_STRINGS);
 
 	/**
 	 * NMManager:metered:
@@ -3304,62 +3334,63 @@ nm_netns_class_init (NMNetnsClass *klass)
 	 *
 	 * Since: 1.2
 	 **/
-	g_object_class_install_property
-		(object_class, PROP_METERED,
-		 g_param_spec_uint (NM_NETNS_METERED, "", "",
-		                    0, G_MAXUINT32, NM_METERED_UNKNOWN,
-		                    G_PARAM_READABLE |
-		                    G_PARAM_STATIC_STRINGS));
+	obj_properties[PROP_METERED] =
+	    g_param_spec_uint (NM_NETNS_METERED, "", "",
+	                       0, G_MAXUINT32, NM_METERED_UNKNOWN,
+	                       G_PARAM_READABLE |
+	                       G_PARAM_STATIC_STRINGS);
+
+	g_object_class_install_properties (object_class, _PROPERTY_ENUMS_LAST, obj_properties);
 
 	/* Signals */
-        signals[DEVICE_ADDED] =
-                g_signal_new (NM_NETNS_DEVICE_ADDED,
-                              G_OBJECT_CLASS_TYPE (object_class),
-                              G_SIGNAL_RUN_FIRST,
-                              0, NULL, NULL, NULL,
-                              G_TYPE_NONE, 1, NM_TYPE_DEVICE);
+	signals[DEVICE_ADDED] =
+	    g_signal_new (NM_NETNS_DEVICE_ADDED,
+	                  G_OBJECT_CLASS_TYPE (object_class),
+	                  G_SIGNAL_RUN_FIRST,
+	                  0, NULL, NULL, NULL,
+	                  G_TYPE_NONE, 1, NM_TYPE_DEVICE);
 
-        signals[DEVICE_REMOVED] =
-                g_signal_new (NM_NETNS_DEVICE_REMOVED,
-                              G_OBJECT_CLASS_TYPE (object_class),
-                              G_SIGNAL_RUN_FIRST,
-                              0, NULL, NULL, NULL,
-                              G_TYPE_NONE, 1, NM_TYPE_DEVICE);
+	signals[DEVICE_REMOVED] =
+	    g_signal_new (NM_NETNS_DEVICE_REMOVED,
+	                  G_OBJECT_CLASS_TYPE (object_class),
+	                  G_SIGNAL_RUN_FIRST,
+	                  0, NULL, NULL, NULL,
+	                  G_TYPE_NONE, 1, NM_TYPE_DEVICE);
 
-        signals[INTERNAL_DEVICE_ADDED] =
-                g_signal_new (NM_NETNS_INTERNAL_DEVICE_ADDED,
-                              G_OBJECT_CLASS_TYPE (object_class),
-                              G_SIGNAL_RUN_FIRST,
-                              0, NULL, NULL, NULL,
-                              G_TYPE_NONE, 1, NM_TYPE_DEVICE);
+	signals[INTERNAL_DEVICE_ADDED] =
+	    g_signal_new (NM_NETNS_INTERNAL_DEVICE_ADDED,
+	                  G_OBJECT_CLASS_TYPE (object_class),
+	                  G_SIGNAL_RUN_FIRST,
+	                  0, NULL, NULL, NULL,
+	                  G_TYPE_NONE, 1, NM_TYPE_DEVICE);
 
-        signals[INTERNAL_DEVICE_REMOVED] =
-                g_signal_new (NM_NETNS_INTERNAL_DEVICE_REMOVED,
-                              G_OBJECT_CLASS_TYPE (object_class),
-                              G_SIGNAL_RUN_FIRST,
-                              0, NULL, NULL, NULL,
-                              G_TYPE_NONE, 1, NM_TYPE_DEVICE);
+	signals[INTERNAL_DEVICE_REMOVED] =
+	    g_signal_new (NM_NETNS_INTERNAL_DEVICE_REMOVED,
+	                  G_OBJECT_CLASS_TYPE (object_class),
+	                  G_SIGNAL_RUN_FIRST,
+	                  0, NULL, NULL, NULL,
+	                  G_TYPE_NONE, 1, NM_TYPE_DEVICE);
 
 	signals[ACTIVE_CONNECTION_ADDED] =
-		g_signal_new (NM_NETNS_ACTIVE_CONNECTION_ADDED,
-		              G_OBJECT_CLASS_TYPE (object_class),
-		              G_SIGNAL_RUN_FIRST,
-		              0, NULL, NULL, NULL,
-		              G_TYPE_NONE, 1, NM_TYPE_ACTIVE_CONNECTION);
+	    g_signal_new (NM_NETNS_ACTIVE_CONNECTION_ADDED,
+	                  G_OBJECT_CLASS_TYPE (object_class),
+	                  G_SIGNAL_RUN_FIRST,
+	                  0, NULL, NULL, NULL,
+	                  G_TYPE_NONE, 1, NM_TYPE_ACTIVE_CONNECTION);
 
 	signals[ACTIVE_CONNECTION_REMOVED] =
-		g_signal_new (NM_NETNS_ACTIVE_CONNECTION_REMOVED,
-		              G_OBJECT_CLASS_TYPE (object_class),
-		              G_SIGNAL_RUN_FIRST,
-		              0, NULL, NULL, NULL,
-		              G_TYPE_NONE, 1, NM_TYPE_ACTIVE_CONNECTION);
+	    g_signal_new (NM_NETNS_ACTIVE_CONNECTION_REMOVED,
+	                  G_OBJECT_CLASS_TYPE (object_class),
+	                  G_SIGNAL_RUN_FIRST,
+	                  0, NULL, NULL, NULL,
+	                  G_TYPE_NONE, 1, NM_TYPE_ACTIVE_CONNECTION);
 
 	nm_exported_object_class_add_interface (NM_EXPORTED_OBJECT_CLASS (klass),
-						NMDBUS_TYPE_NET_NS_INSTANCE_SKELETON,
-						"GetDevices", impl_netns_get_devices,
-						"GetAllDevices", impl_netns_get_all_devices,
-						"TakeDevice", impl_netns_take_device,
+	                                        NMDBUS_TYPE_NET_NS_INSTANCE_SKELETON,
+	                                        "GetDevices", impl_netns_get_devices,
+	                                        "GetAllDevices", impl_netns_get_all_devices,
+	                                        "TakeDevice", impl_netns_take_device,
 	                                        "ActivateConnection", impl_netns_activate_connection,
-						NULL);
+	                                        NULL);
 }
 

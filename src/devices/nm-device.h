@@ -26,9 +26,7 @@
 
 #include "nm-exported-object.h"
 #include "nm-dbus-interface.h"
-#include "nm-default.h"
 #include "nm-connection.h"
-#include "nm-netns.h"
 #include "nm-platform.h"
 #include "nm-rfkill-manager.h"
 #include "NetworkManagerUtils.h"
@@ -571,9 +569,11 @@ void nm_device_update_hw_address (NMDevice *self);
 void nm_device_update_initial_hw_address (NMDevice *self);
 
 void nm_device_set_netns (NMDevice *self, NMNetns *netns);
-NMNetns * nm_device_get_netns (NMDevice *self);
+NMNetns *nm_device_get_netns (NMDevice *self);
 
-NMPlatform * nm_device_get_platform(NMDevice *self);
+NMPlatform *nm_device_get_platform (NMDevice *self);
+NMDefaultRouteManager *nm_device_get_default_route_manager (NMDevice *self);
+NMRouteManager *nm_device_get_route_manager (NMDevice *self);
 
 G_END_DECLS
 

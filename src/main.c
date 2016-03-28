@@ -446,12 +446,6 @@ main (int argc, char *argv[])
 	/* Set up platform interaction layer */
 	nm_linux_platform_setup ();
 
-	/* Set up network namespace controller */
-	if (!nm_netns_controller_setup ()) {
-		nm_log_err (LOGD_CORE, "failed to initialize network namespace controller");
-		goto done;
-	}
-
 	NM_UTILS_KEEP_ALIVE (config, NM_PLATFORM_GET, "NMConfig-depends-on-NMPlatform");
 
 	nm_dispatcher_init ();
@@ -488,8 +482,6 @@ done:
 	nm_exported_object_class_set_quitting ();
 
 	nm_manager_stop (nm_manager_get ());
-
-	nm_netns_controller_stop (nm_netns_controller_get ());
 
 	if (global_opt.pidfile && wrote_pidfile)
 		unlink (global_opt.pidfile);

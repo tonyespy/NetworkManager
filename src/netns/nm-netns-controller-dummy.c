@@ -51,118 +51,20 @@
 
 G_DEFINE_TYPE (NMNetnsController, nm_netns_controller, G_TYPE_OBJECT)
 
-enum {
-	PROP_0,
-	PROP_REGISTER_SINGLETON,
-	LAST_PROP,
-};
-
 typedef struct {
-	gboolean register_singleton;
-
-	/*
-	 * Only one fixed network namespace
-	 */
 	NMNetns *netns;
-
 } NMNetnsControllerPrivate;
 
 #define NM_NETNS_CONTROLLER_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_NETNS_CONTROLLER, NMNetnsControllerPrivate))
 
-NM_DEFINE_SINGLETON_INSTANCE (NMNetnsController);
-
-NM_DEFINE_SINGLETON_REGISTER (NMNetnsController);
-
-void nm_netns_controller_activate_root_netns(void)
-{
-}
-
-void nm_netns_controller_activate_netns(NMNetns *netns)
-{
-}
-
-NMRouteManager *
-nm_netns_controller_get_route_manager(void)
-{
-	NMNetnsControllerPrivate *priv = NM_NETNS_CONTROLLER_GET_PRIVATE (singleton_instance);
-
-	return nm_netns_get_route_manager(priv->netns);
-}
+NM_DEFINE_SINGLETON_GETTER (NMNetnsController, nm_netns_controller_get, NM_TYPE_NETNS_CONTROLLER);
 
 NMNetns *
-nm_netns_controller_get_root_netns(void)
-{
-	return nm_netns_controller_get_active_netns();
-}
-
-NMNetns *
-nm_netns_controller_get_active_netns(void)
+nm_netns_controller_get_root_netns (void)
 {
 	NMNetnsControllerPrivate *priv = NM_NETNS_CONTROLLER_GET_PRIVATE (singleton_instance);
 
 	return priv->netns;
-}
-
-/******************************************************************/
-
-/**
- * nm_netns_controller_setup:
- * @instance: the #NMNetnsController instance
- *
- * Failing to set up #NMNetnsController singleton results in a fatal
- * error, as well as trying to initialize it multiple times without
- * freeing it.
- *
- * NetworkManager will typically use only one network manager controller
- * object during its run.
- */
-gboolean
-nm_netns_controller_setup (void)
-{
-	NMNetnsControllerPrivate *priv;
-
-        g_return_val_if_fail (!singleton_instance, FALSE);
-
-        singleton_instance = nm_netns_controller_new();
-
-        nm_singleton_instance_register ();
-
-	priv = NM_NETNS_CONTROLLER_GET_PRIVATE (singleton_instance);
-
-	priv->netns = nm_netns_new(NULL);
-
-        nm_log_dbg (LOGD_NETNS, "setup %s singleton (%p, %s)",
-			"NMNetnsController", singleton_instance,
-			G_OBJECT_TYPE_NAME (singleton_instance));
-
-	return TRUE;
-}
-
-NMNetnsController *
-nm_netns_controller_get(void)
-{
-	return singleton_instance;
-}
-
-void
-nm_netns_controller_stop (NMNetnsController *self)
-{
-	NMNetnsControllerPrivate *priv = NM_NETNS_CONTROLLER_GET_PRIVATE (self);
-
-	nm_netns_stop(priv->netns);
-	g_clear_object(&priv->netns);
-}
-
-NMNetnsController *
-nm_netns_controller_new (void)
-{
-	NMNetnsController *self;
-
-        self = g_object_new (NM_TYPE_NETNS_CONTROLLER,
-			NM_NETNS_CONTROLLER_REGISTER_SINGLETON, TRUE,
-			NULL);
-
-	return self;
 }
 
 /******************************************************************/

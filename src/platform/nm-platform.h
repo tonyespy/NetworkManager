@@ -625,10 +625,6 @@ typedef struct {
 
 	gboolean (*check_support_kernel_extended_ifa_flags) (NMPlatform *);
 	gboolean (*check_support_user_ipv6ll) (NMPlatform *);
-
-	int (*netns_create) (NMPlatform *platform, const char *name, gboolean isroot);
-	void (*netns_destroy) (NMPlatform *platform, const char *name);
-	gboolean (*netns_activate) (NMPlatform *platform, int netns_id);
 } NMPlatformClass;
 
 /* NMPlatform signals
@@ -937,10 +933,6 @@ int nm_platform_ip6_route_cmp (const NMPlatformIP6Route *a, const NMPlatformIP6R
 
 gboolean nm_platform_check_support_kernel_extended_ifa_flags (NMPlatform *self);
 gboolean nm_platform_check_support_user_ipv6ll (NMPlatform *self);
-
-int nm_platform_netns_create(NMPlatform *self, const char *name, gboolean isroot);
-void nm_platform_netns_destroy(NMPlatform *self, const char *name);
-gboolean nm_platform_netns_activate(NMPlatform *self, int netns_id);
 
 const char *nm_platform_link_flags2str (unsigned flags, char *buf, gsize len);
 const char *nm_platform_link_inet6_addrgenmode2str (guint8 mode, char *buf, gsize len);

@@ -236,37 +236,6 @@ nm_platform_check_support_user_ipv6ll (NMPlatform *self)
 	return !!supported;
 }
 
-int
-nm_platform_netns_create(NMPlatform *self, const char *name, gboolean isroot)
-{
-	_CHECK_SELF (self, klass, -1);
-
-	if (!klass->netns_create)
-		return FALSE;
-
-	return klass->netns_create (self, name, isroot);
-}
-
-void
-nm_platform_netns_destroy(NMPlatform *self, const char *name)
-{
-	_CHECK_SELF_VOID (self, klass);
-
-	if (klass->netns_destroy)
-		klass->netns_destroy (self, name);
-}
-
-gboolean
-nm_platform_netns_activate(NMPlatform *self, int netns_id)
-{
-	_CHECK_SELF (self, klass, FALSE);
-
-	if (!klass->netns_activate)
-		return FALSE;
-
-	return klass->netns_activate (self, netns_id);
-}
-
 /**
  * nm_platform_process_events:
  * @self: platform instance
@@ -4276,7 +4245,7 @@ nm_platform_class_init (NMPlatformClass *platform_class)
 	g_object_class_install_property
 	 (object_class, PROP_NETNS_SUPPORT,
 	     g_param_spec_boolean (NM_PLATFORM_NETNS_SUPPORT, "", "",
-	                           FALSE,
+	                           TRUE,
 	                           G_PARAM_WRITABLE |
 	                           G_PARAM_CONSTRUCT_ONLY |
 	                           G_PARAM_STATIC_STRINGS));

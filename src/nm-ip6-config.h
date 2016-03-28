@@ -23,10 +23,8 @@
 
 #include <netinet/in.h>
 
-#include "nm-types.h"
 #include "nm-exported-object.h"
 #include "nm-setting-ip6-config.h"
-#include "nm-netns.h"
 
 #define NM_TYPE_IP6_CONFIG (nm_ip6_config_get_type ())
 #define NM_IP6_CONFIG(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_IP6_CONFIG, NMIP6Config))

@@ -19,19 +19,13 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- * (C) Copyright 2007 - 2011 Red Hat, Inc.
- * (C) Copyright 2008 Novell, Inc.
+ * (C) Copyright 2016 Red Hat, Inc.
  */
 
 #ifndef __NM_NETNS_CONTROLLER_H__
 #define __NM_NETNS_CONTROLLER_H__
 
-#include "nm-types.h"
-
 #include "nm-exported-object.h"
-#include "nm-platform.h"
-#include "nm-default-route-manager.h"
-#include "nm-route-manager.h"
 
 #define NM_TYPE_NETNS_CONTROLLER            (nm_netns_controller_get_type ())
 #define NM_NETNS_CONTROLLER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_NETNS_CONTROLLER, NMNetnsController))
@@ -48,25 +42,16 @@ typedef struct {
 	NMExportedObjectClass parent_class;
 } NMNetnsControllerClass;
 
-#define NM_NETNS_CONTROLLER_REGISTER_SINGLETON		"register-singleton"
-#define NM_NETNS_CONTROLLER_NETWORK_NAMESPACES		"network-namespaces"
+#define NM_NETNS_CONTROLLER_NETWORK_NAMESPACES  "network-namespaces"
 
 /* Signals */
-#define NM_NETNS_CONTROLLER_NETNS_ADDED			"network-namespace-added"
-#define NM_NETNS_CONTROLLER_NETNS_REMOVED		"network-namespace-removed"
+#define NM_NETNS_CONTROLLER_NETNS_ADDED         "network-namespace-added"
+#define NM_NETNS_CONTROLLER_NETNS_REMOVED       "network-namespace-removed"
 
 GType nm_netns_controller_get_type (void);
 
-gboolean nm_netns_controller_setup (void);
-
 NMNetnsController * nm_netns_controller_get (void);
 
-void nm_netns_controller_stop (NMNetnsController *self);
-
-void nm_netns_controller_activate_root_netns (void);
-void nm_netns_controller_activate_netns (NMNetns *netns);
-
-NMNetns * nm_netns_controller_get_active_netns (void);
 NMNetns * nm_netns_controller_get_root_netns (void);
 
 NMNetns * nm_netns_controller_find_netns_by_path (const char *netns_path);
@@ -78,12 +63,6 @@ NMDevice * nm_netns_controller_find_device_by_path (const char *device_path);
 NMNetns * nm_netns_controller_new_netns (const char *netns_name);
 
 void nm_netns_controller_remove_netns (NMNetnsController *self, NMNetns *netns);
-
-NMPlatform * nm_netns_controller_get_active_platform (void);
-NMPlatform * nm_netns_controller_get_root_platform (NMNetnsController *self);
-
-NMDefaultRouteManager *nm_netns_controller_get_default_route_manager (void);
-NMRouteManager *nm_netns_controller_get_route_manager (void);
 
 NMNetnsController *nm_netns_controller_new (void);
 

@@ -428,9 +428,6 @@ main (int argc, char *argv[])
 	/* Set up platform interaction layer */
 	nm_linux_platform_setup ();
 
-	/* Set up dummy network namespace control */
-	nm_netns_controller_setup ();
-
 	tmp = nm_platform_link_get_address (NM_PLATFORM_GET, ifindex, &hwaddr_len);
 	if (tmp) {
 		hwaddr = g_byte_array_sized_new (hwaddr_len);

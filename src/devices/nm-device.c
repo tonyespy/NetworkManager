@@ -4301,7 +4301,7 @@ ip4_config_merge_and_apply (NMDevice *self,
 	 */
 
 	connection_has_default_route
-	    = nm_default_route_manager_ip4_connection_has_default_route (nm_netns_controller_get_default_route_manager (),
+	    = nm_default_route_manager_ip4_connection_has_default_route (nm_device_get_default_route_manager (self),
 	                                                                 connection, &connection_is_never_default);
 
 	if (   !priv->v4_commit_first_time
@@ -5023,7 +5023,7 @@ ip6_config_merge_and_apply (NMDevice *self,
 	 */
 
 	connection_has_default_route
-	    = nm_default_route_manager_ip6_connection_has_default_route (nm_netns_controller_get_default_route_manager (),
+	    = nm_default_route_manager_ip6_connection_has_default_route (nm_device_get_default_route_manager (self),
 	                                                                 connection, &connection_is_never_default);
 
 	if (   !priv->v6_commit_first_time
@@ -7884,7 +7884,7 @@ nm_device_set_ip4_config (NMDevice *self,
 		g_clear_object (&priv->dev_ip4_config);
 	}
 
-	nm_default_route_manager_ip4_update_default_route (nm_netns_controller_get_default_route_manager (), self);
+	nm_default_route_manager_ip4_update_default_route (nm_device_get_default_route_manager (self), self);
 
 	if (has_changes) {
 		_update_ip4_address (self);
@@ -8052,7 +8052,7 @@ nm_device_set_ip6_config (NMDevice *self,
 		       nm_exported_object_get_path (NM_EXPORTED_OBJECT (old_config)));
 	}
 
-	nm_default_route_manager_ip6_update_default_route (nm_netns_controller_get_default_route_manager (), self);
+	nm_default_route_manager_ip6_update_default_route (nm_device_get_default_route_manager (self), self);
 
 	if (has_changes) {
 		if (old_config != priv->ip6_config)
@@ -9956,14 +9956,14 @@ _cleanup_generic_post (NMDevice *self, CleanupType cleanup_type)
 	if (cleanup_type == CLEANUP_TYPE_DECONFIGURE) {
 		priv->default_route.v4_is_assumed = FALSE;
 		priv->default_route.v6_is_assumed = FALSE;
-		nm_default_route_manager_ip4_update_default_route (nm_netns_controller_get_default_route_manager (), self);
-		nm_default_route_manager_ip6_update_default_route (nm_netns_controller_get_default_route_manager (), self);
+		nm_default_route_manager_ip4_update_default_route (nm_device_get_default_route_manager (self), self);
+		nm_default_route_manager_ip6_update_default_route (nm_device_get_default_route_manager (self), self);
 	}
 
 	priv->default_route.v4_is_assumed = TRUE;
 	priv->default_route.v6_is_assumed = TRUE;
-	nm_default_route_manager_ip4_update_default_route (nm_netns_controller_get_default_route_manager (), self);
-	nm_default_route_manager_ip6_update_default_route (nm_netns_controller_get_default_route_manager (), self);
+	nm_default_route_manager_ip4_update_default_route (nm_device_get_default_route_manager (self), self);
+	nm_default_route_manager_ip6_update_default_route (nm_device_get_default_route_manager (self), self);
 
 	priv->v4_commit_first_time = TRUE;
 	priv->v6_commit_first_time = TRUE;
@@ -10060,7 +10060,7 @@ nm_device_cleanup (NMDevice *self, NMDeviceStateReason reason, CleanupType clean
 	/* Take out any entries in the routing table and any IP address the device had. */
 	ifindex = nm_device_get_ip_ifindex (self);
 	if (ifindex > 0) {
-		nm_route_manager_route_flush (nm_netns_controller_get_route_manager (), ifindex);
+		nm_route_manager_route_flush (nm_device_get_route_manager (self), ifindex);
 		nm_platform_address_flush (nm_device_get_platform(self), ifindex);
 	}
 
@@ -11025,15 +11025,38 @@ nm_device_get_platform (NMDevice *self)
 {
 	NMDevicePrivate *priv;
 
-	if (self == NULL)
-		return NULL;
+	g_return_val_if_fail (NM_IS_DEVICE (self), NULL);
 
 	priv = NM_DEVICE_GET_PRIVATE (self);
+	g_return_val_if_fail (priv->netns, NULL);
 
-	if (priv == NULL)
-		return NULL;
+	return nm_netns_get_platform (priv->netns);
+}
 
-	return nm_netns_get_platform(priv->netns);
+NMDefaultRouteManager *
+nm_device_get_default_route_manager (NMDevice *self)
+{
+	NMDevicePrivate *priv;
+
+	g_return_val_if_fail (NM_IS_DEVICE (self), NULL);
+
+	priv = NM_DEVICE_GET_PRIVATE (self);
+	g_return_val_if_fail (priv->netns, NULL);
+
+	return nm_netns_get_default_route_manager (priv->netns);
+}
+
+NMRouteManager *
+nm_device_get_route_manager (NMDevice *self)
+{
+	NMDevicePrivate *priv;
+
+	g_return_val_if_fail (NM_IS_DEVICE (self), NULL);
+
+	priv = NM_DEVICE_GET_PRIVATE (self);
+	g_return_val_if_fail (priv->netns, NULL);
+
+	return nm_netns_get_route_manager (priv->netns);
 }
 
 static const char *

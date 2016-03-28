@@ -4442,7 +4442,9 @@ nm_manager_start (NMManager *self, GError **error)
 	g_signal_connect (nm_settings_get(), NM_SETTINGS_SIGNAL_CONNECTION_REMOVED,
 	                  G_CALLBACK (connection_removed), self);
 
-	priv->policy = nm_policy_new (self, nm_settings_get());
+	priv->policy = nm_policy_new (self,
+	                              nm_settings_get(),
+	                              nm_netns_get_default_route_manager (nm_netns_controller_get_root_netns()));
 	g_signal_connect (priv->policy, "notify::" NM_POLICY_DEFAULT_IP4_DEVICE,
 	                  G_CALLBACK (policy_default_device_changed), self);
 	g_signal_connect (priv->policy, "notify::" NM_POLICY_DEFAULT_IP6_DEVICE,
