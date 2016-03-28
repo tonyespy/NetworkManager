@@ -1,0 +1,3276 @@
+<?xml version='1.0'?>
+<?xml-stylesheet type="text/xsl" href="http://docbook.sourceforge.net/release/xsl/current/xhtml/docbook.xsl"?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
+        "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+
+<!--
+  nmcli (1) manual page
+
+  This is free documentation; you can redistribute it and/or
+  modify it under the terms of the GNU General Public License as
+  published by the Free Software Foundation; either version 2 of
+  the License, or (at your option) any later version.
+
+  The GNU General Public License's references to "object code"
+  and "executables" are to be interpreted as the output of any
+  document formatting or typesetting system, including
+  intermediate and printed output.
+
+  This manual is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public Licence along
+  with this manual; if not, write to the Free Software Foundation, Inc.,
+  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+
+  Copyright 2010 - 2014 Red Hat, Inc.
+-->
+
+<refentry id='nmcli'>
+
+  <refentryinfo>
+    <title>nmcli</title>
+    <author>NetworkManager developers</author>
+  </refentryinfo>
+
+  <refmeta>
+    <refentrytitle>nmcli</refentrytitle>
+    <manvolnum>1</manvolnum>
+    <refmiscinfo class="source">NetworkManager</refmiscinfo>
+    <refmiscinfo class="manual">General Commands Manual</refmiscinfo>
+    <refmiscinfo class="version">1.2</refmiscinfo>
+  </refmeta>
+
+  <refnamediv>
+    <refname>nmcli</refname>
+    <refpurpose>command-line tool for controlling NetworkManager</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv id='synopsis'>
+    <cmdsynopsis>
+      <command>nmcli</command>
+      <group>
+        <arg choice='plain'><option>-t</option></arg>
+        <arg choice='plain'><option>--terse</option></arg>
+      </group>
+      <sbr/>
+      <group>
+        <arg choice='plain'><option>-p</option></arg>
+        <arg choice='plain'><option>--pretty</option></arg>
+      </group>
+      <sbr/>
+      <group>
+        <arg choice='plain'><option>-m</option></arg>
+        <arg choice='plain'><option>--mode</option></arg>
+        <group choice='req'>
+          <arg choice='plain'>tabular</arg>
+          <arg choice='plain'>multiline</arg>
+        </group>
+      </group>
+      <sbr/>
+      <group>
+        <arg choice='plain'><option>-c</option></arg>
+        <arg choice='plain'><option>--colors</option></arg>
+        <group choice='req'>
+          <arg choice='plain'>yes</arg>
+          <arg choice='plain'>no</arg>
+          <arg choice='plain'>auto</arg>
+        </group>
+      </group>
+      <sbr/>
+      <group>
+        <arg choice='plain'><option>-f</option></arg>
+        <arg choice='plain'><option>--fields</option></arg>
+        <group choice='req'>
+          <arg conice='plain' rep='repeat'><replaceable>field</replaceable></arg>
+          <arg choice='plain'>all</arg>
+          <arg choice='plain'>common</arg>
+        </group>
+      </group>
+      <sbr/>
+      <group>
+        <arg choice='plain'><option>-e</option></arg>
+        <arg choice='plain'><option>--escape</option></arg>
+        <group choice='req'>
+          <arg choice='plain'>yes</arg>
+          <arg choice='plain'>no</arg>
+        </group>
+      </group>
+      <sbr/>
+      <group>
+        <arg choice='plain'><option>-n</option></arg>
+        <arg choice='plain'><option>--nocheck</option></arg>
+      </group>
+      <sbr/>
+      <group>
+        <arg choice='plain'><option>-a</option></arg>
+        <arg choice='plain'><option>--ask</option></arg>
+      </group>
+      <sbr/>
+      <group>
+        <arg choice='plain'><option>-s</option></arg>
+        <arg choice='plain'><option>--show-secrets</option></arg>
+      </group>
+      <sbr/>
+      <arg>
+        <group choice='plain'>
+          <arg choice='plain'><option>-w</option></arg>
+          <arg choice='plain'><option>--wait</option></arg>
+        </group>
+        <arg choice='plain' rep='repeat'><replaceable>seconds</replaceable></arg>
+      </arg>
+      <sbr/>
+      <group>
+        <arg choice='plain'><option>-v</option></arg>
+        <arg choice='plain'><option>--version</option></arg>
+      </group>
+      <sbr/>
+      <group>
+        <arg choice='plain'><option>-h</option></arg>
+        <arg choice='plain'><option>--help</option></arg>
+      </group>
+      <sbr/>
+      <group choice='req'>
+        <arg choice='plain'>general</arg>
+        <arg choice='plain'>networking</arg>
+        <arg choice='plain'>radio</arg>
+        <arg choice='plain'>connection</arg>
+        <arg choice='plain'>device</arg>
+        <arg choice='plain'>agent</arg>
+        <arg choice='plain'>monitor</arg>
+      </group>
+      <group>
+        <arg choice='plain'><replaceable>COMMAND</replaceable></arg>
+        <arg choice='plain'>help</arg>
+      </group>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsect1 id='description'><title>Description</title>
+    <para><command>nmcli</command> is a command-line tool for controlling
+    NetworkManager and reporting network status. It can be utilized as a
+    replacement for <emphasis>nm-applet</emphasis> or other graphical clients.
+    <command>nmcli</command> is used to create, display, edit, delete, activate,
+    and deactivate network connections, as well as control and display network
+    device status.</para>
+
+    <para>Typical uses include:</para>
+    <itemizedlist>
+      <listitem>
+        <para>Scripts: Utilize NetworkManager via <command>nmcli</command> instead of
+        managing network connections manually. <command>nmcli</command> supports a
+        terse output format which is better suited for script processing. Note that
+        NetworkManager can also execute scripts, called "dispatcher scripts", in
+        response to network events. See <emphasis>NetworkManager</emphasis> for details
+        about these dispatcher scripts.</para>
+      </listitem>
+
+      <listitem>
+        <para>Servers, headless machines, and terminals: <command>nmcli</command> can
+        be used to control NetworkManager without a GUI, including creating, editing,
+        starting and stopping network connections and viewing network status.</para>
+      </listitem>
+    </itemizedlist>
+  </refsect1>
+
+  <refsect1 id='options'><title>Options</title>
+    <variablelist>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-t</option></arg>
+          <arg choice='plain'><option>--terse</option></arg>
+        </group></term>
+
+        <listitem>
+          <para>Output is terse. This mode is designed and suitable for computer (script)
+          processing.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-p</option></arg>
+          <arg choice='plain'><option>--pretty</option></arg>
+        </group></term>
+
+        <listitem>
+          <para>Output is pretty. This causes <command>nmcli</command> to produce easily
+          readable outputs for humans, i.e. values are aligned, headers are printed,
+          etc.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-m</option></arg>
+          <arg choice='plain'><option>--mode</option></arg>
+          <group choice='req'>
+            <arg choice='plain'>tabular</arg>
+            <arg choice='plain'>multiline</arg>
+          </group>
+        </group></term>
+
+        <listitem>
+          <para>Switch between <emphasis>tabular</emphasis> and
+          <emphasis>multiline</emphasis> output:</para>
+
+          <variablelist>
+            <varlistentry>
+              <term><arg choice='plain'>tabular</arg></term>
+              <listitem>
+                <para>Output is a table where each line describes a single entry.
+                Columns define particular properties of the entry.</para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>multiline</arg></term>
+              <listitem>
+                <para>Each entry comprises multiple lines, each property on its
+                own line. The values are prefixed with the property name.</para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+
+          <para>If omitted, default is <emphasis>tabular</emphasis> for most commands.
+          For the commands producing more structured information, that cannot be
+          displayed on a single line, default is <emphasis>multiline</emphasis>.
+          Currently, they are:</para>
+
+          <itemizedlist>
+            <listitem>
+              <para><literal>nmcli connection show <replaceable>ID</replaceable></literal></para>
+            </listitem>
+
+            <listitem>
+              <para><literal>nmcli device show</literal></para>
+            </listitem>
+          </itemizedlist>
+
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-c</option></arg>
+          <arg choice='plain'><option>--colors</option></arg>
+          <group choice='req'>
+            <arg choice='plain'>yes</arg>
+            <arg choice='plain'>no</arg>
+            <arg choice='plain'>auto</arg>
+          </group>
+        </group></term>
+
+        <listitem>
+          <para>This option controls color output (using terminal escape sequences).
+          <emphasis>yes</emphasis> enables colors, <emphasis>no</emphasis> disables them,
+          <emphasis>auto</emphasis> only produces colors when standard output is directed
+          to a terminal. The default value is <emphasis>auto</emphasis>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-f</option></arg>
+          <arg choice='plain'><option>--fields</option></arg>
+          <group choice='req'>
+            <arg conice='plain' rep='repeat'><replaceable>field</replaceable></arg>
+            <arg choice='plain'>all</arg>
+            <arg choice='plain'>common</arg>
+          </group>
+        </group></term>
+
+        <listitem>
+          <para>This option is used to specify what fields (column names) should be
+          printed. Valid field names differ for specific commands. List available fields
+          by providing an invalid value to the <option>--fields</option> option.
+          <emphasis>all</emphasis> is used to print all valid field values of the
+          command. <emphasis>common</emphasis> is used to print common field values of
+          the command.</para>
+
+          <para>If omitted, default is <emphasis>common</emphasis>. The option is
+          mandatory when <option>--terse</option> is used. In this case, generic values
+          <emphasis>all</emphasis> and <emphasis>common</emphasis> cannot be used.(This
+          is to maintain compatibility when new fields are added in the future).</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-e</option></arg>
+          <arg choice='plain'><option>--escape</option></arg>
+          <group choice='req'>
+            <arg choice='plain'>yes</arg>
+            <arg choice='plain'>no</arg>
+          </group>
+        </group></term>
+
+        <listitem>
+          <para>Whether to escape ':' and '\' characters in terse tabular mode. The
+          escape character is '\'.</para>
+
+          <para>If omitted, default is <emphasis>yes</emphasis>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-n</option></arg>
+          <arg choice='plain'><option>--nocheck</option></arg>
+        </group></term>
+
+        <listitem>
+          <para>This option can be used to force <command>nmcli</command> to skip
+          checking <command>nmcli</command> and <emphasis>NetworkManager</emphasis>
+          version compatibility. Use it with care, because using incompatible versions
+          may produce incorrect results.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-a</option></arg>
+          <arg choice='plain'><option>--ask</option></arg>
+        </group></term>
+
+        <listitem>
+          <para>When using this option <command>nmcli</command> will stop and ask for any
+          missing required arguments, so do not use this option for non-interactive
+          purposes like scripts. This option controls, for example, whether you will be
+          prompted for a password if it is required for connecting to a network.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-s</option></arg>
+          <arg choice='plain'><option>--show-secrets</option></arg>
+        </group></term>
+
+        <listitem>
+          <para>When using this option <command>nmcli</command> will display passwords
+          and secrets that might be present in an output of an operation. This option
+          also influences echoing passwords typed by user as an input.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><arg>
+          <group choice='plain'>
+            <arg choice='plain'><option>-w</option></arg>
+            <arg choice='plain'><option>--wait</option></arg>
+          </group>
+          <arg choice='plain' rep='repeat'><replaceable>seconds</replaceable></arg>
+        </arg></term>
+
+        <listitem>
+          <para>This option sets a timeout period for which <command>nmcli</command> will
+          wait for <emphasis>NetworkManager</emphasis> to finish operations. It is
+          especially useful for commands that may take a longer time to complete, e.g.
+          connection activation.</para>
+
+          <para>Specifying a value of <literal>0</literal> instructs
+          <command>nmcli</command> not to wait but to exit immediately with a status of
+          success. The default value depends on the executed command.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-v</option></arg>
+          <arg choice='plain'><option>--version</option></arg>
+        </group></term>
+
+        <listitem>
+          <para>Show <command>nmcli</command> version.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='plain'>
+          <arg choice='plain'><option>-h</option></arg>
+          <arg choice='plain'><option>--help</option></arg>
+        </group></term>
+
+        <listitem>
+          <para>Print help information.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><group choice='req'>
+          <arg choice='plain'>general</arg>
+          <arg choice='plain'>networking</arg>
+          <arg choice='plain'>radio</arg>
+          <arg choice='plain'>connection</arg>
+          <arg choice='plain'>device</arg>
+          <arg choice='plain'>agent</arg>
+          <arg choice='plain'>monitor</arg>
+        </group></term>
+
+        <listitem>
+
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='general'><title>General Commands</title>
+
+    <cmdsynopsis>
+      <command>nmcli</command> <arg choice='plain'>general</arg>
+      <group choice='req'>
+        <arg choice='plain'>status</arg>
+        <arg choice='plain'>hostname</arg>
+        <arg choice='plain'>permissions</arg>
+        <arg choice='plain'>logging</arg>
+      </group>
+      <arg rep='repeat'><replaceable>ARGUMENTS</replaceable></arg>
+    </cmdsynopsis>
+
+    <para>Use this object to show NetworkManager status and permissions. You can also get
+    and change system hostname, as well as NetworkManager logging level and domains.</para>
+
+    <variablelist>
+
+      <varlistentry>
+        <term><arg choice='plain'>status</arg></term>
+
+        <listitem>
+          <para>Show overall status of NetworkManager. This is the default action, when
+          no additional command is provided for <emphasis>general</emphasis>
+          object.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>hostname</arg>
+          <arg><replaceable>hostname</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Get and change system hostname. With no arguments, this prints currently
+          configured hostname. When you pass a hostname, it will be handed over to
+          NetworkManager to be set as a new system hostname.</para>
+
+          <para>Note that the term <emphasis>system</emphasis> hostname may also be
+          referred to as <emphasis>persistent</emphasis> or <emphasis>static</emphasis>
+          by other programs or tools. The hostname is stored in /etc/hostname file in
+          most distributions. For example, systemd-hostnamed service uses the term
+          <emphasis>static</emphasis> hostname and it only reads the /etc/hostname file
+          when it starts.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><arg choice='plain'>permissions</arg></term>
+
+        <listitem>
+          <para>Show the permissions a caller has for various authenticated operations
+          that NetworkManager provides, like enable and disable networking, changing
+          Wi-Fi and WWAN state, modifying connections, etc.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>logging</arg>
+          <arg>level <replaceable>level</replaceable></arg>
+          <arg rep='repeat'>domain <replaceable>domains</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Get and change <emphasis>NetworkManager</emphasis> logging level and
+          domains. Without any argument current logging level and domains are shown. In
+          order to change logging state, provide <emphasis>level</emphasis> and, or,
+          <emphasis>domain</emphasis> parameters. See
+          <emphasis>NetworkManager.conf</emphasis> for available level and domain
+          values.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='networking'><title>Networking Control Commands</title>
+
+    <cmdsynopsis>
+      <command>nmcli</command> <arg choice='plain'>networking</arg>
+      <group choice='req'>
+        <arg choice='plain'>on</arg>
+        <arg choice='plain'>off</arg>
+        <arg choice='plain'>connectivity</arg>
+      </group>
+      <arg rep='repeat'><replaceable>ARGUMENTS</replaceable></arg>
+    </cmdsynopsis>
+
+    <para>Use this object to show NetworkManager networking status, or to enable and disable
+    networking. Disabling networking removes the configuration from all devices and
+    changes them to the 'unmanaged' state.</para>
+
+    <variablelist>
+
+      <varlistentry>
+        <term>
+          <group choice='req'>
+            <arg choice='plain'>on</arg>
+            <arg choice='plain'>off</arg>
+          </group>
+        </term>
+
+        <listitem>
+          <para>Get networking-enabled status or enable and disable networking by
+          NetworkManager. All interfaces managed by NetworkManager are deactivated when
+          networking has been disabled.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>connectivity</arg>
+          <arg>check</arg>
+        </term>
+
+        <listitem>
+          <para>Get network connectivity state. The optional <emphasis>check</emphasis>
+          argument tells NetworkManager to re-check the connectivity, else the most
+          recent known connectivity state is displayed without re-checking.</para>
+
+          <para>Possible states are:</para>
+
+          <variablelist>
+            <varlistentry>
+              <term><arg choice='plain'>none</arg></term>
+              <listitem>
+                <para>the host is not connected to any network</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>portal</arg></term>
+              <listitem>
+                <para>the host is behind a captive portal and cannot reach the full Internet</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>limited</arg></term>
+              <listitem>
+                <para>the host is connected to a network, but it has no access to the Internet</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>full</arg></term>
+              <listitem>
+                <para>the host is connected to a network and has full access to the Internet</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>unknown</arg></term>
+              <listitem>
+                <para>the connectivity status cannot be found out</para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+        </listitem>
+      </varlistentry>
+
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='radio'><title>Radio Transmission Control Commands</title>
+
+    <cmdsynopsis>
+      <command>nmcli</command> <arg choice='plain'>radio</arg>
+      <group choice='req'>
+        <arg choice='plain'>all</arg>
+        <arg choice='plain'>wifi</arg>
+        <arg choice='plain'>wwan</arg>
+      </group>
+      <arg rep='repeat'><replaceable>ARGUMENTS</replaceable></arg>
+    </cmdsynopsis>
+
+    <para>Use this object to show radio switches status, or enable and disable
+    the switches.</para>
+
+    <variablelist>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>wifi</arg>
+          <group>
+            <arg choice='plain'>on</arg>
+            <arg choice='plain'>off</arg>
+          </group>
+        </term>
+
+        <listitem>
+          <para>Show or set status of Wi-Fi in NetworkManager. If no arguments are
+          supplied, Wi-Fi status is printed; <emphasis>on</emphasis> enables Wi-Fi;
+          <emphasis>off</emphasis> disables Wi-Fi.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>wwan</arg>
+          <group>
+            <arg choice='plain'>on</arg>
+            <arg choice='plain'>off</arg>
+          </group>
+        </term>
+
+        <listitem>
+          <para>Show or set status of WWAN (mobile broadband) in NetworkManager. If no
+          arguments are supplied, mobile broadband status is printed;
+          <emphasis>on</emphasis> enables mobile broadband, <emphasis>off</emphasis>
+          disables it.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>all</arg>
+          <group>
+            <arg choice='plain'>on</arg>
+            <arg choice='plain'>off</arg>
+          </group>
+        </term>
+
+        <listitem>
+          <para>Show or set all previously mentioned radio switches at the same time.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='monitor'><title>Activity Monitor</title>
+
+    <cmdsynopsis>
+      <command>nmcli</command> <arg choice='plain'>monitor</arg>
+    </cmdsynopsis>
+
+    <para>Use this object to observe NetworkManager activity. Watches for changes
+    in connectivity state, devices or connection profiles.</para>
+
+    <para>See also <emphasis>monitor</emphasis> command of
+    <emphasis>connection</emphasis> or <emphasis>device</emphasis> object to watch
+    for changes in certain objects or object classes.</para>
+  </refsect1>
+
+  <refsect1 id='connection'><title>Connection Management Commands</title>
+
+    <cmdsynopsis>
+      <command>nmcli</command> <arg choice='plain'>connection</arg>
+      <group choice='req'>
+        <arg choice='plain'>show</arg>
+        <arg choice='plain'>up</arg>
+        <arg choice='plain'>down</arg>
+        <arg choice='plain'>add</arg>
+        <arg choice='plain'>edit</arg>
+        <arg choice='plain'>modify</arg>
+        <arg choice='plain'>delete</arg>
+        <arg choice='plain'>monitor</arg>
+        <arg choice='plain'>reload</arg>
+        <arg choice='plain'>load</arg>
+      </group>
+      <arg rep='repeat'><replaceable>ARGUMENTS</replaceable></arg>
+    </cmdsynopsis>
+
+    <para>NetworkManager stores all network configuration as
+    <emphasis>connections</emphasis>, which are collections of data (Layer2
+    details, IP addressing, etc.) that describe how to create or connect to a
+    network. A connection is <emphasis>active</emphasis> when a device uses that
+    connection's configuration to create or connect to a network. There may be
+    multiple connections that apply to a device, but only one of them can be active
+    on that device at any given time. The additional connections can be used to
+    allow quick switching between different networks and configurations.</para>
+
+    <para>Consider a machine which is usually connected to a DHCP-enabled network,
+    but sometimes connected to a testing network which uses static IP addressing.
+    Instead of manually reconfiguring eth0 each time the network is changed, the
+    settings can be saved as two connections which both apply to eth0, one for DHCP
+    (called "default") and one with the static addressing details (called
+    "testing"). When connected to the DHCP-enabled network the user would run
+    "nmcli con up default" , and when connected to the static network the user
+    would run "nmcli con up testing".</para>
+
+    <variablelist>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>show</arg>
+          <arg><option>--active</option></arg>
+        </term>
+
+        <listitem>
+          <para>List in-memory and on-disk connection profiles, some of which may also be
+          active if a device is using that connection profile. Without a parameter, all
+          profiles are listed. When --active option is specified, only the active profiles
+          are shown.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>show</arg>
+          <arg><option>--active</option></arg>
+          <arg><option>--order</option> <replaceable>order</replaceable></arg>
+          <group>
+            <arg choice='plain'>id</arg>
+            <arg choice='plain'>uuid</arg>
+            <arg choice='plain'>path</arg>
+            <arg choice='plain'>apath</arg>
+          </group>
+          <arg rep='repeat' choice='plain'><replaceable>ID</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Show details for specified connections. By default, both static
+          configuration and active connection data are displayed. When --active option is
+          specified, only the active profiles are taken into account. Use global
+          --show-secrets option to display secrets associated with the profile.</para>
+
+          <para>The --order option can be used to get custom ordering of connections. The
+          connections can be ordered by active status, name, type or D-Bus path. If
+          connections are equal according to a sort order category, an additional
+          category can be specified.
+          The default sorting order is equivalent to "--order active:name:path".</para>
+          <!-- XXX GRAM -->
+
+          <para>&lt;order spec&gt; := category:category:...</para>
+
+          <para>category := [+-]active | [+-]name | [+-]type | [+-]path</para>
+
+          <para><emphasis>+</emphasis> or no prefix means sorting in ascending order
+          (alphabetically or in numbers).</para>
+
+          <para><emphasis>-</emphasis> means reverse (descending) order.</para>
+
+          <para>The category names can be abbreviated (e.g. --order -a:na)</para>
+
+          <para><emphasis>id</emphasis>, <emphasis>uuid</emphasis>,
+          <emphasis>path</emphasis> and <emphasis>apath</emphasis> keywords can be used
+          if <emphasis><replaceable>ID</replaceable></emphasis> is ambiguous.</para>
+
+          <para>Optional <replaceable>ID</replaceable>-specifying keywords are:</para>
+
+          <variablelist>
+            <varlistentry>
+              <term><arg choice='plain'>id</arg></term>
+              <listitem>
+                <para>the <replaceable>ID</replaceable> denotes a connection name</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>uuid</arg></term>
+              <listitem>
+                <para>the <replaceable>ID</replaceable> denotes a connection UUID</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>path</arg></term>
+              <listitem>
+                <para>the <replaceable>ID</replaceable> denotes a D-Bus
+                static connection path in the format of
+                /org/freedesktop/NetworkManager/Settings/<replaceable>num</replaceable>
+                or just <replaceable>num</replaceable></para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>apath</arg></term>
+              <listitem>
+                <para>the <replaceable>ID</replaceable> denotes a D-Bus active connection path in the format of
+                /org/freedesktop/NetworkManager/ActiveConnection/<replaceable>num</replaceable> or just
+                <replaceable>num</replaceable></para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+
+          <para>It is possible to filter the output using the global
+          <option>--fields</option> option. Use the following values:</para>
+
+          <variablelist>
+            <varlistentry>
+              <term><arg choice='plain'>profile</arg></term>
+              <listitem>
+                <para>only shows static profile configuration</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>active</arg></term>
+              <listitem>
+                <para>only shows active connection data (when the profile is active)</para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+
+          <para>You can also specify particular fields. For static configuration, use
+          setting and property names as described in
+          <citerefentry><refentrytitle>nm-settings</refentrytitle><manvolnum>5</manvolnum>
+          </citerefentry> manual page. For active data use GENERAL, IP4, DHCP4, IP6,
+          DHCP6, VPN.</para>
+
+          <para>When no command is given to the <emphasis>connection</emphasis> object,
+          the default action is 'nmcli connection show'.</para>
+
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>up</arg>
+          <group>
+            <arg choice='plain'>id</arg>
+            <arg choice='plain'>uuid</arg>
+            <arg choice='plain'>path</arg>
+          </group>
+          <arg rep='repeat' choice='plain'><replaceable>ID</replaceable></arg>
+          <arg>ifname <replaceable>ifname</replaceable></arg>
+          <arg>ap <replaceable>BSSID</replaceable></arg>
+          <arg>passwd-file <replaceable>file</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Activate a connection. The connection is identified by its name, UUID or
+          D-Bus path. If <replaceable>ID</replaceable> is ambiguous, a keyword <emphasis>id</emphasis>,
+          <emphasis>uuid</emphasis> or <emphasis>path</emphasis> can be used. When
+          requiring a particular device to activate the connection on, the
+          <emphasis>ifname</emphasis> option with interface name should be given. If the
+          <replaceable>ID</replaceable> is not given an <emphasis>ifname</emphasis> is required, and
+          NetworkManager will activate the best available connection for the given
+          <emphasis>ifname</emphasis>. In case of a VPN connection, the
+          <emphasis>ifname</emphasis> option specifies the device of the base connection.
+          The <emphasis>ap</emphasis> option specify what particular AP should be used in
+          case of a Wi-Fi connection.</para>
+
+          <para>If '--wait' option is not specified, the default timeout will be 90
+          seconds.</para>
+
+          <para>See <emphasis>connection show</emphasis> above for the description of the
+          <replaceable>ID</replaceable>-specifying keywords.</para>
+
+          <para>Available options are:</para>
+
+          <variablelist>
+            <varlistentry>
+              <term><arg choice='plain'>ifname</arg></term>
+              <listitem>
+                <para>interface that will be used for activation</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>ap</arg></term>
+              <listitem>
+                <para>BSSID of the AP which the command should connect to (for Wi-Fi connections)</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>passwd-file</arg></term>
+              <listitem>
+                <para>some networks may require credentials during activation. You can give
+                these credentials using this option. Each line of the file should contain one
+                password in the form of</para>
+
+                <para><literal>setting_name.property_name:the password</literal></para>
+
+                <para>For example, for WPA Wi-Fi with PSK, the line would be</para>
+
+                <para><literal>802-11-wireless-security.psk:secret12345</literal></para>
+
+                <para>For 802.1X password, the line would be</para>
+
+                <para><literal>802-1x.password:my 1X password</literal></para>
+
+                <para>nmcli also accepts "wifi-sec" and "wifi" strings instead of
+                "802-11-wireless-security". When NetworkManager requires a password and it is
+                not given, nmcli will ask for it when run with --ask. If --ask was not
+                passed, NetworkManager can ask another secret agent that may be running
+                (typically a GUI secret agent, such as nm-applet or gnome-shell).</para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>down</arg>
+          <group>
+            <arg choice='plain'>id</arg>
+            <arg choice='plain'>uuid</arg>
+            <arg choice='plain'>path</arg>
+            <arg choice='plain'>apath</arg>
+          </group>
+          <arg rep='repeat' choice='plain'><replaceable>ID</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Deactivate a connection from a device without preventing the device from
+          further auto-activation. Multiple connections can be passed to the
+          command.</para>
+
+          <para>Be aware that this command deactivates the specified active connection,
+          but the device on which the connection was active, is still ready to connect
+          and will perform auto-activation by looking for a suitable connection that has
+          the 'autoconnect' flag set. This includes the just deactivated connection. So
+          if the connection is set to auto-connect, it will be automatically started on
+          the disconnected device again.</para>
+
+          <para>In most cases you may want to use <emphasis>device disconnect</emphasis>
+          command instead.</para>
+
+          <para>The connection is identified by its name, UUID or D-Bus path. If
+          <replaceable>ID</replaceable> is ambiguous, a keyword <emphasis>id</emphasis>,
+          <emphasis>uuid</emphasis>, <emphasis>path</emphasis> or
+          <emphasis>apath</emphasis> can be used.</para>
+
+          <para> See <emphasis>connection show</emphasis> above for the description of
+          the <replaceable>ID</replaceable>-specifying keywords.</para>
+
+          <para>If '--wait' option is not specified, the default timeout will be 10
+          seconds.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>add</arg>
+          <arg choice='plain'>ifname <replaceable>ifname</replaceable></arg>
+          <arg>con-name <replaceable>name</replaceable></arg>
+          <arg>
+            <arg choice='plain'>autoconnect</arg>
+            <group choice='req'>
+              <arg choice='plain'>yes</arg>
+              <arg choice='plain'>no</arg>
+            </group>
+          </arg>
+          <arg>
+            <arg choice='plain'>save</arg>
+            <group choice='req'>
+              <arg choice='plain'>yes</arg>
+              <arg choice='plain'>no</arg>
+            </group>
+          </arg>
+          <arg>master <replaceable>master</replaceable></arg>
+          <arg>slave-type <replaceable>type</replaceable></arg>
+          <sbr/>
+          <group choice='plain'>
+            <arg choice='plain'>
+              type ethernet
+              <arg>mac <replaceable>addr</replaceable></arg>
+              <arg>cloned-mac <replaceable>addr</replaceable></arg>
+              <arg>mtu <replaceable>mtu</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type wifi
+              <arg choice='plain'>ssid <replaceable>SSID</replaceable></arg>
+              <arg>mac <replaceable>addr</replaceable></arg>
+              <arg>cloned-mac <replaceable>addr</replaceable></arg>
+              <arg>
+                <arg choice='plain'>mode</arg>
+                <group choice='req'>
+                  <arg choice='plain'>infrastructure</arg>
+                  <arg choice='plain'>ap</arg>
+                  <arg choice='plain'>adhoc</arg>
+                </group>
+              </arg>
+              <arg>mtu <replaceable>mtu</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type wimax
+              <arg>mac <replaceable>addr</replaceable></arg>
+              <arg>nsp <replaceable>nsp</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type pppoe
+              <arg req='plain'>username <replaceable>user</replaceable></arg>
+              <arg>password <replaceable>passwd</replaceable></arg>
+              <arg>service <replaceable>name</replaceable></arg>
+              <arg>mtu <replaceable>mtu</replaceable></arg>
+              <arg>mac <replaceable>addr</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type gsm
+              <arg req='plain'>apn <replaceable>APN</replaceable></arg>
+              <arg>username <replaceable>user</replaceable></arg>
+              <arg>password <replaceable>passwd</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type cdma
+              <arg>username <replaceable>user</replaceable></arg>
+              <arg>password <replaceable>passwd</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type infiniband
+              <arg>mac <replaceable>addr</replaceable></arg>
+              <arg>mtu <replaceable>mtu</replaceable></arg>
+              <arg>
+                <arg choice='plain'>transport-modemode</arg>
+                <group choice='req'>
+                  <arg choice='plain'>datagram</arg>
+                  <arg choice='plain'>connected</arg>
+                </group>
+              </arg>
+              <arg>parent <replaceable>device</replaceable></arg>
+              <arg>p-key <replaceable>key</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type bluetooth
+              <arg>addr <replaceable>addr</replaceable></arg>
+              <arg>
+                <arg choice='plain'>bt-type</arg>
+                <group choice='req'>
+                  <arg choice='plain'>panu</arg>
+                  <arg choice='plain'>dun-gsm</arg>
+                  <arg choice='plain'>dun-cdma</arg>
+                </group>
+              </arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type vlan
+              <arg choice='plain'>dev <replaceable>device</replaceable></arg>
+              <arg choice='plain'>id <replaceable>id</replaceable></arg>
+              <arg>flags <replaceable>flags</replaceable></arg>
+              <arg>ingress <replaceable>mapping</replaceable></arg>
+              <arg>egress <replaceable>mapping</replaceable></arg>
+              <arg>mtu <replaceable>mtu</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type bond
+              <arg>
+                <arg choice='plain'>mode</arg>
+                <group choice='req'>
+                  <arg choice='plain'>active-backup</arg>
+                  <arg choice='plain'>balance-xor</arg>
+                  <arg choice='plain'>broadcast</arg>
+                  <arg choice='plain'>802.3ad</arg>
+                  <arg choice='plain'>balance-tlb</arg>
+                  <arg choice='plain'>balance-alb</arg>
+                  <arg choice='plain'><replaceable>num</replaceable></arg>
+                </group>
+              </arg>
+              <arg>primary <replaceable>ifname</replaceable></arg>
+              <arg>miimon <replaceable>num</replaceable></arg>
+              <arg>downdelay <replaceable>num</replaceable></arg>
+              <arg>updelay <replaceable>num</replaceable></arg>
+              <arg>arp-interval <replaceable>num</replaceable></arg>
+              <arg>arp-ip-target <replaceable>num</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type bond-slave
+              <arg>master <replaceable>master</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type team
+              <arg>
+                <arg choice='plain'>config</arg>
+                <group choice='req'>
+                  <arg choice='plain'>file</arg>
+                  <arg choice='plain'><replaceable>JSON</replaceable></arg>
+                </group>
+              </arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type team-slave
+              <arg>
+                <arg choice='plain'>config</arg>
+                <arg choice='plain'><replaceable>JSON</replaceable></arg>
+              </arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type bridge
+              <arg>
+                <arg choice='plain'>stp</arg>
+                <group choice='req'>
+                  <arg choice='plain'>yes</arg>
+                  <arg choice='plain'>no</arg>
+                </group>
+              </arg>
+              <arg>priority <replaceable>num</replaceable></arg>
+              <arg>forward-delay <replaceable>2-30</replaceable></arg>
+              <arg>hello-time <replaceable>1-10</replaceable></arg>
+              <arg>max-age <replaceable>6-42</replaceable></arg>
+              <arg>ageing-time <replaceable>0-1000000</replaceable></arg>
+              <arg>
+                <arg choice='plain'>multicast-snooping</arg>
+                <group choice='req'>
+                  <arg choice='plain'>yes</arg>
+                  <arg choice='plain'>no</arg>
+                </group>
+              </arg>
+              <arg>mac <replaceable>addr</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type vpn
+              <arg>type <replaceable>type</replaceable></arg>
+              <arg>user <replaceable>username</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type olpc-mesh
+              <arg choice='plain'>ssid <replaceable>SSID</replaceable></arg>
+              <arg>channel <replaceable>1-13</replaceable></arg>
+              <arg>dhcp-anycast <replaceable>MAC</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type adsl
+              <arg choice='plain'>username <replaceable>username</replaceable></arg>
+              <arg choice='plain'>
+                <arg choice='plain'>protocol</arg>
+                <group choice='req'>
+                  <arg choice='plain'>pppoa</arg>
+                  <arg choice='plain'>pppoe</arg>
+                  <arg choice='plain'>ipoatm</arg>
+                </group>
+              </arg>
+              <arg>password <replaceable>passwd</replaceable></arg>
+              <arg>
+                <arg choice='plain'>encapsulation</arg>
+                <group choice='req'>
+                  <arg choice='plain'>vcmux</arg>
+                  <arg choice='plain'>llc</arg>
+                </group>
+              </arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type tun
+              <arg choice='plain'>
+                <arg choice='plain'>mode</arg>
+                <group choice='req'>
+                  <arg choice='plain'>tun</arg>
+                  <arg choice='plain'>tap</arg>
+                </group>
+              </arg>
+              <arg>owner <replaceable>UID</replaceable></arg>
+              <arg>group <replaceable>GID</replaceable></arg>
+              <arg>
+                <arg choice='plain'>pi</arg>
+                <group choice='req'>
+                  <arg choice='plain'>yes</arg>
+                  <arg choice='plain'>no</arg>
+                </group>
+              </arg>
+              <arg>
+                <arg choice='plain'>vnet-hdr</arg>
+                <group choice='req'>
+                  <arg choice='plain'>yes</arg>
+                  <arg choice='plain'>no</arg>
+                </group>
+              </arg>
+              <arg>
+                <arg choice='plain'>multi-queue</arg>
+                <group choice='req'>
+                  <arg choice='plain'>yes</arg>
+                  <arg choice='plain'>no</arg>
+                </group>
+              </arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type ip-tunnel
+              <arg choice='plain'>
+                <arg choice='plain'>mode</arg>
+                <group choice='req'>
+                  <arg choice='plain'>ipip</arg>
+                  <arg choice='plain'>gre</arg>
+                  <arg choice='plain'>sit</arg>
+                  <arg choice='plain'>isatap</arg>
+                  <arg choice='plain'>vti</arg>
+                  <arg choice='plain'>ip6ip6</arg>
+                  <arg choice='plain'>ipip6</arg>
+                  <arg choice='plain'>ip6gre</arg>
+                  <arg choice='plain'>vti6</arg>
+                  <arg choice='plain'>tun</arg>
+                </group>
+              </arg>
+              <arg choice='plain'>remote <replaceable>addr</replaceable></arg>
+              <arg>local <replaceable>addr</replaceable></arg>
+              <arg>dev <replaceable>device</replaceable></arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type macvlan
+              <arg choice='plain'>dev <replaceable>device</replaceable></arg>
+              <arg choice='plain'>
+                <arg choice='plain'>mode</arg>
+                <group choice='req'>
+                  <arg choice='plain'>vepa</arg>
+                  <arg choice='plain'>bridge</arg>
+                  <arg choice='plain'>private</arg>
+                  <arg choice='plain'>passthru</arg>
+                  <arg choice='plain'>source</arg>
+                </group>
+              </arg>
+              <arg>
+                <arg choice='plain'>tap</arg>
+                <group choice='req'>
+                  <arg choice='plain'>yes</arg>
+                  <arg choice='plain'>no</arg>
+                </group>
+              </arg>
+            </arg>
+            <sbr/>
+            <arg choice='plain'>
+              type vxlan
+              <arg choice='plain'>id <replaceable>id</replaceable></arg>
+              <arg choice='plain'>remote <replaceable>addr</replaceable></arg>
+              <arg>dev <replaceable>parent device (ifname or connection UUID)</replaceable></arg>
+              <arg>local <replaceable>addr</replaceable></arg>
+              <arg>source-port-min <replaceable>0-65535</replaceable></arg>
+              <arg>source-port-max <replaceable>0-65535</replaceable></arg>
+              <arg>destination-port <replaceable>0-65535</replaceable></arg>
+            </arg>
+          </group>
+
+          <sbr/>
+          <arg>ip4 <replaceable>addr</replaceable></arg>
+          <arg>gw4 <replaceable>addr</replaceable></arg>
+          <arg>ip6 <replaceable>addr</replaceable></arg>
+          <arg>gw6 <replaceable>addr</replaceable></arg>
+          <arg>
+            <option>--</option>
+            <arg choice='plain' rep='repeat'>
+              [+|-]<replaceable>setting</replaceable>.<replaceable>property</replaceable>
+              <replaceable>value</replaceable>
+            </arg>
+          </arg>
+        </term>
+
+        <listitem>
+          <para>Add a connection for NetworkManager. Arguments differ according to connection types, see below.</para>
+
+          <variablelist>
+
+            <varlistentry>
+              <term><arg choice='plain'>ifname</arg></term>
+              <listitem>
+                <para>interface to bind the connection to. The connection will only be
+                applicable to this interface name. A special value of "<emphasis>*</emphasis>"
+                can be used for interface-independent connections. The
+                <emphasis>ifname</emphasis> argument is mandatory for all connection types
+                except bond, team, bridge and vlan. Note: use quotes around
+                <emphasis>*</emphasis> to suppress shell expansion.</para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>con-name</arg></term>
+              <listitem>
+                <para>connection name (when not provided a default name is generated:
+                &lt;type&gt;[-&lt;ifname&gt;][-&lt;num&gt;])</para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>autoconnect</arg></term>
+              <listitem>
+                <para>whether the connection profile can be automatically activated (default:
+                yes)</para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>save</arg></term>
+              <listitem>
+                <para>whether the connection should be persistent, i.e. NetworkManager should
+                store it on disk (default: yes)</para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>master</arg></term>
+              <listitem>
+                <para>master interface name, or connection UUID or ID of master connection
+                profile. The value can be prefixed with <emphasis>ifname/</emphasis>,
+                <emphasis>uuid/</emphasis> or <emphasis>id/</emphasis> to disambiguate it. See
+                below <emphasis>SLAVE_OPTIONS</emphasis> for additional options for slave
+                connection to masters of various types.</para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>slave-type</arg></term>
+              <listitem>
+                <para>type of master connection. Only required when it can not be inferred
+                (i.e. the master connection does
+                not exist yet).</para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type</arg></term>
+              <listitem>
+                <para>connection type; see below <emphasis>TYPE_SPECIFIC_OPTIONS</emphasis> for
+                allowed values; (mandatory) Note that types <emphasis>bond-slave</emphasis>,
+                <emphasis>team-slave</emphasis> and <emphasis>bridge-slave</emphasis> create
+                <emphasis>ethernet</emphasis> connection profiles. Their use is discouraged in
+                favor of using a specific type with <emphasis>master</emphasis> option.</para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type ethernet</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>mac</arg></term>
+                    <listitem>
+                      <para>MAC address of the device this connection is
+                      locked to</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>cloned-mac</arg></term>
+                    <listitem>
+                      <para>cloned MAC</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mtu</arg></term>
+                    <listitem>
+                      <para>MTU</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type wifi</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>ssid</arg></term>
+                    <listitem>
+                      <para>SSID</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mac</arg></term>
+                    <listitem>
+                      <para>MAC address of the device this connection is
+                      locked to</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>cloned-mac</arg></term>
+                    <listitem>
+                      <para>cloned MAC</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mode</arg></term>
+                    <listitem>
+                      <para>Wi-Fi network mode. If blank,
+                      <emphasis>infrastructure</emphasis>is assumed.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mtu</arg></term>
+                    <listitem>
+                      <para>MTU</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type wimax</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>mac</arg></term>
+                    <listitem>
+                      <para>MAC address of the device this connection is
+                      locked to</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>nsp</arg></term>
+                    <listitem>
+                      <para>Network Service Provider name</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type pppoe</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>username</arg></term>
+                    <listitem>
+                      <para>PPPoE username</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>password</arg></term>
+                    <listitem>
+                      <para>Password for the PPPoE username</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>service</arg></term>
+                    <listitem>
+                      <para>PPPoE service name (if required by
+                      concentrator)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mtu</arg></term>
+                    <listitem>
+                      <para>MTU</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mac</arg></term>
+                    <listitem>
+                      <para>MAC address of the device this connection is
+                      locked to</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type gsm</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>apn</arg></term>
+                    <listitem>
+                      <para>APN - GSM Access Point Name</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>user</arg></term>
+                    <listitem>
+                      <para>user name</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>password</arg></term>
+                    <listitem>
+                      <para>password</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type cdma</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>user</arg></term>
+                    <listitem>
+                      <para>user name</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>password</arg></term>
+                    <listitem>
+                      <para>password</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type infiniband</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>mac</arg></term>
+                    <listitem>
+                      <para>MAC address of the device this connection is
+                      locked to (InfiniBand MAC is 20 bytes)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mtu</arg></term>
+                    <listitem>
+                      <para>MTU</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>transport-mode</arg></term>
+                    <listitem>
+                      <para>InfiniBand transport mode</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>parent</arg></term>
+                    <listitem>
+                      <para>the interface name of the parent device (if any)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>p-key</arg></term>
+                    <listitem>
+                      <para>the InfiniBand P_Key (16-bit unsigned integer)</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type bluetooth</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>addr</arg></term>
+                    <listitem>
+                      <para>Bluetooth device address (MAC)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>bt-type</arg></term>
+                    <listitem>
+                      <para>Bluetooth connection type</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type vlan</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>dev</arg></term>
+                    <listitem>
+                      <para>parent device this VLAN is on</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>id</arg></term>
+                    <listitem>
+                      <para>VLAN ID in range 0-4095</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>flags</arg></term>
+                    <listitem>
+                      <para>flags</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>ingress</arg></term>
+                    <listitem>
+                      <para>VLAN ingress priority mapping</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>egress</arg></term>
+                    <listitem>
+                      <para>VLAN egress priority mapping</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mtu</arg></term>
+                    <listitem>
+                      <para>MTU</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type bond</arg></term>
+              <listitem>
+                <variablelist>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mode</arg></term>
+                    <listitem>
+                      <para>bonding mode (default: balance-rr)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>primary</arg></term>
+                    <listitem>
+                      <para>primary interface name (for "active-backup" mode)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>miimon</arg></term>
+                    <listitem>
+                      <para>miimon (default: 100)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>downdelay</arg></term>
+                    <listitem>
+                      <para>downdelay (default: 0)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>updelay</arg></term>
+                    <listitem>
+                      <para>updelay (default: 0)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>arp-interval</arg></term>
+                    <listitem>
+                      <para>ARP interval (default: 0)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>arp-ip-target</arg></term>
+                    <listitem>
+                      <para>ARP IP target</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type bond-slave</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>master</arg></term>
+                    <listitem>
+                      <para>master bond interface name, or connection UUID or
+                      ID of bond master connection profile. The value can be
+                      prefixed with <emphasis>ifname</emphasis>,
+                      <emphasis>uuid</emphasis> or <emphasis>id</emphasis> to
+                      disambiguate it.</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type team</arg></term>
+              <listitem>
+                <variablelist>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>config</arg></term>
+                    <listitem>
+                      <para>JSON configuration for team</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type team-slave</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>master</arg></term>
+                    <listitem>
+                      <para>master team interface name, or connection UUID or
+                      ID of team master connection profile. The value can be
+                      prefixed with <emphasis>ifname</emphasis>,
+                      <emphasis>uuid</emphasis> or <emphasis>id</emphasis>to
+                      disambiguate it.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>config</arg></term>
+                    <listitem>
+                      <para>JSON configuration for team</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type bridge</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>stp</arg></term>
+                    <listitem>
+                      <para>controls whether Spanning Tree Protocol (STP) is
+                      enabled for this bridge (default: yes)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>priority</arg></term>
+                    <listitem>
+                      <para>sets STP priority (default: 128)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>forward-delay</arg></term>
+                    <listitem>
+                      <para>STP forwarding delay, in seconds (default:
+                      15)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>hello-time</arg></term>
+                    <listitem>
+                      <para>STP hello time, in seconds (default: 2)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>max-age</arg></term>
+                    <listitem>
+                      <para>STP maximum message age, in seconds (default:
+                      20)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>ageing-time</arg></term>
+                    <listitem>
+                      <para>the Ethernet MAC address aging time, in seconds
+                      (default: 300)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>multicast-snooping</arg></term>
+                    <listitem>
+                      <para>controls whether IGMP snooping is enabled
+                      (default: yes)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mac</arg></term>
+                    <listitem>
+                      <para>MAC address of the bridge (note: this requires a
+                      recent kernel feature, originally introduced in 3.15
+                      upstream kernel)</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type bridge-slave</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>master</arg></term>
+                    <listitem>
+                      <para>master bridge interface name, or connection UUID
+                      or ID of bridge master connection profile. The value
+                      can be prefixed with <emphasis>ifname</emphasis>,
+                      <emphasis>uuid</emphasis> or <emphasis>id</emphasis>
+                      to disambiguate it.</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>priority</arg></term>
+                    <listitem>
+                      <para>STP priority of this slave (default: 32)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>path-cost</arg></term>
+                    <listitem>
+                      <para>STP port cost for destinations via this slave (default: 100)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>hairpin</arg></term>
+                    <listitem>
+                       <para>'hairpin mode' for the slave, which allows frames to be sent back out
+                       through the slave the frame was received on (default: yes)</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type vpn</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>vpn-type</arg></term>
+                    <listitem>
+                      <para>VPN type</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>
+                      <emphasis>user</emphasis>
+                    </term>
+                    <listitem>
+                      <para>VPN username</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type olpc-mesh</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>ssid</arg></term>
+                    <listitem>
+                      <para>SSID</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>channel</arg></term>
+                    <listitem>
+                      <para>channel to use for the network</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>dhcp-anycast</arg></term>
+                    <listitem>
+                      <para>anycast DHCP MAC address used when requesting an
+                      IP address via DHCP</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type adsl</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>username</arg></term>
+                    <listitem>
+                      <para>ADSL user name</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>protocol</arg></term>
+                    <listitem>
+                      <para>ADSL protocol</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>password</arg></term>
+                    <listitem>
+                      <para>ADSL password</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>encapsulation</arg></term>
+                    <listitem>
+                      <para>ADSL encapsulation</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type tun</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>mode</arg></term>
+                    <listitem>
+                      <para>Mode for the device</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>owner</arg></term>
+                    <listitem>
+                      <para>UID of the owner</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>group</arg></term>
+                    <listitem>
+                      <para>GID of the group</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>pi</arg></term>
+                    <listitem>
+                      <para>include packet information (~IFF_NO_PI flag)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>vnet-hdr</arg></term>
+                    <listitem>
+                      <para>send and receive large (i.e. GSO) packets and
+                      packets with partial checksums (IFF_VNET_HDR
+                      flag)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>multi-queue</arg></term>
+                    <listitem>
+                      <para>multi-queue support for tun/tap device (IFF_MULTI_QUEUE flag)</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type ip-tunnel</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>mode</arg></term>
+                    <listitem>
+                      <para>tunnel mode</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>remote</arg></term>
+                    <listitem>
+                      <para>IPv4 or IPv6 address of the remote tunnel endpoint</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>local</arg></term>
+                    <listitem>
+                      <para>IPv4 or IPv6 address of the local tunnel endpoint</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>dev</arg></term>
+                    <listitem>
+                      <para>device to use for tunnel endpoint communication</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type macvlan</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>dev</arg></term>
+                    <listitem>
+                      <para>parent device this MACVLAN is on</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>mode</arg></term>
+                    <listitem>
+                      <para>MACVLAN mode, which specifies the communication
+                      mechanism between multiple MACVLANs on the same lower
+                      device</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>tap</arg></term>
+                    <listitem>
+                      <para>controls the device type. If set to 'yes' a
+                      MACVTAP will be created (default: no)</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>type vxlan</arg></term>
+              <listitem>
+                <variablelist>
+                  <varlistentry>
+                    <term><arg choice='plain'>id</arg></term>
+                    <listitem>
+                      <para>VXLAN Network Identifer to use</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>remote</arg></term>
+                    <listitem>
+                      <para>unicast destination IP address or multicast IP
+                      address to join</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>dev</arg></term>
+                    <listitem>
+                      <para>device to use for tunnel endpoint
+                      communication</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>local</arg></term>
+                    <listitem>
+                      <para>source IP address</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>source-port-min</arg></term>
+                    <listitem>
+                      <para>minimum UDP source port to communicate to the
+                      remote VXLAN tunnel endpoint</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>source-port-max</arg></term>
+                    <listitem>
+                      <para>maximum UDP source port to communicate to the
+                      remote VXLAN tunnel endpoint</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term><arg choice='plain'>destination-port</arg></term>
+                    <listitem>
+                      <para>UDP destination port to communicate to the remote
+                      VXLAN tunnel endpoint</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>ip4</arg></term>
+              <term><arg choice='plain'>gw4</arg></term>
+              <listitem>
+                <para>IPv4 addresses</para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><arg choice='plain'>ip6</arg></term>
+              <term><arg choice='plain'>gw6</arg></term>
+              <listitem>
+                <para>IPv6 addresses</para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term><option>--</option></term>
+              <listitem>
+                <para>If a <option>--</option> argument is encountered, the rest of command
+                line is interpreted as property list in the same format as <emphasis>connection
+                modify</emphasis> command accepts.  This makes it possible to adjust the
+                connection properties before it's added.</para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>edit</arg>
+          <group choice='req'>
+            <arg choice='plain'>
+              <group>
+                <arg choice='plain'>id</arg>
+                <arg choice='plain'>uuid</arg>
+                <arg choice='plain'>path</arg>
+              </group>
+              <arg rep='repeat' choice='plain'><replaceable>ID</replaceable></arg>
+            </arg>
+            <arg choice='plain'>
+              <arg>type <replaceable>type</replaceable></arg>
+              <arg>con-name <replaceable>name</replaceable></arg>
+            </arg>
+          </group>
+        </term>
+
+        <listitem>
+          <para>Edit an existing connection or add a new one, using an interactive editor.</para>
+
+          <para>The existing connection is identified by its name, UUID or D-Bus path. If
+          <replaceable>ID</replaceable> is ambiguous, a keyword <emphasis>id</emphasis>,
+          <emphasis>uuid</emphasis>, or <emphasis>path</emphasis> can be used. See
+          <emphasis>connection show</emphasis> above for the description of the
+          <replaceable>ID</replaceable>-specifying keywords. Not providing an
+          <replaceable>ID</replaceable> means that a new connection will be added.</para>
+
+          <para>The interactive editor will guide you through the connection editing and
+          allow you to change connection parameters according to your needs by means of
+          a simple menu-driven interface. The editor indicates what settings and
+          properties can be modified and provides in-line help.</para>
+
+          <para>Available options:</para>
+
+          <variablelist>
+            <varlistentry>
+              <term><arg choice='plain'>type</arg></term>
+              <listitem>
+                  <para>type of the new connection; valid types are the same as for
+                  <emphasis>connection add</emphasis> command</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>con-name</arg></term>
+              <listitem>
+                  <para>name for the new connection. It can be changed later in the editor.</para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+
+          <para>See also
+          <citerefentry><refentrytitle>nm-settings</refentrytitle><manvolnum>5</manvolnum>
+          </citerefentry> for all NetworkManager settings and property names, and their
+          descriptions; and
+          <citerefentry><refentrytitle>nmcli-examples</refentrytitle><manvolnum>5</manvolnum></citerefentry>
+          for sample editor sessions.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>modify</arg>
+          <arg><option>--temporary</option></arg>
+          <group>
+            <arg choice='plain'>id</arg>
+            <arg choice='plain'>uuid</arg>
+            <arg choice='plain'>path</arg>
+          </group>
+          <arg choice='plain'><replaceable>ID</replaceable></arg>
+          <arg choice='plain' rep='repeat'>
+            [+|-]<replaceable>setting</replaceable>.<replaceable>property</replaceable>
+            <replaceable>value</replaceable>
+          </arg>
+        </term>
+
+        <listitem>
+          <para>Modify one or more properties in the connection profile.</para>
+
+          <para>The connection is identified by its name, UUID or D-Bus path. If
+          <replaceable>ID</replaceable> is ambiguous, a keyword <emphasis>id</emphasis>,
+          <emphasis>uuid</emphasis> or <emphasis>path</emphasis> can be used. See
+          <citerefentry><refentrytitle>nm-settings</refentrytitle><manvolnum>5</manvolnum>
+          </citerefentry> for setting and property names, their descriptions and default
+          values. This command supports abbreviations for <emphasis>setting
+          name</emphasis> and <emphasis>property name</emphasis> provided they are
+          unique. Empty <emphasis>value</emphasis> ("") removes the property value (sets
+          the property to the default value). The provided value overwrites the existing
+          property value.</para>
+
+          <para>If you want to append an item to the existing value, use
+          <emphasis>+</emphasis> prefix for the property name. If you want to remove just
+          one item from container-type property, use <emphasis>-</emphasis> prefix for
+          the property name and specify a value or an zero-based index of the item to
+          remove (or option name for properties with named options) as
+          <emphasis>value</emphasis>. Of course, <emphasis>+|-</emphasis> only have a
+          real effect for multi-value (container) properties like ipv4.dns,
+          ipv4.addresses, bond.options, etc.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>clone</arg>
+          <arg><option>--temporary</option></arg>
+          <group>
+            <arg choice='plain'>id</arg>
+            <arg choice='plain'>uuid</arg>
+            <arg choice='plain'>path</arg>
+          </group>
+          <arg choice='plain' rep='repeat'><replaceable>ID</replaceable></arg>
+          <arg choice='plain'>new <replaceable>name</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Clone a connection. The connection to be cloned is identified by its
+          name, UUID or D-Bus path. If <replaceable>ID</replaceable> is ambiguous, a keyword
+          <emphasis>id</emphasis>, <emphasis>uuid</emphasis> or <emphasis>path</emphasis>
+          can be used. See <emphasis>connection show</emphasis> above for the description
+          of the <replaceable>ID</replaceable>-specifying keywords. <replaceable>name</replaceable> is
+          the name of the new cloned connection. The new connection will be the exact
+          copy except the connection.id (<replaceable>name</replaceable>) and
+          connection.uuid (generated) properties.</para>
+
+          <para>The new connection profile will be saved as persistent unless
+          <option>--temporary</option> option is specified, in which case the new profile
+          won't exist after NetworkManager restart.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>delete</arg>
+          <group>
+            <arg choice='plain'>id</arg>
+            <arg choice='plain'>uuid</arg>
+            <arg choice='plain'>path</arg>
+          </group>
+          <arg choice='plain' rep='repeat'><replaceable>ID</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Delete a configured connection. The connection to be deleted is
+          identified by its name, UUID or D-Bus path. If <replaceable>ID</replaceable> is ambiguous, a
+          keyword <emphasis>id</emphasis>, <emphasis>uuid</emphasis> or
+          <emphasis>path</emphasis> can be used.</para>
+
+          <para>See <emphasis>connection show</emphasis> above for the description of
+          the <replaceable>ID</replaceable>-specifying keywords.</para>
+
+          <para>If '--wait' option is not specified, the default timeout will be 10
+          seconds.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>monitor</arg>
+          <group>
+            <arg choice='plain'>id</arg>
+            <arg choice='plain'>uuid</arg>
+            <arg choice='plain'>path</arg>
+          </group>
+          <arg choice='plain' rep='repeat'><replaceable>ID</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Monitor connection profile activity. This command prints a line whenever
+          the specified connection changes. The connection to be monitored is identified
+          by its name, UUID or D-Bus path. If <replaceable>ID</replaceable> is ambiguous, a keyword
+          <emphasis>id</emphasis>, <emphasis>uuid</emphasis> or <emphasis>path</emphasis>
+          can be used.</para>
+
+          <para>See <emphasis>connection show</emphasis> above for the description of the
+          <replaceable>ID</replaceable>-specifying keywords.</para>
+
+          <para>Monitors all connection profiles in case none is specified. The command
+          terminates when all monitored connections disappear. If you want to monitor
+          connection creation consider using the global monitor with <emphasis>nmcli
+          monitor</emphasis> command.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>reload</arg>
+        </term>
+
+        <listitem>
+          <para>Reload all connection files from disk.
+          <emphasis>NetworkManager</emphasis> does not monitor changes to connection
+          files by default. So you need to use this command in order to tell
+          <emphasis>NetworkManager</emphasis> to re-read the connection profiles from
+          disk when a change was made to them. However, the auto-loading feature can be
+          enabled and then <emphasis>NetworkManager</emphasis> will reload connection
+          files any time they change (monitor-connection-files=true in
+          <citerefentry><refentrytitle>NetworkManager.conf</refentrytitle><manvolnum>5</manvolnum></citerefentry>).
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>load</arg>
+          <arg choice='plain' rep='repeat'><replaceable>filename</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Load/reload one or more connection files from disk. Use this after
+          manually editing a connection file to ensure that
+          <emphasis>NetworkManager</emphasis> is aware of its latest state.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>import</arg>
+          <arg><option>--temporary</option></arg>
+          <arg choice='plain'>type <replaceable>type</replaceable></arg>
+          <arg choice='plain'>file <replaceable>file</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Import an external/foreign configuration as a NetworkManager connection
+          profile. The type of the input file is specified by <emphasis>type</emphasis>
+          option.</para>
+
+          <para>Only VPN configurations are supported at the moment. The configuration is
+          imported by NetworkManager VPN plugins. <emphasis>type</emphasis> values are
+          the same as for <emphasis>vpn-type</emphasis> option in <emphasis>nmcli
+          connection add</emphasis>. VPN configurations are imported by VPN plugins.
+          Therefore the proper VPN plugin has to be installed so that nmcli could import
+          the data.</para>
+
+          <para>The imported connection profile will be saved as persistent unless
+          <option>--temporary</option> option is specified, in which case the new profile
+          won't exist after NetworkManager restart.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>export</arg>
+          <group>
+            <arg choice='plain'>id</arg>
+            <arg choice='plain'>uuid</arg>
+            <arg choice='plain'>path</arg>
+          </group>
+          <arg choice='plain'><replaceable>ID</replaceable></arg>
+          <arg><replaceable>file</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Export a connection.</para>
+
+          <para>Only VPN connections are supported at the moment. A proper VPN plugin has
+          to be installed so that nmcli could export a connection. If no
+          <replaceable>file</replaceable> is provided, the VPN configuration
+          data will be printed to standard output.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='device'><title>Device Management Commands</title>
+
+    <cmdsynopsis>
+      <command>nmcli</command> <arg choice='plain'>device</arg>
+      <group choice='req'>
+        <arg choice='plain'>status</arg>
+        <arg choice='plain'>show</arg>
+        <arg choice='plain'>set</arg>
+        <arg choice='plain'>connect</arg>
+        <arg choice='plain'>reapply</arg>
+        <arg choice='plain'>disconnect</arg>
+        <arg choice='plain'>delete</arg>
+        <arg choice='plain'>monitor</arg>
+        <arg choice='plain'>wifi</arg>
+        <arg choice='plain'>lldp</arg>
+      </group>
+      <arg rep='repeat'><replaceable>ARGUMENTS</replaceable></arg>
+    </cmdsynopsis>
+
+    <para>Use this object to show NetworkManager status and permissions. You can also get
+    and change system hostname, as well as NetworkManager logging level and domains.</para>
+
+    <variablelist>
+
+      <varlistentry>
+        <term><arg choice='plain'>status</arg></term>
+
+        <listitem>
+          <para>Print status of devices.</para>
+
+          <para>This is the default action if no command is specified to
+          <emphasis>device</emphasis> object.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>show</arg>
+          <arg><replaceable>ifname</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Show detailed information about devices. Without an argument, all
+          devices are examined. To get information for a specific device, the interface
+          name has to be provided.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>set</arg>
+          <arg>ifname</arg>
+          <arg choice='plain'><replaceable>ifname</replaceable></arg>
+          <arg>
+            <arg choice='plain'>autoconnect</arg>
+            <group choice='req'>
+              <arg choice='plain'>yes</arg>
+              <arg choice='plain'>no</arg>
+            </group>
+          </arg>
+          <arg>
+            <arg choice='plain'>managed</arg>
+            <group choice='req'>
+              <arg choice='plain'>yes</arg>
+              <arg choice='plain'>no</arg>
+            </group>
+          </arg>
+        </term>
+
+        <listitem>
+          <para>Set device properties.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>connect</arg>
+          <arg><replaceable>ifname</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Connect the device. NetworkManager will try to find a suitable connection
+          that will be activated. It will also consider connections that are not set to
+          auto connect.</para>
+
+          <para>If '--wait' option is not specified, the default timeout will be 90
+          seconds.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>reapply</arg>
+          <arg><replaceable>ifname</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Attempt to update device with changes to the currently active connection
+          made since it was last applied.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>disconnect</arg>
+          <arg rep='repeat'><replaceable>ifname</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Disconnect a device and prevent the device from automatically activating
+          further connections without user/manual intervention. Note that disconnecting
+          software devices may mean that the devices will disappear.</para>
+
+          <para>If '--wait' option is not specified, the default timeout will be 10
+          seconds.</para>
+        </listitem>
+      </varlistentry>
+
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>delete</arg>
+          <arg rep='repeat'><replaceable>ifname</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Delete a device. The command removes the interface from the system. Note
+          that this only works for software devices like bonds, bridges, teams, etc.
+          Hardware devices (like Ethernet) cannot be deleted by the command.</para>
+
+          <para>If '--wait' option is not specified, the default timeout will be 10
+          seconds.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>monitor</arg>
+          <arg rep='repeat'><replaceable>ifname</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Monitor device activity. This command prints a line whenever the
+          specified devices change state.</para>
+
+          <para>Monitors all devices in case no interface is specified. The monitor
+          terminates when all specified devices disappear. If you want to monitor device
+          addition consider using the global monitor with <emphasis>nmcli
+          monitor</emphasis> command.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>wifi</arg>
+          <arg>
+            <arg choice='plain'>list</arg>
+            <arg>ifname <replaceable>ifname</replaceable></arg>
+            <arg>bssid <replaceable>BSSID</replaceable></arg>
+          </arg>
+        </term>
+
+        <listitem>
+          <para>List available Wi-Fi access points. The <emphasis>ifname</emphasis> and
+          <emphasis>bssid</emphasis> options can be used to list APs for a particular
+          interface or with a specific BSSID, respectively.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>wifi</arg>
+          <arg choice='plain'>connect</arg>
+          <arg choice='plain'><replaceable>(B)SSID</replaceable></arg>
+          <arg>password <replaceable>password</replaceable></arg>
+          <arg>
+            <arg choice='plain'>wep-key-type</arg>
+            <group choice='req'>
+              <arg choice='plain'>key</arg>
+              <arg choice='plain'>phrase</arg>
+            </group>
+          </arg>
+          <arg>ifname <replaceable>ifname</replaceable></arg>
+          <arg>bssid <replaceable>BSSID</replaceable></arg>
+          <arg>name <replaceable>name</replaceable></arg>
+          <arg>
+            <arg choice='plain'>private</arg>
+            <group choice='req'>
+              <arg choice='plain'>yes</arg>
+              <arg choice='plain'>no</arg>
+            </group>
+          </arg>
+          <arg>
+            <arg choice='plain'>hidden</arg>
+            <group choice='req'>
+              <arg choice='plain'>yes</arg>
+              <arg choice='plain'>no</arg>
+            </group>
+          </arg>
+        </term>
+
+        <listitem>
+          <para>Connect to a Wi-Fi network specified by SSID or BSSID. The command
+          creates a new connection and then activates it on a device. This is a
+          command-line counterpart of clicking an SSID in a GUI client. The command
+          always creates a new connection and thus it is mainly useful for connecting to
+          new Wi-Fi networks. If a connection for the network already exists, it is
+          better to bring up (activate) the existing connection as follows:
+          <emphasis>nmcli con up id <replaceable>name</replaceable></emphasis>. Note that
+          only open, WEP and WPA-PSK networks are supported at the moment. It is also
+          supposed that IP configuration is obtained via DHCP.</para>
+
+          <para>If '--wait' option is not specified, the default timeout will be 90
+          seconds.</para>
+
+          <para>Available options are:</para>
+
+          <variablelist>
+            <varlistentry>
+              <term><arg choice='plain'>password</arg></term>
+              <listitem>
+                <para>password for secured networks (WEP or WPA)</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>wep-key-type</arg></term>
+              <listitem>
+                <para>type of WEP secret, either <emphasis>key</emphasis> for ASCII/HEX key or
+                <emphasis>phrase</emphasis> for passphrase</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>ifname</arg></term>
+              <listitem>
+                <para>interface that will be used for activation</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>bssid</arg></term>
+              <listitem>
+                <para>if specified, the created connection will be restricted just for the
+                BSSID</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>name</arg></term>
+              <listitem>
+                <para>if specified, the connection will use the name (else NM creates a name
+                itself)</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>private</arg></term>
+              <listitem>
+                <para>if set to <emphasis>yes</emphasis>, the connection will only be visible
+                to the user who created it. Otherwise the connection is system-wide, which is
+                the default.</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>hidden</arg></term>
+              <listitem>
+                <para>set to <emphasis>yes</emphasis> when connecting for the first time to an
+                AP not broadcasting its SSID. Otherwise the SSID would not be found and the
+                connection attempt would fail.</para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>wifi</arg>
+          <arg choice='plain'>hotspot</arg>
+          <arg>ifname <replaceable>ifname</replaceable></arg>
+          <arg>con-name <replaceable>name</replaceable></arg>
+          <arg>ssid <replaceable>SSID</replaceable></arg>
+          <arg>
+            <arg choice='plain'>band</arg>
+            <group choice='req'>
+              <arg choice='plain'>a</arg>
+              <arg choice='plain'>bg</arg>
+            </group>
+          </arg>
+          <arg>channel <replaceable>channel</replaceable></arg>
+          <arg>password <replaceable>password</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Create a Wi-Fi hotspot. The command creates a hotspot connection profile
+          according to Wi-Fi device capabilities and activates it on the device. The
+          hotspot is secured with WPA if device/driver supports that, otherwise WEP is
+          used. Use <emphasis>connection down</emphasis> or <emphasis>device
+          disconnect</emphasis> to stop the hotspot.</para>
+
+          <para>Parameters of the hotspot can be influenced by the optional
+          parameters:</para>
+
+          <variablelist>
+            <varlistentry>
+              <term><arg choice='plain'>ifname</arg></term>
+              <listitem>
+                <para>what Wi-Fi device is used</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>con-name</arg></term>
+              <listitem>
+                <para>name of the created hotspot connection profile</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>ssid</arg></term>
+              <listitem>
+                <para>SSID of the hotspot</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>band</arg></term>
+              <listitem>
+                <para>Wi-Fi band to use</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>channel</arg></term>
+              <listitem>
+                <para>Wi-Fi channel to use</para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><arg choice='plain'>password</arg></term>
+              <listitem>
+                <para>password to use for the created hotspot. If not provided, nmcli will
+                generate a password. The password is either WPA pre-shared key or WEP
+                key.</para>
+
+                <para>Note that <option>--show-secrets</option> global option can be used to
+                print the hotspot password. It is useful especially when the password was
+                generated.</para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>wifi</arg>
+          <arg choice='plain'>rescan</arg>
+          <arg>ifname <replaceable>ifname</replaceable></arg>
+          <arg rep='repeat'>ssid <replaceable>SSID</replaceable></arg>
+        </term>
+
+        <listitem>
+          <para>Request that <emphasis>NetworkManager</emphasis> immediately re-scan for
+          available access points. NetworkManager scans Wi-Fi networks periodically, but
+          in some cases it can be useful to start scanning manually (e.g. after resuming
+          the computer). By using <emphasis>ssid</emphasis>, it is possible to scan for a
+          specific SSID, which is useful for APs with hidden SSIDs. You can provide
+          multiple <emphasis>ssid</emphasis> parameters in order to scan more
+          SSIDs.</para>
+
+          <para>This command does not show the APs, use 'nmcli device wifi list' for
+          that.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>lldp</arg>
+          <arg>
+            <arg choice='plain'>list</arg>
+            <arg>ifname <replaceable>ifname</replaceable></arg>
+          </arg>
+        </term>
+
+        <listitem>
+          <para>Display information about neighboring devices learned through the Link
+          Layer Discovery Protocol (LLDP). The <emphasis>ifname</emphasis> option can be
+          used to list neighbors only for a given interface. The protocol must be enabled
+          in the connection settings.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='agent'><title>Secret Agent</title>
+
+    <cmdsynopsis>
+      <command>nmcli</command> <arg choice='plain'>agent</arg>
+      <group choice='req'>
+        <arg choice='plain'>secret</arg>
+        <arg choice='plain'>polkit</arg>
+        <arg choice='plain'>all</arg>
+      </group>
+    </cmdsynopsis>
+
+    <para>Run nmcli as a NetworkManager secret agent, or polkit agent.</para>
+
+    <variablelist>
+
+      <varlistentry>
+        <term><arg choice='plain'>secret</arg></term>
+
+        <listitem>
+          <para>Register nmcli as a NetworkManager secret agent and listen for secret
+          requests. You do usually not need this command, because nmcli can handle
+          secrets when connecting to networks. However, you may find the command useful
+          when you use another tool for activating connections and you do not have a
+          secret agent available (like nm-applet).</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>polkit</arg>
+        </term>
+
+        <listitem>
+          <para>Register nmcli as a polkit agent for the user session and listen for
+          authorization requests. You do not usually need this command, because nmcli can
+          handle polkit actions related to NetworkManager operations (when run with
+          --ask). However, you may find the command useful when you want to run a simple
+          text based polkit agent and you do not have an agent of a desktop environment.
+          Note that running this command makes nmcli handle all polkit requests, not only
+          NetworkManager related ones, because only one polkit agent can run for the
+          session.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <arg choice='plain'>all</arg>
+        </term>
+
+        <listitem>
+          <para>Runs nmcli as both NetworkManager secret and a polkit agent.</para>
+        </listitem>
+      </varlistentry>
+
+    </variablelist>
+
+  </refsect1>
+
+  <refsect1 id='environment_variables'><title>Environment Variables</title>
+
+    <para><command>nmcli</command>'s behavior is affected by the following
+    environment variables.</para>
+
+    <variablelist>
+      <varlistentry>
+        <term><envar>LC_ALL</envar></term>
+        <listitem>
+          <para>If set to a non-empty string value, it overrides the values of all the
+          other internationalization variables.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><envar>LC_MESSAGES</envar></term>
+        <listitem>
+          <para>Determines the locale to be used for internationalized messages.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><envar>LANG</envar></term>
+        <listitem>
+          <para>Provides a default value for the internationalization variables that are
+          unset or null.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>Internationalization notes:</para>
+
+    <para>Be aware that <command>nmcli</command> is localized and that is why the
+    output depends on your environment. This is important to realize especially
+    when you parse the output.</para>
+
+    <para>Call <command>nmcli</command> as <emphasis>LC_ALL=C nmcli</emphasis> to
+    be sure the locale is set to "C" while executing in a script.</para>
+
+    <para><envar>LC_ALL</envar>, <envar>LC_MESSAGES</envar>, <envar>LANG</envar>
+    variables specify the <envar>LC_MESSAGES</envar> locale category (in that
+    order), which determines the language that <command>nmcli</command> uses for
+    messages. The "C" locale is used if none of these variables are set, and this
+    locale uses English messages.</para>
+
+  </refsect1>
+
+  <refsect1 id='exit_status'><title>Exit Status</title>
+
+    <para><command>nmcli</command> exits with status 0 if it succeeds, a value
+    greater than 0 is returned if an error occurs.</para>
+
+    <variablelist spacing='compact' termlength='3'>
+      <varlistentry>
+        <term>0</term>
+        <listitem>
+          <para>Success &ndash; indicates the operation succeeded</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>1</term>
+        <listitem>
+          <para>Unknown or unspecified error</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>2</term>
+        <listitem>
+          <para>Invalid user input, wrong <command>nmcli</command>
+          invocation</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>3</term>
+        <listitem>
+          <para>Timeout expired (see <option>--wait</option> option)</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>4</term>
+        <listitem>
+          <para>Connection activation failed</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>5</term>
+        <listitem>
+          <para>Connection deactivation failed</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>6</term>
+        <listitem>
+          <para>Disconnecting device failed</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>7</term>
+        <listitem>
+          <para>Connection deletion failed</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>8</term>
+        <listitem>
+          <para>NetworkManager is not running</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>9</term>
+        <listitem>
+          <para><command>nmcli</command> and <emphasis>NetworkManager</emphasis>
+          versions mismatch</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>10</term>
+        <listitem>
+          <para>Connection, device, or access point does not exist.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='examples'><title>Examples</title>
+
+    <para>This section presents various examples of nmcli usage. If you want even
+    more, please refer to
+    <citerefentry><refentrytitle>nmcli-examples</refentrytitle><manvolnum>5</manvolnum></citerefentry>
+    manual page.</para>
+
+    <variablelist>
+      <varlistentry>
+        <term><userinput>nmcli -t -f RUNNING general</userinput></term>
+        <listitem>
+          <para>tells you whether NetworkManager is running or not.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli -t -f STATE general</userinput></term>
+        <listitem>
+          <para>shows the overall status of NetworkManager.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli radio wifi off</userinput></term>
+        <listitem>
+          <para>switches Wi-Fi off.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli connection show</userinput></term>
+        <listitem>
+          <para>lists all connections NetworkManager has.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli -p -m multiline -f all con show</userinput></term>
+        <listitem>
+          <para>shows all configured connections in multi-line mode.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli connection show --active</userinput></term>
+        <listitem>
+          <para>lists all currently active connections.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli -f name,autoconnect c s</userinput></term>
+        <listitem>
+          <para>shows all connection profile names and their auto-connect property.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli -p connection show "My default em1"</userinput></term>
+        <listitem>
+          <para>shows details for "My default em1" connection profile.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli --show-secrets connection show "My Home WiFi"</userinput></term>
+        <listitem>
+          <para>shows details for "My Home WiFi" connection profile with all passwords.
+          Without <option>--show-secrets</option> option, secrets would not be
+          displayed.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli -f active connection show "My default em1"</userinput></term>
+        <listitem>
+          <para>shows details for "My default em1" active connection, like IP, DHCP
+          information, etc.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli -f profile con s "My wired connection"</userinput></term>
+        <listitem>
+          <para>shows static configuration details of the connection profile with "My
+          wired connection" name.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli -p con up "My wired connection" ifname eth0</userinput></term>
+        <listitem>
+          <para>activates the connection profile with name "My wired connection" on
+          interface eth0. The -p option makes nmcli show progress of the
+          activation.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli con up 6b028a27-6dc9-4411-9886-e9ad1dd43761 ap 00:3A:98:7C:42:D3</userinput></term>
+        <listitem>
+          <para>connects the Wi-Fi connection with UUID
+          6b028a27-6dc9-4411-9886-e9ad1dd43761 to the AP with BSSID
+          00:3A:98:7C:42:D3.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli device status</userinput></term>
+        <listitem>
+          <para>shows the status for all devices.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli dev disconnect em2</userinput></term>
+        <listitem>
+          <para>disconnects a connection on interface em2 and marks the device as
+          unavailable for auto-connecting. As a result, no connection will automatically
+          be activated on the device until the device's 'autoconnect' is set to TRUE or
+          the user manually activates a connection.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli -f GENERAL,WIFI-PROPERTIES dev show wlan0</userinput></term>
+        <listitem>
+          <para>shows details for wlan0 interface; only GENERAL and WIFI-PROPERTIES
+          sections will be shown.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli -f CONNECTIONS device show wlp3s0</userinput></term>
+        <listitem>
+          <para>shows all available connection profiles for your Wi-Fi interface
+          wlp3s0.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli dev wifi</userinput></term>
+        <listitem>
+          <para>lists available Wi-Fi access points known to NetworkManager.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli dev wifi con "Cafe Hotspot 1" password caffeine name "My cafe"</userinput></term>
+        <listitem>
+          <para>creates a new connection named "My cafe" and then connects it to "Cafe
+          Hotspot 1" SSID using password "caffeine". This is mainly useful when
+          connecting to "Cafe Hotspot 1" for the first time. Next time, it is better to
+          use 'nmcli con up id "My cafe"' so that the
+          existing connection profile can be used and no additional is created.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli -s dev wifi hotspot con-name QuickHotspot</userinput></term>
+        <listitem>
+          <para>creates a hotspot profile and connects it. Prints the hotspot password
+          the user should use to connect to the hotspot from other devices.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli connection add type ethernet autoconnect no ifname eth0</userinput></term>
+        <listitem>
+          <para>non-interactively adds an Ethernet connection tied to eth0 interface with
+          automatic IP configuration (DHCP), and disables the connection's "autoconnect"
+          flag.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli c a ifname Maxipes-fik type vlan dev eth0 id 55</userinput></term>
+        <listitem>
+          <para>non-interactively adds a VLAN connection with ID 55. The connection will
+          use eth0 and the VLAN interface will be named Maxipes-fik.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli c a ifname eth0 type ethernet -- ipv4.method disabled ipv6.method link-local</userinput></term>
+        <listitem>
+          <para>non-interactively adds a connection that will use eth0 Ethernet interface
+          and only have an IPv6 link-local address configured.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli connection edit ethernet-em1-2</userinput></term>
+        <listitem>
+          <para>edits existing "ethernet-em1-2" connection in the interactive
+          editor.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli connection edit type ethernet con-name "yet another Ethernet connection"</userinput></term>
+        <listitem>
+          <para>adds a new Ethernet connection in the interactive editor.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli con mod ethernet-2 connection.autoconnect no</userinput></term>
+        <listitem>
+          <para>modifies 'autoconnect' property in the 'connection' setting of
+          'ethernet-2' connection.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli con mod "Home Wi-Fi" wifi.mtu 1350</userinput></term>
+        <listitem>
+          <para>modifies 'mtu' property in the 'wifi' setting of 'Home Wi-Fi'
+          connection.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli con mod em1-1 ipv4.method manual ipv4.addr "192.168.1.23/24 192.168.1.1, 10.10.1.5/8, 10.0.0.11"</userinput></term>
+        <listitem>
+          <para>sets manual addressing and the addresses in em1-1 profile.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli con modify ABC +ipv4.dns 8.8.8.8</userinput></term>
+        <listitem>
+          <para>appends a Google public DNS server to DNS servers in ABC profile.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli con modify ABC -ipv4.addresses "192.168.100.25/24 192.168.1.1"</userinput></term>
+        <listitem>
+          <para>removes the specified IP address from (static) profile ABC.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli con import type openvpn file ~/Downloads/frootvpn.ovpn</userinput></term>
+        <listitem>
+          <para>imports an OpenVPN configuration to NetworkManager.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><userinput>nmcli con export corp-vpnc /home/joe/corpvpn.conf</userinput></term>
+        <listitem>
+          <para>exports NetworkManager VPN profile corp-vpnc as standard Cisco (vpnc)
+          configuration.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='notes'><title>Notes</title>
+    <para><command>nmcli</command> accepts abbreviations, as long as they are a unique prefix in the set
+    of possible options. As new options get added, these abbreviations are not guaranteed
+    to stay unique. For scripting and long term compatibility it is therefore strongly
+    advised to spell out the full option names.</para>
+  </refsect1>
+
+  <refsect1 id='bugs'><title>Bugs</title>
+    <para>There are probably some bugs. If you find a bug, please report it to
+    https://bugzilla.gnome.org/ &mdash; product <emphasis>NetworkManager</emphasis>.</para>
+  </refsect1>
+
+  <refsect1 id='see_also'><title>See Also</title>
+    <para><citerefentry><refentrytitle>nmcli-examples</refentrytitle><manvolnum>5</manvolnum></citerefentry>,
+    <citerefentry><refentrytitle>nm-online</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+    <citerefentry><refentrytitle>NetworkManager</refentrytitle><manvolnum>8</manvolnum></citerefentry>,
+    <citerefentry><refentrytitle>NetworkManager.conf</refentrytitle><manvolnum>5</manvolnum></citerefentry>,
+    <citerefentry><refentrytitle>nm-settings</refentrytitle><manvolnum>5</manvolnum></citerefentry>,
+    <citerefentry><refentrytitle>nm-applet</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+    <citerefentry><refentrytitle>nm-connection-editor</refentrytitle><manvolnum>1</manvolnum></citerefentry>.</para>
+  </refsect1>
+
+</refentry>
