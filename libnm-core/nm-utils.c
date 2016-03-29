@@ -4101,14 +4101,12 @@ _nm_utils_check_valid_json (const char *str, GError **error)
 
 	json = json_loads (str, 0, &jerror);
 	if (!json) {
-		if (error) {
-			g_set_error (error,
-			             NM_CONNECTION_ERROR,
-			             NM_CONNECTION_ERROR_INVALID_PROPERTY,
-			             "%s at position %d",
-			             jerror.text,
-			             jerror.position);
-		}
+		g_set_error (error,
+		             NM_CONNECTION_ERROR,
+		             NM_CONNECTION_ERROR_INVALID_PROPERTY,
+		             "%s at position %d",
+		             jerror.text,
+		             jerror.position);
 		return FALSE;
 	}
 
