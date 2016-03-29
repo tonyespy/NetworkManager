@@ -32,7 +32,10 @@
 #include <libintl.h>
 #include <gmodule.h>
 #include <sys/stat.h>
+
+#if WITH_JANSSON
 #include <jansson.h>
+#endif
 
 #include "nm-utils-private.h"
 #include "nm-setting-private.h"
@@ -4091,6 +4094,7 @@ const char **nm_utils_enum_get_values (GType type, gint from, gint to)
 	return (const char **) g_ptr_array_free (array, FALSE);
 }
 
+#if WITH_JANSSON
 gboolean
 _nm_utils_check_valid_json (const char *str, GError **error)
 {
@@ -4190,3 +4194,20 @@ out:
 
 	return ret;
 }
+
+#else /* WITH_JANSSON */
+
+gboolean
+_nm_utils_check_valid_json (const char *str, GError **error)
+{
+	return TRUE;
+}
+
+gboolean
+_nm_utils_team_config_equal (const char *conf1,
+                             const char *conf2,
+                             gboolean port_config)
+{
+	return nm_streq (conf1 ?: "", conf2 ?: "");
+}
+#endif

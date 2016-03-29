@@ -4396,10 +4396,19 @@ _json_config_check_valid (const char *conf, gboolean expected)
 static void
 test_nm_utils_check_valid_json (void)
 {
+#if WITH_JANSSON
+	_json_config_check_valid (NULL, FALSE);
 	_json_config_check_valid ("", FALSE);
 	_json_config_check_valid ("{}", TRUE);
 	_json_config_check_valid ("{ \"a\" : 1 }", TRUE);
 	_json_config_check_valid ("{ \"a\" : }", FALSE);
+#else
+	/* Without JSON library everything is considered valid */
+	_json_config_check_valid (NULL, TRUE);
+	_json_config_check_valid ("", TRUE);
+	_json_config_check_valid ("{'%!-a1", TRUE);
+	g_test_assert_expected_messages ();
+#endif
 }
 
 static void
@@ -4414,6 +4423,7 @@ _team_config_equal_check (const char *conf1,
 static void
 test_nm_utils_team_config_equal (void)
 {
+#if WITH_JANSSON
 	_team_config_equal_check ("", "", TRUE, TRUE);
 	_team_config_equal_check ("{}",
 	                          "{ }",
@@ -4467,6 +4477,13 @@ test_nm_utils_team_config_equal (void)
 	                          "{ \"link_watch\" :  { \"name\" : \"arp_ping\"}, \"ports\" : { \"eth1\" : {} } }",
 	                          TRUE,
 	                          TRUE);
+#else
+	/* Without JSON library, strings are compared for equality */
+	_team_config_equal_check ("", "", TRUE, TRUE);
+	_team_config_equal_check ("", " ", TRUE, FALSE);
+	_team_config_equal_check ("{ \"a\": 1 }", "{ \"a\": 1 }", TRUE, TRUE);
+	_team_config_equal_check ("{ \"a\": 1 }", "{ \"a\":   1 }", TRUE, FALSE);
+#endif
 }
 
 /******************************************************************************/
