@@ -445,7 +445,7 @@ rm -f %{buildroot}%{_libdir}/pppd/%{ppp_version}/*.la
 rm -f %{buildroot}%{_libdir}/NetworkManager/*.la
 
 # Ensure the documentation timestamps are constant to avoid multilib conflicts
-find %{buildroot}%{_datadir}/gtk-doc |xargs touch --reference configure.ac
+find %{buildroot}%{_datadir}/gtk-doc -exec touch --reference configure.ac '{}' \+
 
 %if 0%{?__debug_package}
 mkdir -p %{buildroot}%{_prefix}/src/debug/NetworkManager-%{real_version}
