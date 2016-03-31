@@ -4103,6 +4103,14 @@ _nm_utils_check_valid_json (const char *str, GError **error)
 
 	g_return_val_if_fail (!error || !*error, FALSE);
 
+	if (!str) {
+		g_set_error_literal (error,
+		                     NM_CONNECTION_ERROR,
+		                     NM_CONNECTION_ERROR_INVALID_PROPERTY,
+		                     "missing configuration");
+		return FALSE;
+	}
+
 	json = json_loads (str, 0, &jerror);
 	if (!json) {
 		g_set_error (error,
