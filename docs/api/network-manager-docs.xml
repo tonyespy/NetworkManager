@@ -146,6 +146,7 @@
     <title>UNIX Manual Pages</title>
     <xi:include href="xml/NetworkManager.xml"/>
     <xi:include href="xml/NetworkManager.conf.xml"/>
+    <xi:include href="xml/nmcli.xml"/>
     <xi:include href="xml/nmcli-examples.xml"/>
     <xi:include href="xml/nm-settings.xml"><xi:fallback /></xi:include>
     <xi:include href="xml/nm-settings-keyfile.xml"><xi:fallback /></xi:include>
