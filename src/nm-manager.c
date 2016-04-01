@@ -839,20 +839,27 @@ remove_device (NMManager *self,
 	       nm_device_get_iface (device), allow_unmanage, nm_device_get_managed (device, FALSE));
 
 	if (allow_unmanage && nm_device_get_managed (device, FALSE)) {
-		NMActRequest *req = nm_device_get_act_request (device);
 		gboolean unmanage = FALSE;
 
-		/* Leave activated interfaces up when quitting so their configuration
+		/* Leave NM-activated connections, assumed connections, and devices
+		 * without active connections alone when quitting so their configuration
 		 * can be taken over when NM restarts.  This ensures connectivity while
 		 * NM is stopped. Devices which do not support connection assumption
 		 * cannot be left up.
 		 */
-		if (!quitting)  /* Forced removal; device already gone */
+		if (!quitting) {
+			  /* Forced removal; device already gone */
 			unmanage = TRUE;
-		else if (!nm_device_can_assume_active_connection (device))
+		} else if (!nm_device_can_assume_connections (device)) {
+			/* Devices that cannot assume any connection must be cleaned up */
 			unmanage = TRUE;
-		else if (!req)
+		} else if (   !nm_device_uses_assumed_connection (device)
+		           && !nm_device_can_assume_active_connection (device)) {
+			/* NM-activated devices that cannot re-assume their active connection
+			 * must be cleaned up.
+			 */
 			unmanage = TRUE;
+		}
 
 		if (unmanage) {
 			if (quitting)
