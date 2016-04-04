@@ -24,7 +24,11 @@
 #include <string.h>
 
 #if WITH_CONCHECK
+#if WITH_LIBCURL
+#include "nm-connectivity-curl.h"
+#else
 #include "nm-connectivity-soup.h"
+#endif
 #endif
 
 #include "nm-connectivity.h"
@@ -98,7 +102,11 @@ update_state (NMConnectivity *self, NMConnectivityState state)
 }
 
 #if WITH_CONCHECK
+#if WITH_LIBCURL
+#include "nm-connectivity-curl.c"
+#else
 #include "nm-connectivity-soup.c"
+#endif
 #endif
 
 static void
